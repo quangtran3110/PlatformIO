@@ -109,7 +109,6 @@ const int pin_B3 = P3;
 const int pin_NK = P4;
 const int pin_Fan = P5;
 const int pin_rst = P6;
-
 //-----------------------------
 int xSetAmpe = 0, xSetAmpe1 = 0, xSetAmpe2 = 0, xSetAmpe3 = 0;
 int timer_I, timer_Measure, speed_motor;
@@ -129,7 +128,6 @@ float f2dec(float number)
 {
   return round(number * 100.0) / 100.0;
 }
-
 //-----------------------------
 #define filterSamples 121
 int dai = 510;
