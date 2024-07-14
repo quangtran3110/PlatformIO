@@ -1,7 +1,0 @@
-.pio/
-!.pio/build/nodemcuv2/firmware.bin
-.vscode/
-include/
-lib/
-test/
-.editorconfig
