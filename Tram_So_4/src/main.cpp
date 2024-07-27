@@ -125,7 +125,7 @@ const word address = 0;
 #include <ESP8266HTTPClient.h>
 WiFiClient client;
 HTTPClient http;
-#define URL_fw_Bin "https://raw.githubusercontent.com/quangtran3110/IOT/main/Arduino/Tram4/main/build/esp8266.esp8266.nodemcuv2/main.ino.bin"
+#define URL_fw_Bin "https://raw.githubusercontent.com/quangtran3110/PlatformIO/main/Tram_So_4/.pio/build/nodemcuv2/firmware.bin"
 String server_name = "http://sgp1.blynk.cloud/external/api/";
 //-------------------
 #define filterSamples 121
@@ -464,7 +464,7 @@ void readPower() // C2 - Giếng    - I0
     xIrms0++;
     if (xIrms0 > 3)
     {
-      if (status_g1 == HIGH)
+      if ((status_g1 == HIGH) && (keyp))
       {
         offcap1();
         trip0 = true;
@@ -529,7 +529,7 @@ void readPower1() // C3 - Bơm 1    - I1
     xIrms1++;
     if (xIrms1 > 3)
     {
-      if (status_b1 == HIGH)
+      if ((status_b1 == HIGH) && (keyp))
       {
         offbom1();
         trip1 = true;
@@ -592,7 +592,7 @@ void readPower2() // C4 - Bơm 2    - I2
     Irms2 = 0;
     yIrms2 = 0;
     xIrms2++;
-    if (xIrms2 > 3)
+    if ((xIrms2 > 3) && (keyp))
     {
       if (status_b2 == HIGH)
       {
