@@ -46,97 +46,88 @@ V45- thời gian chạy B3 - 24h
 #define BLYNK_TEMPLATE_ID "TMPL6XlJbectO"
 #define BLYNK_TEMPLATE_NAME "TRẠM TÂN LẬP 2"
 #define BLYNK_AUTH_TOKEN "4ucvqgxgGbTgGLtfIAQatiGH2JDiMMG_"
-
 #define BLYNK_FIRMWARE_VERSION "240610"
-
-const char *ssid = "tram bom so 4";
-const char *password = "0943950555";
-//-------------------------------------------------------------------
 #define BLYNK_PRINT Serial
 #define APP_DEBUG
 #include <BlynkSimpleEsp8266.h>
 #include <ESP8266WiFi.h>
-//-----------------------------
 #include "PCF8575.h"
-PCF8575 pcf8575_1(0x20);
-//-----------------------------
-#include "EmonLib.h"
-EnergyMonitor emon0, emon1, emon2, emon3;
-//-----------------------------
 #include <WidgetRTC.h>
 #include "RTClib.h"
-RTC_DS3231 rtc_module;
-char tz[] = "Asia/Ho_Chi_Minh";
-char daysOfTheWeek[7][12] = {"CN", "T2", "T3", "T4", "T5", "T6", "T7"};
-//-----------------------------
 #include <Wire.h>
 #include <Eeprom24C32_64.h>
-#define EEPROM_ADDRESS 0x57
-static Eeprom24C32_64 eeprom(EEPROM_ADDRESS);
-const word address = 0;
-//-----------------------------
-#include <ESP8266httpUpdate.h>
-#include <WiFiClientSecure.h>
-#include <ESP8266HTTPClient.h>
-//-----------------------------
 #include <OneWire.h>
 #include <DallasTemperature.h>
 #include <SPI.h>
-#define ONE_WIRE_BUS D1
-OneWire oneWire(ONE_WIRE_BUS);
-DallasTemperature sensors(&oneWire);
-float temp[3];
-//-----------------------------
-WiFiClient client;
-HTTPClient http;
-#define URL_fw_Bin "https://raw.githubusercontent.com/quangtran3110/IOT/main/Arduino/TanLap2/main/build/esp8266.esp8266.nodemcuv2/main.ino.bin"
-String server_name = "http://sgp1.blynk.cloud/external/api/";
-//-----------------------------
 #include <ModbusRTU.h>
 #include <SoftwareSerial.h>
-// connect RX to D5 (GPI14),TX to D6 (GPI12) - SoftwareSerial S(RX, TX);
-SoftwareSerial S(14, 12);
+#include <ESP8266httpUpdate.h>
+#include <WiFiClientSecure.h>
+#include <ESP8266HTTPClient.h>
+#include "EmonLib.h"
+//-----------------------------
+#define filterSamples 121
+#define EEPROM_ADDRESS 0x57
+#define ONE_WIRE_BUS D1
+#define URL_fw_Bin "https://raw.githubusercontent.com/quangtran3110/PlatformIO/main/TanLap2/.pio/build/nodemcuv2/firmware.bin"
+//-----------------------------
+const char *ssid = "tram bom so 4";
+const char *password = "0943950555";
+//-----------------------------
+PCF8575 pcf8575_1(0x20);
+EnergyMonitor emon0, emon1, emon2, emon3;
+RTC_DS3231 rtc_module;
+OneWire oneWire(ONE_WIRE_BUS);
+DallasTemperature sensors(&oneWire);
+WiFiClient client;
+HTTPClient http;
+SoftwareSerial S(14, 12); // connect RX to D5 (GPI14),TX to D6 (GPI12) - SoftwareSerial S(RX, TX);
 ModbusRTU mb;
 //-----------------------------
+static Eeprom24C32_64 eeprom(EEPROM_ADDRESS);
+const word address = 0;
 const int S0pin = P15;
 const int S1pin = P14;
 const int S2pin = P13;
 const int S3pin = P12;
-
 const int pin_B1 = P1;
 const int pin_B2 = P2;
 const int pin_B3 = P3;
 const int pin_NK = P4;
 const int pin_Fan = P5;
 const int pin_rst = P6;
-
+char tz[] = "Asia/Ho_Chi_Minh";
+char daysOfTheWeek[7][12] = {"CN", "T2", "T3", "T4", "T5", "T6", "T7"};
 //-----------------------------
-int xSetAmpe = 0, xSetAmpe1 = 0, xSetAmpe2 = 0, xSetAmpe3 = 0;
-int timer_I, timer_Measure, speed_motor;
-unsigned long int yIrms0 = 0, yIrms1 = 0, yIrms2 = 0, yIrms3 = 0;
-float Irms0, Irms1, Irms2, Irms3, temp_vfd, I_vfd, out_volt, in_volt, power, pre, ref_percent, hz;
-bool trip0 = false, trip1 = false, trip2 = false, trip3 = false;
-bool key = false, blynk_first_connect = false, status_fan = HIGH;
+String server_name = "http://sgp1.blynk.cloud/external/api/";
 byte status_b1, status_b2, status_b3, time_run = false;
 byte c, j, i, x = 0, b;
 byte reboot_num;
-int LLG1_1m3;
-int temp_;
-int B1_start, B2_start, B3_start;
-bool B1_save = false, B2_save = false, B3_save = false;
-int zero_pre = 194, max_pre_bar = 10;
+
+float temp[3];
+float Irms0, Irms1, Irms2, Irms3, temp_vfd, I_vfd, out_volt, in_volt, power, pre, ref_percent, hz;
 float f2dec(float number)
 {
   return round(number * 100.0) / 100.0;
 }
 
-//-----------------------------
-#define filterSamples 121
+long distance;
+
+bool trip0 = false, trip1 = false, trip2 = false, trip3 = false;
+bool key = false, blynk_first_connect = false, status_fan = HIGH;
+bool B1_save = false, B2_save = false, B3_save = false;
+
+unsigned long int yIrms0 = 0, yIrms1 = 0, yIrms2 = 0, yIrms3 = 0;
 int dai = 510;
 int rong = 510;
 int dosau = 260;
 int volume, dungtich, smoothDistance;
-long distance;
+int xSetAmpe = 0, xSetAmpe1 = 0, xSetAmpe2 = 0, xSetAmpe3 = 0;
+int timer_I, timer_Measure, speed_motor;
+int LLG1_1m3;
+int temp_;
+int B1_start, B2_start, B3_start;
+int zero_pre = 194, max_pre_bar = 10;
 int zeropointTank = 189, fullpointTank = 850;
 int sensSmoothArray1[filterSamples];
 int digitalSmooth(int rawIn, int *sensSmoothArray)
@@ -331,20 +322,32 @@ void update_fw()
   }
 }
 //-------------------------------------------------------------------
-
 void up()
 {
-  String server_path = server_name + "batch/update?token=" + BLYNK_AUTH_TOKEN + "&V5=" + Irms0 + "&V6=" + Irms1 + "&V7=" + Irms2 + "&V13=" + hz + "&V14=" + pre + "&V15=" + smoothDistance + "&V16=" + volume + "&V18=" + temp_vfd + "&V26=" + in_volt + "&V27=" + out_volt + "&V28=" + speed_motor + "&V29=" + power + "&V30=" + I_vfd;
+  String server_path = server_name + "batch/update?token=" + BLYNK_AUTH_TOKEN +
+                       "&V5=" + Irms0 +
+                       "&V6=" + Irms1 +
+                       "&V7=" + Irms2 +
+                       "&V13=" + hz +
+                       "&V14=" + pre +
+                       "&V15=" + smoothDistance +
+                       "&V16=" + volume +
+                       "&V18=" + temp_vfd +
+                       "&V26=" + in_volt +
+                       "&V27=" + out_volt +
+                       "&V28=" + speed_motor +
+                       "&V29=" + power +
+                       "&V30=" + I_vfd;
   //+ "&V21=" + temp[0]
   http.begin(client, server_path.c_str());
-  int httpResponseCode = http.GET();
+  http.GET();
   http.end();
 }
 void up_timerun_motor()
 {
   String server_path = server_name + "batch/update?token=" + BLYNK_AUTH_TOKEN + "&V41=" + float(data.timerun_B1) / 1000 / 60 / 60 + "&V43=" + float(data.timerun_B2) / 1000 / 60 / 60;
   http.begin(client, server_path.c_str());
-  int httpResponseCode = http.GET();
+  http.GET();
   http.end();
 }
 void time_run_motor()
@@ -381,7 +384,6 @@ void time_run_motor()
   }
 }
 //----------------------------------------------------------------
-
 void on_vfd()
 {                                     // 0x3001
   mb.writeHreg(1, 12289, 1, cbWrite); // 0x01: FWD run
@@ -429,7 +431,7 @@ void on_b1()
   if (trip0 == false)
   {
     status_b1 = HIGH;
-    pcf8575_1.digitalWrite(pin_B1, status_b1);
+    pcf8575_1.digitalWrite(pin_B1, !status_b1);
     Blynk.virtualWrite(V0, status_b1);
     savedata();
   }
@@ -437,7 +439,7 @@ void on_b1()
 void off_b1()
 {
   status_b1 = LOW;
-  pcf8575_1.digitalWrite(pin_B1, status_b1);
+  pcf8575_1.digitalWrite(pin_B1, !status_b1);
   Blynk.virtualWrite(V0, status_b1);
   savedata();
 }
@@ -446,7 +448,7 @@ void on_b2()
   if (trip1 == false)
   {
     status_b2 = HIGH;
-    pcf8575_1.digitalWrite(pin_B2, status_b2);
+    pcf8575_1.digitalWrite(pin_B2, !status_b2);
     Blynk.virtualWrite(V1, status_b2);
     savedata();
   }
@@ -454,7 +456,7 @@ void on_b2()
 void off_b2()
 {
   status_b2 = LOW;
-  pcf8575_1.digitalWrite(pin_B2, status_b2);
+  pcf8575_1.digitalWrite(pin_B2, !status_b2);
   Blynk.virtualWrite(V1, status_b2);
   savedata();
 }
@@ -463,7 +465,7 @@ void on_b3()
   if (trip2 == false)
   {
     status_b3 = HIGH;
-    pcf8575_1.digitalWrite(pin_B3, status_b3);
+    pcf8575_1.digitalWrite(pin_B3, !status_b3);
     Blynk.virtualWrite(V2, status_b3);
     savedata();
   }
@@ -471,7 +473,7 @@ void on_b3()
 void off_b3()
 {
   status_b3 = LOW;
-  pcf8575_1.digitalWrite(pin_B3, status_b3);
+  pcf8575_1.digitalWrite(pin_B3, !status_b3);
   Blynk.virtualWrite(V2, status_b3);
   savedata();
 }
@@ -492,12 +494,12 @@ void off_nenkhi() {
 void on_fan()
 { // NC
   status_fan = HIGH;
-  pcf8575_1.digitalWrite(pin_Fan, status_fan);
+  pcf8575_1.digitalWrite(pin_Fan, !status_fan);
 }
 void off_fan()
 {
   status_fan = LOW;
-  pcf8575_1.digitalWrite(pin_Fan, status_fan);
+  pcf8575_1.digitalWrite(pin_Fan, !status_fan);
 }
 void rst_module()
 {
@@ -547,7 +549,7 @@ void temperature()
     temp[i] = sensors.getTempCByIndex(i);
     if (temp[i] < 0)
       temp[i] = 0;
-    // Serial.println(temp[0]);
+    Serial.println(temp[0]);
   }
 }
 //-------------------------------------------------------------------
@@ -754,7 +756,7 @@ void rtctime()
     if ((now.day() != day()) || (now.hour() != hour()) || ((now.minute() - minute() > 2) || (minute() - now.minute() > 2)))
     {
       rtc_module.adjust(DateTime(year(), month(), day(), hour(), minute(), second()));
-      DateTime now = rtc_module.now();
+      now = rtc_module.now();
     }
   }
   Blynk.virtualWrite(V20, daysOfTheWeek[now.dayOfTheWeek()], ", ", now.day(), "/", now.month(), "/", now.year(), " - ", now.hour(), ":", now.minute(), ":", now.second());
@@ -762,10 +764,35 @@ void rtctime()
   int nowtime = (now.hour() * 3600 + now.minute() * 60);
   if (data.mode_cap2 == 1)
   { // Chạy Tu Dong
-    if ((nowtime > data.t1_start && nowtime < data.t1_stop) || (nowtime > data.t2_start && nowtime < data.t2_stop) || (nowtime > data.t3_start && nowtime < data.t3_stop))
+    struct TimeInterval
     {
-      time_run = true;
+      int start;
+      int stop;
+    };
+    TimeInterval timer_cap2[] = {
+        {data.t1_start, data.t1_stop},
+        {data.t2_start, data.t2_stop},
+        {data.t3_start, data.t3_stop}};
+
+    for (const auto &interval : timer_cap2)
+    {
+      if ((interval.start < interval.stop && (nowtime < interval.start || nowtime > interval.stop)) ||
+          (interval.start > interval.stop && nowtime < interval.start && nowtime > interval.stop))
+      {
+        time_run = false;
+        break; // Dừng kiểm tra nếu đã thỏa mãn điều kiện
+      }
     }
+    for (const auto &interval : timer_cap2)
+    {
+      if ((interval.start < interval.stop && nowtime > interval.start && nowtime < interval.stop) ||
+          (interval.start > interval.stop && (nowtime > interval.start || nowtime < interval.stop)))
+      {
+        time_run = true;
+        break; // Dừng kiểm tra nếu đã thỏa mãn điều kiện
+      }
+    }
+
     if (time_run == true)
     {
       if (pre > 0)
@@ -795,10 +822,10 @@ void rtctime()
               }
               timer1.setTimeout(8000, []()
                                 {
-                if (hz < 15) {
-                  on_b2();
-                  on_vfd();
-                } });
+                 if (hz < 15) {
+                   on_b2();
+                   on_vfd();
+                 } });
               j = 0;
             }
           }
@@ -811,10 +838,10 @@ void rtctime()
             off_vfd();
             timer1.setTimeout(4000, []()
                               {
-              if (hz < 15) {
-                off_b2();
-                on_vfd();
-              } });
+               if (hz < 15) {
+                 off_b2();
+                 on_vfd();
+               } });
             i = 0;
           }
         }
@@ -1287,12 +1314,6 @@ void read_modbus()
 
 void setup()
 {
-  pinMode(D4, OUTPUT);
-  pinMode(D3, INPUT);
-  pinMode(S0pin, OUTPUT);
-  pinMode(S1pin, OUTPUT);
-  pinMode(S2pin, OUTPUT);
-  pinMode(S3pin, OUTPUT);
   //-----------------------
   Serial.begin(115200);
   WiFi.mode(WIFI_STA);
@@ -1318,6 +1339,10 @@ void setup()
   //-----------------------
   pcf8575_1.begin();
 
+  pcf8575_1.pinMode(S0pin, OUTPUT);
+  pcf8575_1.pinMode(S1pin, OUTPUT);
+  pcf8575_1.pinMode(S2pin, OUTPUT);
+  pcf8575_1.pinMode(S3pin, OUTPUT);
   pcf8575_1.pinMode(pin_B1, OUTPUT);
   pcf8575_1.digitalWrite(pin_B1, HIGH);
   pcf8575_1.pinMode(pin_B2, OUTPUT);
@@ -1340,7 +1365,7 @@ void setup()
       readcurrent1();
       readcurrent2();
       //readcurrent3();
-      //temperature();
+      temperature();
       read_modbus();
       up();
     });
