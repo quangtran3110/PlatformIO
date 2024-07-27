@@ -68,7 +68,7 @@ V45- thời gian chạy B3 - 24h
 //-----------------------------
 #define filterSamples 121
 #define EEPROM_ADDRESS 0x57
-#define ONE_WIRE_BUS D1
+#define ONE_WIRE_BUS D3
 #define URL_fw_Bin "https://raw.githubusercontent.com/quangtran3110/PlatformIO/main/TanLap2/.pio/build/nodemcuv2/firmware.bin"
 //-----------------------------
 const char *ssid = "tram bom so 4";
@@ -105,7 +105,7 @@ byte c, j, i, x = 0, b;
 byte reboot_num;
 
 float temp[3];
-float Irms0, Irms1, Irms2, Irms3, temp_vfd, I_vfd, out_volt, in_volt, power, pre, ref_percent, hz;
+float Irms0, Irms1, Irms2, Irms3, temp_vfd, I_vfd, power, pre, ref_percent;
 float f2dec(float number)
 {
   return round(number * 100.0) / 100.0;
@@ -121,6 +121,7 @@ unsigned long int yIrms0 = 0, yIrms1 = 0, yIrms2 = 0, yIrms3 = 0;
 int dai = 510;
 int rong = 510;
 int dosau = 260;
+int hz, out_volt, in_volt;
 int volume, dungtich, smoothDistance;
 int xSetAmpe = 0, xSetAmpe1 = 0, xSetAmpe2 = 0, xSetAmpe3 = 0;
 int timer_I, timer_Measure, speed_motor;
@@ -549,7 +550,6 @@ void temperature()
     temp[i] = sensors.getTempCByIndex(i);
     if (temp[i] < 0)
       temp[i] = 0;
-    Serial.println(temp[0]);
   }
 }
 //-------------------------------------------------------------------
