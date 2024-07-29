@@ -46,7 +46,7 @@ V45- thời gian chạy B3 - 24h
 #define BLYNK_TEMPLATE_ID "TMPL6XlJbectO"
 #define BLYNK_TEMPLATE_NAME "TRẠM TÂN LẬP 2"
 #define BLYNK_AUTH_TOKEN "4ucvqgxgGbTgGLtfIAQatiGH2JDiMMG_"
-#define BLYNK_FIRMWARE_VERSION "240610"
+#define BLYNK_FIRMWARE_VERSION "240728"
 #define BLYNK_PRINT Serial
 #define APP_DEBUG
 #include <BlynkSimpleEsp8266.h>
@@ -93,9 +93,10 @@ const int S3pin = P12;
 const int pin_B1 = P1;
 const int pin_B2 = P2;
 const int pin_B3 = P3;
-const int pin_NK = P4;
-const int pin_Fan = P5;
-const int pin_rst = P6;
+const int pin_khuay_clo = P4;
+const int pin_cham_clo = P5;
+const int pin_Fan = P6;
+const int pin_rst = P7;
 char tz[] = "Asia/Ho_Chi_Minh";
 char daysOfTheWeek[7][12] = {"CN", "T2", "T3", "T4", "T5", "T6", "T7"};
 //-----------------------------
@@ -478,20 +479,6 @@ void off_b3()
   Blynk.virtualWrite(V2, status_b3);
   savedata();
 }
-/*
-void on_nenkhi() {  //NC
-  data.status_nenkhi = HIGH;
-  pcf8575_1.digitalWrite(pin_NK, data.status_nenkhi);
-  Blynk.virtualWrite(V3, data.status_nenkhi);
-  savedata();
-}
-void off_nenkhi() {
-  data.status_nenkhi = LOW;
-  pcf8575_1.digitalWrite(pin_NK, data.status_nenkhi);
-  Blynk.virtualWrite(V3, data.status_nenkhi);
-  savedata();
-}
-*/
 void on_fan()
 { // NC
   status_fan = HIGH;
@@ -550,6 +537,13 @@ void temperature()
     temp[i] = sensors.getTempCByIndex(i);
     if (temp[i] < 0)
       temp[i] = 0;
+    else
+    {
+      if (temp[i] >= 37)
+        on_fan();
+      else if (temp[i] <= 35)
+        off_fan();
+    }
   }
 }
 //-------------------------------------------------------------------
@@ -1349,22 +1343,22 @@ void setup()
   pcf8575_1.digitalWrite(pin_B2, HIGH);
   pcf8575_1.pinMode(pin_B3, OUTPUT);
   pcf8575_1.digitalWrite(pin_B3, HIGH);
-  pcf8575_1.pinMode(pin_NK, OUTPUT);
-  pcf8575_1.digitalWrite(pin_NK, HIGH);
-  pcf8575_1.pinMode(pin_rst, OUTPUT);
-  pcf8575_1.digitalWrite(pin_rst, HIGH);
+  pcf8575_1.pinMode(pin_khuay_clo, OUTPUT);
+  pcf8575_1.digitalWrite(pin_khuay_clo, HIGH);
+  pcf8575_1.pinMode(pin_cham_clo, OUTPUT);
+  pcf8575_1.digitalWrite(pin_cham_clo, HIGH);
   pcf8575_1.pinMode(pin_Fan, OUTPUT);
   pcf8575_1.digitalWrite(pin_Fan, HIGH);
+  pcf8575_1.pinMode(pin_rst, OUTPUT);
+  pcf8575_1.digitalWrite(pin_rst, HIGH);
 
   timer1.setTimeout(5000L, []()
                     {
     timer.setInterval(230L, MeasureCmForSmoothing);
     timer_I = timer.setInterval(1589, []() {
       readcurrent();
-      //read_timerun_B2();
       readcurrent1();
       readcurrent2();
-      //readcurrent3();
       temperature();
       read_modbus();
       up();
