@@ -54,7 +54,7 @@
 #define APP_DEBUG
 #define BLYNK_PRINT Serial
 #define EEPROM_ADDRESS 0x57
-#define URL_fw_Bin "https://raw.githubusercontent.com/quangtran3110/IOT/main/Arduino/Tram3/main/build/esp8266.esp8266.nodemcuv2/main.ino.bin"
+#define URL_fw_Bin "https://raw.githubusercontent.com/quangtran3110/PlatformIO/main/Tram_So_3/.pio/build/nodemcuv2/firmware.bin"
 String server_main = "http://sgp1.blynk.cloud/external/api/batch/update?token=";
 //------------------
 PCF8575 pcf8575_1(0x20);
