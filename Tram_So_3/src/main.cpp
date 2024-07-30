@@ -64,7 +64,7 @@ WiFiClient client;
 HTTPClient http;
 WidgetRTC rtc_widget;
 static Eeprom24C32_64 eeprom(EEPROM_ADDRESS);
-
+//-----------------------------
 const char *ssid = "TTTV Xay Dung";
 const char *password = "0723841249";
 // const char* ssid = "iPhone 13";
@@ -195,7 +195,7 @@ void savedata() {
     // Serial.println("\nWrite bytes to EEPROM memory...");
     data.save_num = data.save_num + 1;
     eeprom.writeBytes(address, sizeof(dataDefault), (byte *)&data);
-    Blynk.setProperty(V11, "label", BLYNK_FIRMWARE_VERSION, "-EEPROM ",
+    Blynk.setProperty(V11, "label",
                       data.save_num);
   }
 }
@@ -276,10 +276,10 @@ void off_time_cap1() {
 }
 //-------------------------------------------------------------------
 void readPower() { // C2 - Cấp 1  - I0
-  digitalWrite(S0pin, LOW);
-  digitalWrite(S1pin, HIGH);
-  digitalWrite(S2pin, LOW);
-  digitalWrite(S3pin, LOW);
+  pcf8575_1.digitalWrite(S0pin, LOW);
+  pcf8575_1.digitalWrite(S1pin, HIGH);
+  pcf8575_1.digitalWrite(S2pin, LOW);
+  pcf8575_1.digitalWrite(S3pin, LOW);
   float rms0 = emon0.calcIrms(740);
   if (rms0 < 2) {
     Irms0 = 0;
@@ -326,10 +326,10 @@ void readPower() { // C2 - Cấp 1  - I0
 }
 void readPower1() { // C3 - Bơm    - I1
   // Blynk.run();
-  digitalWrite(S0pin, HIGH);
-  digitalWrite(S1pin, HIGH);
-  digitalWrite(S2pin, LOW);
-  digitalWrite(S3pin, LOW);
+  pcf8575_1.digitalWrite(S0pin, HIGH);
+  pcf8575_1.digitalWrite(S1pin, HIGH);
+  pcf8575_1.digitalWrite(S2pin, LOW);
+  pcf8575_1.digitalWrite(S3pin, LOW);
   float rms1 = emon1.calcIrms(740);
   if (rms1 < 2) {
     Irms1 = 0;
@@ -369,10 +369,10 @@ void readPower1() { // C3 - Bơm    - I1
 }
 void readPower2() { // C4 - Nen khi- I2
   // Blynk.run();
-  digitalWrite(S0pin, LOW);
-  digitalWrite(S1pin, LOW);
-  digitalWrite(S2pin, HIGH);
-  digitalWrite(S3pin, LOW);
+  pcf8575_1.digitalWrite(S0pin, LOW);
+  pcf8575_1.digitalWrite(S1pin, LOW);
+  pcf8575_1.digitalWrite(S2pin, HIGH);
+  pcf8575_1.digitalWrite(S3pin, LOW);
   float rms2 = emon2.calcIrms(740);
   if (rms2 < 2) {
     Irms2 = 0;
@@ -750,10 +750,6 @@ void setup() {
   Blynk.config(BLYNK_AUTH_TOKEN);
   delay(7000);
   //------------------------------------------------------------------
-  pinMode(S0pin, OUTPUT);
-  pinMode(S1pin, OUTPUT);
-  pinMode(S2pin, OUTPUT);
-  pinMode(S3pin, OUTPUT);
 
   emon0.current(A0, 130);
   emon1.current(A0, 130);
