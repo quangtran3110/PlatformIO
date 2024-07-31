@@ -30,7 +30,7 @@ const char *password = "Abcd@1234";
 #define APP_DEBUG
 #define EEPROM_ADDRESS 0x57
 static Eeprom24C32_64 eeprom(EEPROM_ADDRESS);
-#define URL_fw_Bin "https://raw.githubusercontent.com/quangtran3110/IOT/main/Arduino/DoThi/Phuong2/Bo_ke_3/build/esp8266.esp8266.nodemcuv2/Bo_ke_3.ino.bin"
+#define URL_fw_Bin "https://raw.githubusercontent.com/quangtran3110/PlatformIO/main/Do_Thi/Phuong2/Bo_Ke4/.pio/build/nodemcuv2/firmware.bin"
 String server_name = "http://sgp1.blynk.cloud/external/api/batch/update?token=";
 //-----------------------------
 #define pin_terminal "&V54="
