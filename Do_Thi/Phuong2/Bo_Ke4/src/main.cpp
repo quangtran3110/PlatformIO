@@ -340,7 +340,7 @@ void readcurrent() // C2
         String dataS = "Bơm bờ kè 4 lỗi! " + String(Irms0) + "A";
         String server_path = server_name + "batch/update?token=" + Main_TOKEN + "&V100=" + urlEncode(dataS);
         http.begin(client, server_path.c_str());
-        int httpResponseCode = http.GET();
+        http.GET();
         http.end();
       }
     }
