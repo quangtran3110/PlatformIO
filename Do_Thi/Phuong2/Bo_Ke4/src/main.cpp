@@ -31,7 +31,7 @@ const char *password = "Abcd@1234";
 #define EEPROM_ADDRESS 0x57
 static Eeprom24C32_64 eeprom(EEPROM_ADDRESS);
 #define URL_fw_Bin "https://raw.githubusercontent.com/quangtran3110/PlatformIO/main/Do_Thi/Phuong2/Bo_Ke4/.pio/build/nodemcuv2/firmware.bin"
-String server_name = "http://sgp1.blynk.cloud/external/api/batch/update?token=";
+String server_name = "http://sgp1.blynk.cloud/external/api/";
 //-----------------------------
 #define pin_terminal "&V54="
 #define pin_G "&V55="
@@ -209,30 +209,30 @@ void weekday_() {
 void print_terminal() {
   String server_path = server_name + "batch/update?token=" + Main_TOKEN + pin_terminal + "clr";
   http.begin(client, server_path.c_str());
-  int httpResponseCode = http.GET();
+  http.GET();
   http.end();
 
   server_path = server_name + "batch/update?token=" + Main_TOKEN + pin_terminal + location + pin_terminal + s_weekday + pin_terminal + s_timer_van_1 + pin_terminal + urlEncode(s_temp);
   http.begin(client, server_path.c_str());
-  httpResponseCode = http.GET();
+  http.GET();
   http.end();
   // Serial.println(server_path);
 }
 void print_terminal_main() {
   String server_path = server_name + "batch/update?token=" + Main_TOKEN + "&V0=" + "clr";
   http.begin(client, server_path.c_str());
-  int httpResponseCode = http.GET();
+  http.GET();
   http.end();
   server_path = server_name + "batch/update?token=" + Main_TOKEN + "&V0=" + location + "&V0=" + s_weekday + "&V0=" + s_timer_van_1;
   http.begin(client, server_path.c_str());
-  httpResponseCode = http.GET();
+  http.GET();
   http.end();
 }
 void up() {
   byte g;
   bitWrite(g, 0, data.mode);
   bitWrite(g, 1, sta_rl1);
-  String server_path = server_name + Main_TOKEN + pin_G + g + pin_Irms + Irms0;
+  String server_path = server_name + "batch/update?token=" + Main_TOKEN + pin_G + g + pin_Irms + Irms0;
   http.begin(client, server_path.c_str());
   http.GET();
   http.end();

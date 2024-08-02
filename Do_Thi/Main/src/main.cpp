@@ -102,7 +102,7 @@ V58 - Irms
 //-----------------------------
 #define BLYNK_PRINT Serial
 #define APP_DEBUG
-#define URL_fw_Bin "https://raw.githubusercontent.com/quangtran3110/IOT/main/Arduino/DoThi/Main/build/esp8266.esp8266.nodemcuv2/Main.ino.bin"
+#define URL_fw_Bin "https://raw.githubusercontent.com/quangtran3110/PlatformIO/main/Do_Thi/Main/.pio/build/nodemcuv2/firmware.bin"
 String main_sever = "http://sgp1.blynk.cloud/external/api/";
 
 WiFiClient client;
@@ -614,7 +614,7 @@ BLYNK_WRITE(V5) { // Save time input
           http.begin(client, server_path.c_str());
           http.GET();
           http.end();
-        } else if (dia_diem == 6) { // Bờ kè 4
+        } else if (dia_diem == 7) { // Bờ kè 4
           String server_path = main_sever + "batch/update?token=" + boke4_TOKEN + "&V1=" + start_ + "&V1=" + stop_ + "&V1=" + tz + "&V1=" + String(A);
           http.begin(client, server_path.c_str());
           http.GET();
