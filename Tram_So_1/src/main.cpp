@@ -340,7 +340,7 @@ void readPressure() { // C0 - Ap Luc
   pcf8575_1.digitalWrite(S3pin, LOW);
   float sensorValue = analogRead(A0);
   float Result;
-  Result = (((sensorValue - 199) * 10) / (990 - 199));
+  Result = (((sensorValue - 199) * 10) / (800 - 199));
   if (Result > 0) {
     value += Result;
     Result1 = value / 16;
