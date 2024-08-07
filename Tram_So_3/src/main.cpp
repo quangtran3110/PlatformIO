@@ -55,7 +55,7 @@
 #define BLYNK_PRINT Serial
 #define EEPROM_ADDRESS 0x57
 #define URL_fw_Bin "https://raw.githubusercontent.com/quangtran3110/PlatformIO/main/Tram_So_3/.pio/build/nodemcuv2/firmware.bin"
-String server_main = "http://sgp1.blynk.cloud/external/api/batch/update?token=";
+String server_main = "http://sgp1.blynk.cloud/external/api/";
 //------------------
 PCF8575 pcf8575_1(0x20);
 EnergyMonitor emon0, emon1, emon2;
@@ -182,8 +182,10 @@ void update_fw() {
 }
 //-------------------------------------------------------------------
 void up() {
-  String server_path = server_main + BLYNK_AUTH_TOKEN + "&V2=" + Irms0 +
-                       "&V3=" + Irms1 + "&V19=" + Irms2;
+  String server_path = server_main + "batch/update?token=" + BLYNK_AUTH_TOKEN +
+                       "&V2=" + Irms0 +
+                       "&V3=" + Irms1 +
+                       "&V19=" + Irms2;
   http.begin(client, server_path.c_str());
   http.GET();
   http.end();
@@ -751,9 +753,9 @@ void setup() {
   delay(7000);
   //------------------------------------------------------------------
 
-  emon0.current(A0, 130);
-  emon1.current(A0, 130);
-  emon2.current(A0, 120);
+  emon0.current(A0, 105);
+  emon1.current(A0, 105);
+  emon2.current(A0, 105);
 
   pcf8575_1.begin();
   pcf8575_1.pinMode(S0pin, OUTPUT);
