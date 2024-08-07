@@ -89,7 +89,8 @@ bool blynk_first_connect = false;
 
 float volume, percent, percent1, dungtich, smoothDistance;
 float Irms0, Irms1, Irms2, value, Result1, clo_cache = 0;
-
+float sensor_pre;
+float sensor_tank;
 long distance, distance1, t;
 
 unsigned long int xIrms0 = 0, xIrms1 = 0, xIrms2 = 0;
@@ -150,7 +151,7 @@ struct Data {
   byte SetAmpemax, SetAmpemin;
   byte SetAmpe1max, SetAmpe1min;
   byte SetAmpe2max, SetAmpe2min;
-  byte mode_cap2, mode_run;
+  byte mode_cap2;
   int bom_chanle_start, bom_chanle_stop;
   int bom_moingay_start, bom_moingay_stop;
   byte status_g1, status_b1, status_nk1;
@@ -161,7 +162,7 @@ struct Data {
   byte key_protect;
   int phao_max, phao_min;
 } data, dataCheck;
-const struct Data dataDefault = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+const struct Data dataDefault = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
 
 WidgetTerminal terminal(V11);
 WidgetRTC rtc_widget;
@@ -256,57 +257,57 @@ void on_cap1() {
   if (data.status_g1 != HIGH) {
     data.status_g1 = HIGH;
     savedata();
-    Blynk.virtualWrite(V0, data.status_g1);
   }
   if (!trip0) {
     pcf8575_1.digitalWrite(pin_G1, data.status_g1);
   }
+  Blynk.virtualWrite(V0, data.status_g1);
 }
 void off_cap1() {
   if (data.status_g1 != LOW) {
     data.status_g1 = LOW;
     savedata();
-    Blynk.virtualWrite(V0, data.status_g1);
   }
   yIrms0 = 0;
   pcf8575_1.digitalWrite(pin_G1, data.status_g1);
+  Blynk.virtualWrite(V0, data.status_g1);
 }
 void on_bom() {
   if (data.status_b1 != HIGH) {
     data.status_b1 = HIGH;
     savedata();
-    Blynk.virtualWrite(V1, data.status_b1);
   }
   if (!trip1) {
     pcf8575_1.digitalWrite(pin_B1, data.status_b1);
   }
+  Blynk.virtualWrite(V1, data.status_b1);
 }
 void off_bom() {
   if (data.status_b1 != LOW) {
     data.status_b1 = LOW;
     savedata();
-    Blynk.virtualWrite(V1, data.status_b1);
   }
   yIrms1 = 0;
   pcf8575_1.digitalWrite(pin_B1, data.status_b1);
+  Blynk.virtualWrite(V1, data.status_b1);
 }
 void on_nenkhi() {
   if (data.status_nk1 != HIGH) {
     data.status_nk1 = HIGH;
     savedata();
-    Blynk.virtualWrite(V18, data.status_nk1);
   }
   if (!trip2) {
     pcf8575_1.digitalWrite(pin_NK1, data.status_nk1);
   }
+  Blynk.virtualWrite(V18, data.status_nk1);
 }
 void off_nenkhi() {
   if (data.status_nk1 != LOW) {
     data.status_nk1 = LOW;
     savedata();
-    Blynk.virtualWrite(V18, data.status_nk1);
   }
   pcf8575_1.digitalWrite(pin_NK1, data.status_nk1);
+  Blynk.virtualWrite(V18, data.status_nk1);
 }
 void hidden() {
   Blynk.setProperty(V12, V13, V15, V14, V10, V9, V8, "isHidden", true);
@@ -338,9 +339,9 @@ void readPressure() { // C0 - Ap Luc
   pcf8575_1.digitalWrite(S1pin, LOW);
   pcf8575_1.digitalWrite(S2pin, LOW);
   pcf8575_1.digitalWrite(S3pin, LOW);
-  float sensorValue = analogRead(A0);
+  sensor_pre = analogRead(A0);
   float Result;
-  Result = (((sensorValue - 199) * 10) / (800 - 199));
+  Result = (((sensor_pre - 199) * 10) / (800 - 199));
   if (Result > 0) {
     value += Result;
     Result1 = value / 16;
@@ -352,8 +353,8 @@ void MeasureCmForSmoothing() { // C1-  Muc Nuoc
   pcf8575_1.digitalWrite(S1pin, LOW);
   pcf8575_1.digitalWrite(S2pin, LOW);
   pcf8575_1.digitalWrite(S3pin, LOW);
-  float sensorValue = analogRead(A0);
-  distance1 = (((sensorValue - 196.5) * 500) / (980 - 196.5));
+  sensor_tank = analogRead(A0);
+  distance1 = (((sensor_tank - 196.5) * 500) / (980 - 196.5));
   if (distance1 > 0) {
     smoothDistance = digitalSmooth(distance1, sensSmoothArray1);
     volume = (dai * smoothDistance * rong) / 1000000;
@@ -532,57 +533,23 @@ void rtctime() {
 
   int nowtime = (now.hour() * 3600 + now.minute() * 60);
 
-  if (data.mode_cap2 == 1) {  // Chạy Tu Dong
-                              /*
-   if (data.mode_run == 0) {  //Ngay chan tat may
-     if (now.day() % 2 == 0) {
-       if (nowtime > data.bom_chanle_stop) {
-         off_time();
-       }
-       if (nowtime < data.bom_chanle_stop) {
-         on_time();
-       }
-     }
-     if (now.day() % 2 != 0) {
-       if ((nowtime > data.bom_chanle_start)) {
-         on_time();
-       }
-     }
-   }
-   if (data.mode_run == 1) {  //Ngay le tat may
-     if (now.day() % 2 != 0) {
-       if (nowtime > data.bom_chanle_stop) {
-         off_time();
-       }
-       if (nowtime < data.bom_chanle_stop) {
-         on_time();
-       }
-     }
-     if (now.day() % 2 == 0) {
-       if (nowtime > data.bom_chanle_start) {
-         on_time();
-       }
-     }
-   }
-   */
-    if (data.mode_run == 2) { // Moi ngày
-      if (data.bom_moingay_start > data.bom_moingay_stop) {
-        if ((nowtime > data.bom_moingay_stop) && (nowtime < data.bom_moingay_start)) {
-          off_time();
-        }
-        if ((nowtime < data.bom_moingay_stop) || (nowtime > data.bom_moingay_start)) {
-          on_time();
-        }
-      } else if (data.bom_moingay_start < data.bom_moingay_stop) {
-        if ((nowtime > data.bom_moingay_stop) || (nowtime < data.bom_moingay_start)) {
-          off_time();
-        }
-        if ((nowtime < data.bom_moingay_stop) && (nowtime > data.bom_moingay_start)) {
-          on_time();
-        }
-      } else if (data.bom_moingay_start == data.bom_moingay_stop) {
+  if (data.mode_cap2 == 1) { // Chạy Tu Dong
+    if (data.bom_moingay_start > data.bom_moingay_stop) {
+      if ((nowtime > data.bom_moingay_stop) && (nowtime < data.bom_moingay_start)) {
+        off_time();
+      }
+      if ((nowtime < data.bom_moingay_stop) || (nowtime > data.bom_moingay_start)) {
         on_time();
       }
+    } else if (data.bom_moingay_start < data.bom_moingay_stop) {
+      if ((nowtime > data.bom_moingay_stop) || (nowtime < data.bom_moingay_start)) {
+        off_time();
+      }
+      if ((nowtime < data.bom_moingay_stop) && (nowtime > data.bom_moingay_start)) {
+        on_time();
+      }
+    } else if (data.bom_moingay_start == data.bom_moingay_stop) {
+      on_time();
     }
   }
 }
@@ -752,20 +719,10 @@ BLYNK_WRITE(V13) // Time input
   if (key) {
     TimeInputParam t(param);
     if (t.hasStartTime()) {
-      if ((data.mode_run == 0) || (data.mode_run == 1)) {
-        data.bom_chanle_start = t.getStartHour() * 3600 + t.getStartMinute() * 60;
-      }
-      if (data.mode_run == 2) {
-        data.bom_moingay_start = t.getStartHour() * 3600 + t.getStartMinute() * 60;
-      }
+      data.bom_moingay_start = t.getStartHour() * 3600 + t.getStartMinute() * 60;
     }
     if (t.hasStopTime()) {
-      if ((data.mode_run == 0) || (data.mode_run == 1)) {
-        data.bom_chanle_stop = t.getStopHour() * 3600 + t.getStopMinute() * 60;
-      }
-      if (data.mode_run == 2) {
-        data.bom_moingay_stop = t.getStopHour() * 3600 + t.getStopMinute() * 60;
-      }
+      data.bom_moingay_stop = t.getStopHour() * 3600 + t.getStopMinute() * 60;
     }
   } else
     Blynk.virtualWrite(V13, 0);
@@ -908,11 +865,12 @@ void setup() {
       readPressure();
       MeasureCmForSmoothing();
     });
-    timer_I = timer.setInterval(983L, []() {
+    timer_I = timer.setInterval(1283L, []() {
       readPower();
       readPower1();
       readPower2();
       up();
+      Blynk.virtualWrite(V11, sensor_pre, "-", sensor_tank, "\n");
       timer.restartTimer(timer_I);
     });
     timer.setInterval(15006L, []() {
