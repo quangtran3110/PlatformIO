@@ -871,7 +871,7 @@ void setup() {
       readPower1();
       readPower2();
       up();
-      Blynk.virtualWrite(V11, sensor_pre, "-", sensor_tank, "\n");
+      //Blynk.virtualWrite(V11, sensor_pre, "-", sensor_tank, "\n");
       timer.restartTimer(timer_I);
     });
     timer.setInterval(15006L, []() {
