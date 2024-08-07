@@ -97,8 +97,8 @@ unsigned long int yIrms0 = 0, yIrms1 = 0, yIrms2 = 0;
 unsigned long rest_time = 0, dem_bom = 0, dem_cap1 = 0;
 uint32_t timestamp;
 
-int sensor_pre;
-int sensor_tank;
+float sensor_pre;
+float sensor_tank;
 int LLG1_1m3;
 int reboot_num = 0;
 int c, b, i = 0;
@@ -342,7 +342,7 @@ void readPressure() { // C0 - Ap Luc
   pcf8575_1.digitalWrite(S3pin, LOW);
   sensor_pre = analogRead(A0);
   float Result;
-  Result = (((float(sensor_pre) - 148) * 10) / (1050 - 148));
+  Result = (((sensor_pre - 148) * 10) / (1050 - 148));
   if (Result > 0) {
     value += Result;
     Result1 = value / 16;
@@ -355,7 +355,7 @@ void MeasureCmForSmoothing() { // C1-  Muc Nuoc
   pcf8575_1.digitalWrite(S2pin, LOW);
   pcf8575_1.digitalWrite(S3pin, LOW);
   sensor_tank = analogRead(A0);
-  distance1 = (((float(sensor_tank) - 142) * 600) / (800 - 142));
+  distance1 = (((sensor_tank - 142) * 600) / (800 - 142));
   if (distance1 > 0) {
     smoothDistance = digitalSmooth(distance1, sensSmoothArray1);
     volume = (dai * smoothDistance * rong) / 1000000;
