@@ -286,7 +286,7 @@ void readPower() { // C2 - Cấp 1  - I0
   if (rms0 < 2) {
     Irms0 = 0;
     yIrms0 = 0;
-    if ((data.status_g1 == HIGH) && (conlai <= 195) && (status_pre)) {
+    if ((data.status_g1 == HIGH) && (conlai <= 190) && (status_pre)) {
       xIrms0++;
       if ((xIrms0 > 3) && (data.key_protect)) {
         xIrms0 = 0;
