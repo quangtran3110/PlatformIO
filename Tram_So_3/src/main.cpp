@@ -222,16 +222,16 @@ void on_bom() {
     data.status_b1 = HIGH;
     savedata();
     Blynk.virtualWrite(V1, data.status_b1);
-    pcf8575_1.digitalWrite(pin_B1, !data.status_b1);
+    pcf8575_1.digitalWrite(pin_B1, data.status_b1);
   }
 }
 void off_bom() {
   if (data.status_b1 != LOW) {
     data.status_b1 = LOW;
     savedata();
-    Blynk.virtualWrite(V1, !data.status_b1);
+    Blynk.virtualWrite(V1, data.status_b1);
   }
-  pcf8575_1.digitalWrite(pin_B1, !data.status_b1);
+  pcf8575_1.digitalWrite(pin_B1, data.status_b1);
 }
 void on_nenkhi() {
   if ((data.status_nk1 != HIGH) && (trip1 == false)) {
