@@ -791,6 +791,7 @@ void setup() {
   emon1.current(A0, 105);
   emon2.current(A0, 105);
 
+  Wire.begin();
   pcf8575_1.begin();
   pcf8575_1.pinMode(S0pin, OUTPUT);
   pcf8575_1.pinMode(S1pin, OUTPUT);
