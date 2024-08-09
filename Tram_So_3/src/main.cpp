@@ -36,8 +36,11 @@
 #define BLYNK_TEMPLATE_ID "TMPL6usi7FSqp"
 #define BLYNK_TEMPLATE_NAME "TRẠM SỐ 3"
 #define BLYNK_AUTH_TOKEN "R_V1bJ9xeyl6Yokg1rhlaLhK-NYcDVpx"
-#define BLYNK_FIRMWARE_VERSION "240729"
+#define BLYNK_FIRMWARE_VERSION "240809"
 //------------------
+#include "EmonLib.h"
+#include "PCF8575.h"
+#include "RTClib.h"
 #include <BlynkSimpleEsp8266.h>
 #include <ESP8266HTTPClient.h>
 #include <ESP8266WiFi.h>
@@ -46,10 +49,7 @@
 #include <SPI.h>
 #include <WiFiClientSecure.h>
 #include <WidgetRTC.h>
-
-#include "EmonLib.h"
-#include "PCF8575.h"
-#include "RTClib.h"
+#include <Wire.h>
 //------------------
 #define APP_DEBUG
 #define BLYNK_PRINT Serial
@@ -453,6 +453,37 @@ void rtctime() {
   }
 }
 //-------------------------------------------------------------------
+void i2c_scaner() {
+  byte error, address;
+  int nDevices;
+  String stringOne;
+
+  nDevices = 0;
+  for (address = 1; address < 127; address++) {
+    // The i2c_scanner uses the return value of
+    // the Write.endTransmisstion to see if
+    // a device did acknowledge to the address.
+    Wire.beginTransmission(address);
+    error = Wire.endTransmission();
+
+    if (error == 0) {
+      stringOne = String(address, HEX);
+      if (address < 16)
+        Blynk.virtualWrite(V11, "I2C device found at address 0x0", stringOne, " !\n");
+      Blynk.virtualWrite(V11, "I2C device found at address 0x", stringOne, " !\n");
+      nDevices++;
+    } else if (error == 4) {
+      stringOne = String(address, HEX);
+
+      if (address < 16)
+        Blynk.virtualWrite(V11, "Unknown error at address 0x0", stringOne, " !\n");
+      Blynk.virtualWrite(V11, "I2C device found at address 0x", stringOne, " !\n");
+    }
+  }
+  if (nDevices == 0)
+    Blynk.virtualWrite(V11, "No I2C devices found\n");
+}
+//-------------------------------------------------------------------
 BLYNK_WRITE(V0) // Gieng
 {
   if ((key) && (!trip0)) {
@@ -617,6 +648,9 @@ BLYNK_WRITE(V11) // String
       terminal.clear();
       Blynk.virtualWrite(V11, "Đã lưu - CLO:", data.clo, "kg");
     }
+  } else if (dataS == "i2c") {
+    terminal.clear();
+    i2c_scaner();
   } else {
     Blynk.virtualWrite(V11, "Mật mã sai.\nVui lòng nhập lại!\n");
   }
@@ -763,9 +797,9 @@ void setup() {
   pcf8575_1.pinMode(S2pin, OUTPUT);
   pcf8575_1.pinMode(S3pin, OUTPUT);
   pcf8575_1.pinMode(pin_G1, OUTPUT);
-  pcf8575_1.digitalWrite(pin_G1, HIGH);
+  pcf8575_1.digitalWrite(pin_G1, data.status_g1);
   pcf8575_1.pinMode(pin_B1, OUTPUT);
-  pcf8575_1.digitalWrite(pin_B1, HIGH);
+  pcf8575_1.digitalWrite(pin_B1, data.status_b1);
   pcf8575_1.pinMode(pin_rst, OUTPUT);
   pcf8575_1.digitalWrite(pin_rst, HIGH);
 
