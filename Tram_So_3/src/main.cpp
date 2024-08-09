@@ -792,21 +792,22 @@ void setup() {
   emon2.current(A0, 105);
 
   Wire.begin();
+  rtc_module.begin();
+  eeprom.initialize();
+  eeprom.readBytes(address, sizeof(dataDefault), (byte *)&data);
+
   pcf8575_1.begin();
   pcf8575_1.pinMode(S0pin, OUTPUT);
   pcf8575_1.pinMode(S1pin, OUTPUT);
   pcf8575_1.pinMode(S2pin, OUTPUT);
   pcf8575_1.pinMode(S3pin, OUTPUT);
+
   pcf8575_1.pinMode(pin_G1, OUTPUT);
   pcf8575_1.digitalWrite(pin_G1, data.status_g1);
   pcf8575_1.pinMode(pin_B1, OUTPUT);
   pcf8575_1.digitalWrite(pin_B1, data.status_b1);
   pcf8575_1.pinMode(pin_rst, OUTPUT);
   pcf8575_1.digitalWrite(pin_rst, HIGH);
-
-  rtc_module.begin();
-  eeprom.initialize();
-  eeprom.readBytes(address, sizeof(dataDefault), (byte *)&data);
 
   //------------------------------------
   timer.setTimeout(5000L, []() {
