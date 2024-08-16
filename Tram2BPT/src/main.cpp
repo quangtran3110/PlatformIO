@@ -86,7 +86,7 @@ float temp[3];
 //-----------------------------
 WiFiClient client;
 HTTPClient http;
-#define URL_fw_Bin "https://raw.githubusercontent.com/quangtran3110/IOT/main/Arduino/Tram2BPT/main/build/esp8266.esp8266.nodemcuv2/main.ino.bin"
+#define URL_fw_Bin "https://raw.githubusercontent.com/quangtran3110/PlatformIO/main/Tram2BPT/.pio/build/nodemcuv2/firmware.bin"
 String server_name = "http://sgp1.blynk.cloud/external/api/";
 //-----------------------------
 #include <ModbusRTU.h>
