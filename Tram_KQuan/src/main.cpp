@@ -83,8 +83,7 @@ DallasTemperature sensors(&oneWire);
 
 #include <ESP8266httpUpdate.h>
 #include <WiFiClientSecure.h>
-// #define URL_fw_Bin "https://raw.githubusercontent.com/quangtran3110/work/kwaco/kinhquan/main/main.ino.bin"
-#define URL_fw_Bin "https://raw.githubusercontent.com/quangtran3110/IOT/main/Arduino/TramKQuan/main/build/esp8266.esp8266.nodemcuv2/main.ino.bin"
+#define URL_fw_Bin "https://raw.githubusercontent.com/quangtran3110/PlatformIO/main/Tram_KQuan/.pio/build/nodemcuv2/firmware.bin"
 
 const char *ssid = "net";
 const char *password = "Password";
