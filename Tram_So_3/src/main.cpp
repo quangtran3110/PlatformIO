@@ -36,7 +36,7 @@
 #define BLYNK_TEMPLATE_ID "TMPL6usi7FSqp"
 #define BLYNK_TEMPLATE_NAME "TRẠM SỐ 3"
 #define BLYNK_AUTH_TOKEN "R_V1bJ9xeyl6Yokg1rhlaLhK-NYcDVpx"
-#define BLYNK_FIRMWARE_VERSION "240809"
+#define BLYNK_FIRMWARE_VERSION "240810"
 //------------------
 #include "EmonLib.h"
 #include "PCF8575.h"
