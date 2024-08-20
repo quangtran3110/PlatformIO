@@ -62,7 +62,7 @@ float temp;
 #include <ESP8266HTTPClient.h>
 WiFiClient client;
 HTTPClient http;
-#define URL_fw_Bin "https://raw.githubusercontent.com/quangtran3110/IOT/main/Arduino/DoThi/Phuong2/Bo_ke_3/build/esp8266.esp8266.nodemcuv2/Bo_ke_3.ino.bin"
+#define URL_fw_Bin "https://raw.githubusercontent.com/quangtran3110/PlatformIO/main/Do_Thi/Phuong2/Bo_Ke3/.pio/build/nodemcuv2/firmware.bin"
 String server_name = "http://sgp1.blynk.cloud/external/api/";
 //-----------------------------
 #define pin_terminal "&V49="
