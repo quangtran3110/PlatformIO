@@ -4,10 +4,10 @@
 #define BLYNK_FIRMWARE_VERSION "240610"
 
 #define Main_TOKEN "w3ZZc7F4pvOIwqozyrzYcBFVUE3XxSiW"
-const char* ssid = "net";
-const char* password = "Abcd@1234";
-//const char* ssid = "tram bom so 4";
-//const char* password = "0943950555";
+const char *ssid = "net";
+const char *password = "Abcd@1234";
+// const char* ssid = "tram bom so 4";
+// const char* password = "0943950555";
 //-------------------------------------------------------------------
 #define BLYNK_PRINT Serial
 #define APP_DEBUG
@@ -38,14 +38,14 @@ const int pin_RL5 = P5;
 const int pin_RL6 = P6;
 const int pin_RL7 = P7;
 //-----------------------------
-#include <WidgetRTC.h>
 #include "RTClib.h"
+#include <WidgetRTC.h>
 RTC_DS3231 rtc_module;
-char daysOfTheWeek[7][12] = { "CN", "T2", "T3", "T4", "T5", "T6", "T7" };
+char daysOfTheWeek[7][12] = {"CN", "T2", "T3", "T4", "T5", "T6", "T7"};
 char tz[] = "Asia/Ho_Chi_Minh";
 //-----------------------------
-#include <Wire.h>
 #include <Eeprom24C32_64.h>
+#include <Wire.h>
 #define EEPROM_ADDRESS 0x57
 static Eeprom24C32_64 eeprom(EEPROM_ADDRESS);
 const word address = 0;
@@ -56,13 +56,13 @@ OneWire oneWire(D3);
 DallasTemperature sensors(&oneWire);
 float temp;
 //-----------------------------
-#include <UrlEncode.h>
-#include <ESP8266httpUpdate.h>
-#include <WiFiClientSecure.h>
 #include <ESP8266HTTPClient.h>
+#include <ESP8266httpUpdate.h>
+#include <UrlEncode.h>
+#include <WiFiClientSecure.h>
 WiFiClient client;
 HTTPClient http;
-#define URL_fw_Bin "https://raw.githubusercontent.com/quangtran3110/IOT/main/Arduino/DoThi/Phuong2/Bo_ke_1/build/esp8266.esp8266.nodemcuv2/Bo_ke_1.ino.bin"
+#define URL_fw_Bin "https://raw.githubusercontent.com/quangtran3110/PlatformIO/main/Do_Thi/Phuong2/Bo_Ke1/.pio/build/nodemcuv2/firmware.bin"
 String server_name = "http://sgp1.blynk.cloud/external/api/";
 //-----------------------------
 #define pin_terminal "&V39="
@@ -78,7 +78,7 @@ struct Data {
   uint32_t rl1_r, rl1_s;
   byte MonWeekDay, TuesWeekDay, WedWeekDay, ThuWeekDay, FriWeekDay, SatWeekend, SunWeekend;
 } data, dataCheck;
-const struct Data dataDefault = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
+const struct Data dataDefault = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
 //-----------------------------
 byte reboot_num;
 int hour_start_rl1 = 0, minute_start_rl1 = 0, hour_stop_rl1 = 0, minute_stop_rl1 = 0;
@@ -148,9 +148,15 @@ void update_fw() {
   ESPhttpUpdate.onError(update_error);
   t_httpUpdate_return ret = ESPhttpUpdate.update(client_, URL_fw_Bin);
   switch (ret) {
-    case HTTP_UPDATE_FAILED: Serial.printf("HTTP_UPDATE_FAILD Error (%d): %s\n", ESPhttpUpdate.getLastError(), ESPhttpUpdate.getLastErrorString().c_str()); break;
-    case HTTP_UPDATE_NO_UPDATES: Serial.println("HTTP_UPDATE_NO_UPDATES"); break;
-    case HTTP_UPDATE_OK: Serial.println("HTTP_UPDATE_OK"); break;
+  case HTTP_UPDATE_FAILED:
+    Serial.printf("HTTP_UPDATE_FAILD Error (%d): %s\n", ESPhttpUpdate.getLastError(), ESPhttpUpdate.getLastErrorString().c_str());
+    break;
+  case HTTP_UPDATE_NO_UPDATES:
+    Serial.println("HTTP_UPDATE_NO_UPDATES");
+    break;
+  case HTTP_UPDATE_OK:
+    Serial.println("HTTP_UPDATE_OK");
+    break;
   }
 }
 //-------------------------
@@ -160,14 +166,14 @@ void savedata() {
   } else {
     // Serial.println("\nWrite bytes to EEPROM memory...");
     data.save_num = data.save_num + 1;
-    eeprom.writeBytes(address, sizeof(dataDefault), (byte*)&data);
-    //Blynk.setProperty(V0, "label", BLYNK_FIRMWARE_VERSION, "-EEPROM ", data.save_num);
+    eeprom.writeBytes(address, sizeof(dataDefault), (byte *)&data);
+    // Blynk.setProperty(V0, "label", BLYNK_FIRMWARE_VERSION, "-EEPROM ", data.save_num);
   }
 }
 //-------------------------
 void weekday_() {
   //---------------------Day
-  int A[7] = { data.MonWeekDay, data.TuesWeekDay, data.WedWeekDay, data.ThuWeekDay, data.FriWeekDay, data.SatWeekend, data.SunWeekend };
+  int A[7] = {data.MonWeekDay, data.TuesWeekDay, data.WedWeekDay, data.ThuWeekDay, data.FriWeekDay, data.SatWeekend, data.SunWeekend};
   memset(s_day, '\0', sizeof(s_day));
   strcat(s_day, "Lịch chạy: ");
   memset(B, '\0', sizeof(B));
@@ -187,9 +193,9 @@ void weekday_() {
       }
     }
   }
-  B[strlen(B) - 1] = '\0';  // Xóa ký tự cuối cùng là dấu phẩy
+  B[strlen(B) - 1] = '\0'; // Xóa ký tự cuối cùng là dấu phẩy
   s_day[strlen(s_day) - 1] = '\0';
-  strcat(s_day, "\n");  // Xuống dòng cuối câu
+  strcat(s_day, "\n"); // Xuống dòng cuối câu
   s_weekday = urlEncode(s_day);
   //---------------------Time RL 1
   if ((hour_start_rl1 == 0) && (minute_start_rl1 == 0) && (hour_stop_rl1 == 0) && (minute_stop_rl1 == 0)) {
@@ -198,37 +204,28 @@ void weekday_() {
     hour_stop_rl1 = data.rl1_s / 3600;
     minute_stop_rl1 = (data.rl1_s - (hour_stop_rl1 * 3600)) / 60;
   }
-  char s_timer_van_1_[30];  // Tạo một mảng ký tự để lưu trữ chuỗi định dạng
+  char s_timer_van_1_[30]; // Tạo một mảng ký tự để lưu trữ chuỗi định dạng
   sprintf(s_timer_van_1_, "Van 1: %02d:%02d - %02d:%02d\n", hour_start_rl1, minute_start_rl1, hour_stop_rl1, minute_stop_rl1);
   s_timer_van_1 = urlEncode(s_timer_van_1_);
 }
 void print_terminal() {
-  String server_path = server_name + "batch/update?token=" + Main_TOKEN
-                       + pin_terminal + "clr";
+  String server_path = server_name + "batch/update?token=" + Main_TOKEN + pin_terminal + "clr";
   http.begin(client, server_path.c_str());
   int httpResponseCode = http.GET();
   http.end();
 
-  server_path = server_name + "batch/update?token=" + Main_TOKEN
-                + pin_terminal + location
-                + pin_terminal + s_weekday
-                + pin_terminal + s_timer_van_1
-                + pin_terminal + urlEncode(s_temp);
+  server_path = server_name + "batch/update?token=" + Main_TOKEN + pin_terminal + location + pin_terminal + s_weekday + pin_terminal + s_timer_van_1 + pin_terminal + urlEncode(s_temp);
   http.begin(client, server_path.c_str());
   httpResponseCode = http.GET();
   http.end();
-  //Serial.println(server_path);
+  // Serial.println(server_path);
 }
 void print_terminal_main() {
-  String server_path = server_name + "batch/update?token=" + Main_TOKEN
-                       + "&V0=" + "clr";
+  String server_path = server_name + "batch/update?token=" + Main_TOKEN + "&V0=" + "clr";
   http.begin(client, server_path.c_str());
   int httpResponseCode = http.GET();
   http.end();
-  server_path = server_name + "batch/update?token=" + Main_TOKEN
-                + "&V0=" + location
-                + "&V0=" + s_weekday
-                + "&V0=" + s_timer_van_1;
+  server_path = server_name + "batch/update?token=" + Main_TOKEN + "&V0=" + location + "&V0=" + s_weekday + "&V0=" + s_timer_van_1;
   http.begin(client, server_path.c_str());
   httpResponseCode = http.GET();
   http.end();
@@ -237,9 +234,7 @@ void up() {
   byte g;
   bitWrite(g, 0, data.mode);
   bitWrite(g, 1, sta_rl1);
-  String server_path = server_name + "batch/update?token=" + Main_TOKEN
-                       + pin_G + g
-                       + pin_Irms + Irms0;
+  String server_path = server_name + "batch/update?token=" + Main_TOKEN + pin_G + g + pin_Irms + Irms0;
   http.begin(client, server_path.c_str());
   int httpResponseCode = http.GET();
   http.end();
@@ -262,7 +257,7 @@ void off_fan() {
   pcf8575_1.digitalWrite(pin_RL3, !sta_rl3);
 }
 //-------------------------
-void readcurrent()  // C2
+void readcurrent() // C2
 {
   pcf8575_1.digitalWrite(S0, LOW);
   pcf8575_1.digitalWrite(S1, HIGH);
@@ -282,8 +277,7 @@ void readcurrent()  // C2
         xSetAmpe = 0;
         trip0 = true;
         String dataS = "Bơm bờ kè 1 lỗi! " + String(Irms0) + "A";
-        String server_path = server_name + "batch/update?token=" + Main_TOKEN
-                             + "&V100=" + urlEncode(dataS);
+        String server_path = server_name + "batch/update?token=" + Main_TOKEN + "&V100=" + urlEncode(dataS);
         http.begin(client, server_path.c_str());
         int httpResponseCode = http.GET();
         http.end();
@@ -291,14 +285,16 @@ void readcurrent()  // C2
     }
   }
 }
-void temperature() {  // Nhiệt độ
+void temperature() { // Nhiệt độ
   sensors.requestTemperatures();
-  //Serial.println(sensors.getDeviceCount());
+  // Serial.println(sensors.getDeviceCount());
   if (sensors.getDeviceCount() > 0) {
     temp = sensors.getTempCByIndex(0);
     s_temp = "Temp: " + String(temp) + "°C\n";
-    if (temp > 37 && sta_rl3 == LOW) on_fan();
-    else if (temp < 35 && sta_rl3 == HIGH) off_fan();
+    if (temp > 37 && sta_rl3 == LOW)
+      on_fan();
+    else if (temp < 35 && sta_rl3 == HIGH)
+      off_fan();
   }
 }
 //-------------------------
@@ -314,25 +310,21 @@ void rtctime() {
   float nowtime = (now.hour() * 3600 + now.minute() * 60);
 
   if (weekday() == 1) {
-    dayadjustment = 6;  // needed for Sunday, Time library is day 1 and Blynk is day 7
+    dayadjustment = 6; // needed for Sunday, Time library is day 1 and Blynk is day 7
   }
-  if ((((weekday() + dayadjustment) == 1) && (data.MonWeekDay))
-      || (((weekday() + dayadjustment) == 2) && (data.TuesWeekDay))
-      || (((weekday() + dayadjustment) == 3) && (data.WedWeekDay))
-      || (((weekday() + dayadjustment) == 4) && (data.ThuWeekDay))
-      || (((weekday() + dayadjustment) == 5) && (data.FriWeekDay))
-      || (((weekday() + dayadjustment) == 6) && (data.SatWeekend))
-      || (((weekday() + dayadjustment) == 7) && (data.SunWeekend))) {
+  if ((((weekday() + dayadjustment) == 1) && (data.MonWeekDay)) || (((weekday() + dayadjustment) == 2) && (data.TuesWeekDay)) || (((weekday() + dayadjustment) == 3) && (data.WedWeekDay)) || (((weekday() + dayadjustment) == 4) && (data.ThuWeekDay)) || (((weekday() + dayadjustment) == 5) && (data.FriWeekDay)) || (((weekday() + dayadjustment) == 6) && (data.SatWeekend)) || (((weekday() + dayadjustment) == 7) && (data.SunWeekend))) {
     dayOfTheWeek_ = true;
-  } else dayOfTheWeek_ = false;
-  if (data.mode == 1) {  // Auto
+  } else
+    dayOfTheWeek_ = false;
+  if (data.mode == 1) { // Auto
     if (dayOfTheWeek_) {
       if (data.rl1_r > data.rl1_s) {
         if ((nowtime > data.rl1_s) && (nowtime < data.rl1_r)) {
           off_van1();
         }
         if ((nowtime < data.rl1_s) || (nowtime > data.rl1_r)) {
-          if (!trip0) on_van1();
+          if (!trip0)
+            on_van1();
         }
       }
       if (data.rl1_r < data.rl1_s) {
@@ -340,36 +332,40 @@ void rtctime() {
           off_van1();
         }
         if ((nowtime < data.rl1_s) && (nowtime > data.rl1_r)) {
-          if (!trip0) on_van1();
+          if (!trip0)
+            on_van1();
         }
       }
     } else {
-      if (sta_rl1 == HIGH) off_van1();
+      if (sta_rl1 == HIGH)
+        off_van1();
     }
   }
 }
-
+//-------------------------------------------------------------------
 BLYNK_WRITE(V0) {
   String dataS = param.asStr();
   if (dataS == "update") {
     update_fw();
   } else if (dataS == "rst") {
     ESP.restart();
-  } else if (dataS == "m") {  //man
+  } else if (dataS == "m") { // man
     data.mode = 0;
     savedata();
-  } else if (dataS == "a") {  //auto
+  } else if (dataS == "a") { // auto
     data.mode = 1;
     savedata();
-  } else if (dataS == "info") {  //mode?
+  } else if (dataS == "info") { // mode?
     print_terminal();
-  } else if (dataS == "van1") {  //mode?
+  } else if (dataS == "van1") { // mode?
     num_van = "van1";
     print_terminal_main();
-  } else if (dataS == "van1_on") {  //RL1 on
-    if (data.mode == 0) on_van1();
-  } else if (dataS == "van1_off") {  //RL1 off
-    if (data.mode == 0) off_van1();
+  } else if (dataS == "van1_on") { // RL1 on
+    if (data.mode == 0)
+      on_van1();
+  } else if (dataS == "van1_off") { // RL1 off
+    if (data.mode == 0)
+      off_van1();
   }
 }
 BLYNK_WRITE(V1) {
@@ -420,7 +416,7 @@ void setup() {
   //-----------------------
   rtc_module.begin();
   eeprom.initialize();
-  eeprom.readBytes(address, sizeof(dataDefault), (byte*)&data);
+  eeprom.readBytes(address, sizeof(dataDefault), (byte *)&data);
   //-----------------------
   Wire.begin();
   sensors.begin();
