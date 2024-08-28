@@ -40,7 +40,7 @@ const char *ssid = "net";
 const char *password = "Abcd@1234";
 //-------------------------------------------------------------------
 #define BLYNK_PRINT Serial
-#define BLYNK_FIRMWARE_VERSION "240827"
+#define BLYNK_FIRMWARE_VERSION "240828"
 #define APP_DEBUG
 
 #pragma region // Library
