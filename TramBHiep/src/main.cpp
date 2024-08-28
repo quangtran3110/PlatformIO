@@ -40,7 +40,7 @@ const char *ssid = "net";
 const char *password = "Abcd@1234";
 //-------------------------------------------------------------------
 #define BLYNK_PRINT Serial
-#define BLYNK_FIRMWARE_VERSION "240503"
+#define BLYNK_FIRMWARE_VERSION "240827"
 #define APP_DEBUG
 
 #pragma region // Library
@@ -73,7 +73,7 @@ DeviceAddress temp = {0x28, 0x83, 0x8B, 0x79, 0xA2, 0x01, 0x03, 0xB2};
 
 #include <ESP8266httpUpdate.h>
 #include <WiFiClientSecure.h>
-#define URL_fw_Bin "https://raw.githubusercontent.com/quangtran3110/IOT/main/Arduino/TBHiep/main/build/esp8266.esp8266.nodemcuv2/main.ino.bin"
+#define URL_fw_Bin "https://raw.githubusercontent.com/quangtran3110/PlatformIO/main/TramBHiep/.pio/build/nodemcuv2/firmware.bin"
 
 const int S0pin = 14;
 const int S1pin = 12;
