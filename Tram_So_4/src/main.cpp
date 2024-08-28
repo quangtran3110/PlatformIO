@@ -280,9 +280,22 @@ void update_fw() {
 }
 //-------------------------------------------------------------------
 void up() {
-  String server_path = server_name + "batch/update?token=" + BLYNK_AUTH_TOKEN + "&V14=" + float(Result1) + "&V15=" + temp[1] + "&V19=" + volume1 + "&V20=" + smoothDistance + "&V23=" + temp[0] + "&V27=" + Irms0 + "&V26=" + Irms1 + "&V24=" + Irms2 + "&V30=" + Irms3 + "&V25=" + Irms4 + "&V39=" + float(data.timerun_G1) / 1000 / 60 / 60 + "&V41=" + float(data.timerun_B1) / 1000 / 60 / 60 + "&V43=" + float(data.timerun_B2) / 1000 / 60 / 60;
+  String server_path = server_name + "batch/update?token=" + BLYNK_AUTH_TOKEN +
+                       "&V14=" + float(Result1) +
+                       //"&V15=" + temp[1] +
+                       "&V19=" + volume1 +
+                       "&V20=" + smoothDistance +
+                       //"&V23=" + temp[0] +
+                       "&V27=" + Irms0 +
+                       "&V26=" + Irms1 +
+                       "&V24=" + Irms2 +
+                       "&V30=" + Irms3 +
+                       "&V25=" + Irms4 +
+                       "&V39=" + float(data.timerun_G1) / 1000 / 60 / 60 +
+                       "&V41=" + float(data.timerun_B1) / 1000 / 60 / 60 +
+                       "&V43=" + float(data.timerun_B2) / 1000 / 60 / 60;
   http.begin(client, server_path.c_str());
-  int httpResponseCode = http.GET();
+  http.GET();
   http.end();
 }
 void up_timerun_motor() {
@@ -620,8 +633,8 @@ void temperature() { // Nhiệt độ
 }
 void up_cycle() {
   if (Irms0 != 0 || Irms1 != 0 || Irms2 != 0 || Irms3 != 0 || Irms4 != 0) {
-    if (time_cycle != 1303) {
-      time_cycle = 1303;
+    if (time_cycle != 1503) {
+      time_cycle = 1503;
       up();
       timer.deleteTimer(timer_cycle);
       timer_cycle = timer.setInterval(time_cycle, []() {
@@ -1328,7 +1341,7 @@ void setup() {
       readPower2();
       readPower3();
       readPower4();
-      temperature();
+      //temperature();
       up_cycle();
       timer.restartTimer(timer_2);
     });
