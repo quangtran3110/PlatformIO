@@ -11,6 +11,8 @@ const char *password = "Abcd@1234";
 //-------------------------------------------------------------------
 #define BLYNK_PRINT Serial
 #define APP_DEBUG
+//-----------------------------
+#pragma region // Library
 #include <BlynkSimpleEsp8266.h>
 #include <ESP8266WiFi.h>
 #include <SPI.h>
@@ -82,7 +84,7 @@ const struct Data dataDefault = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
 //-----------------------------
 byte reboot_num;
 int hour_start_rl1 = 0, minute_start_rl1 = 0, hour_stop_rl1 = 0, minute_stop_rl1 = 0;
-int timer_I;
+int timer_I, time_cycle, timer_cycle;
 int dayadjustment = -1;
 bool key = false, blynk_first_connect = false, dayOfTheWeek_ = false;
 bool sta_rl1 = LOW, sta_rl3 = LOW;
@@ -91,6 +93,7 @@ char s_day[50] = "";
 char B[50] = "";
 String s_timer_van_1, s_temp;
 String s_weekday;
+#pragma endregion
 //-----------------------------
 WidgetTerminal DATAS(V0);
 WidgetRTC rtc_widget;
@@ -298,11 +301,28 @@ void temperature() { // Nhiệt độ
   }
 }
 void up_cycle() {
-  if (sta_rl1 == HIGH) {
-    timer.setTimeout(5000L, []() {
+  if (sta_rl1 != LOW) {
+    if (time_cycle != 2500) {
+      time_cycle = 2500;
       up();
       temperature();
-    });
+      timer.deleteTimer(timer_cycle);
+      timer_cycle = timer.setInterval(time_cycle, []() {
+        up();
+        temperature();
+        timer.restartTimer(timer_I);
+      });
+    }
+  } else {
+    if (time_cycle != 5001) {
+      time_cycle = 5001;
+      timer.deleteTimer(timer_cycle);
+      timer_cycle = timer.setInterval(time_cycle, []() {
+        up();
+        temperature();
+        timer.restartTimer(timer_I);
+      });
+    }
   }
 }
 //-------------------------
@@ -454,11 +474,7 @@ void setup() {
     weekday_();
     timer_I = timer.setInterval(589, []() {
       readcurrent();
-    });
-    timer.setInterval(2589, []() {
-      up();
-      temperature();
-      timer.restartTimer(timer_I);
+      up_cycle();
     });
     timer.setInterval(15005L, []() {
       rtctime();

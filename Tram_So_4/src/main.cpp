@@ -70,7 +70,7 @@
 #define BLYNK_TEMPLATE_NAME "TRẠM SỐ 4"
 #define BLYNK_AUTH_TOKEN "ra1gZtR0irrwiTH1L-L_nhXI6TMRH7M9"
 
-#define BLYNK_FIRMWARE_VERSION "240624"
+#define BLYNK_FIRMWARE_VERSION "240828"
 #define APP_DEBUG
 
 #include <BlynkSimpleEsp8266.h>
@@ -184,10 +184,11 @@ float clo_cache = 0, value, Result1;
 uint32_t timestamp;
 int a, c, b, f = 0;
 int timer_2, timer_1, timer_3, timer_4, timer_5;
+int time_cycle, timer_cycle;
 int LLG1_1m3, reboot_num;
 int time_run_nenkhi = 5 * 60;
 int time_stop_nenkhi = 10 * 60;
-byte status_b1, status_b2, status_g1;
+byte status_b1, status_b2, status_g1, stastus_read_current = false;
 int G1_start, B1_start, B2_start;
 bool G1_save = false, B1_save = false, B2_save = false;
 //-------------------
@@ -616,6 +617,28 @@ void temperature() { // Nhiệt độ
     temp[i] = sensors.getTempCByIndex(i);
   // Blynk.virtualWrite(V15, temp[1]);
   // Blynk.virtualWrite(V23, temp[0]);
+}
+void up_cycle() {
+  if (Irms0 != 0 || Irms1 != 0 || Irms2 != 0 || Irms3 != 0 || Irms4 != 0) {
+    if (time_cycle != 1303) {
+      time_cycle = 1303;
+      up();
+      timer.deleteTimer(timer_cycle);
+      timer_cycle = timer.setInterval(time_cycle, []() {
+        up();
+        timer.restartTimer(timer_1);
+      });
+    }
+  } else {
+    if (time_cycle != 5001) {
+      time_cycle = 5001;
+      timer.deleteTimer(timer_cycle);
+      timer_cycle = timer.setInterval(time_cycle, []() {
+        up();
+        timer.restartTimer(timer_1);
+      });
+    }
+  }
 }
 //-------------------------------------------------------------------
 void readPressure() // C0 - Ap Luc
@@ -1306,8 +1329,7 @@ void setup() {
       readPower3();
       readPower4();
       temperature();
-      up();
-      timer.restartTimer(timer_1);
+      up_cycle();
       timer.restartTimer(timer_2);
     });
     timer_5 = timer.setInterval(15006L, []() {
