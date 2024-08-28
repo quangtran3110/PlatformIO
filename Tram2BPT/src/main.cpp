@@ -46,7 +46,7 @@ V43- thời gian chạy B1 - 24h
 #define BLYNK_TEMPLATE_NAME "TRẠM 2 BPT"
 #define BLYNK_AUTH_TOKEN "YZXkYAgH44t-kjJPKapydw5vMlR7MGAC"
 
-#define BLYNK_FIRMWARE_VERSION "240816"
+#define BLYNK_FIRMWARE_VERSION "240824"
 
 const char *ssid = "BPT2";
 const char *password = "0919126757";
@@ -239,9 +239,7 @@ void connectionstatus() {
       WiFi.begin(ssid, password);
     }
     if (reboot_num % 5 == 0) {
-      WiFi.disconnect();
-      delay(1000);
-      WiFi.begin(ssid, password);
+      ESP.restart();
     }
   }
   if (Blynk.connected()) {

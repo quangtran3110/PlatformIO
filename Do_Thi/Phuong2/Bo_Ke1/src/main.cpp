@@ -297,6 +297,14 @@ void temperature() { // Nhiệt độ
       off_fan();
   }
 }
+void up_cycle() {
+  if (sta_rl1 == HIGH) {
+    timer.setTimeout(5000L, []() {
+      up();
+      temperature();
+    });
+  }
+}
 //-------------------------
 void rtctime() {
   DateTime now = rtc_module.now();
