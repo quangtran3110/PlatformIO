@@ -20,9 +20,18 @@ BLYNK_CONNECTED() {
 void run() {
   timer_run = timer_run + 1;
   Serial.println(timer_run);
-  timer_I = timer.setTimeout(timer_run * 1000, []() {
-    run();
-  });
+  if (timer_run % 5 == 0) {
+    timer.deleteTimer(timer_I);
+    timer_I = timer.setInterval(3000, []() {
+      run();
+    });
+  } else {
+    Serial.println("2");
+    timer.deleteTimer(timer_I);
+    timer_I = timer.setInterval(1000, []() {
+      run();
+    });
+  }
 }
 
 void setup() {
@@ -32,7 +41,7 @@ void setup() {
   Blynk.config(BLYNK_AUTH_TOKEN);
   delay(7000);
 
-  timer_I = timer.setTimeout(timer_run * 1000, []() {
+  timer_I = timer.setTimeout(1000, []() {
     run();
   });
 }

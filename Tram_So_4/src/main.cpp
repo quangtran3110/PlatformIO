@@ -645,6 +645,7 @@ void up_cycle() {
   } else {
     if (time_cycle != 5001) {
       time_cycle = 5001;
+      up();
       timer.deleteTimer(timer_cycle);
       timer_cycle = timer.setInterval(time_cycle, []() {
         up();

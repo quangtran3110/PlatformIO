@@ -301,11 +301,10 @@ void temperature() { // Nhiệt độ
   }
 }
 void up_cycle() {
-  if (sta_rl1 != LOW) {
-    if (time_cycle != 2500) {
-      time_cycle = 2500;
+  if (Irms0 != 0) {
+    if (time_cycle != 1712) {
+      time_cycle = 1712;
       up();
-      temperature();
       timer.deleteTimer(timer_cycle);
       timer_cycle = timer.setInterval(time_cycle, []() {
         up();
@@ -314,8 +313,9 @@ void up_cycle() {
       });
     }
   } else {
-    if (time_cycle != 5001) {
-      time_cycle = 5001;
+    if (time_cycle != 10013) {
+      time_cycle = 10013;
+      up();
       timer.deleteTimer(timer_cycle);
       timer_cycle = timer.setInterval(time_cycle, []() {
         up();
