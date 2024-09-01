@@ -36,7 +36,7 @@
 #define BLYNK_TEMPLATE_ID "TMPL6usi7FSqp"
 #define BLYNK_TEMPLATE_NAME "TRẠM SỐ 3"
 #define BLYNK_AUTH_TOKEN "R_V1bJ9xeyl6Yokg1rhlaLhK-NYcDVpx"
-#define BLYNK_FIRMWARE_VERSION "240810"
+#define BLYNK_FIRMWARE_VERSION "240901"
 //------------------
 #include "EmonLib.h"
 #include "PCF8575.h"
@@ -57,7 +57,7 @@
 #define URL_fw_Bin "https://raw.githubusercontent.com/quangtran3110/PlatformIO/main/Tram_So_3/.pio/build/nodemcuv2/firmware.bin"
 String server_main = "http://sgp1.blynk.cloud/external/api/";
 //------------------
-PCF8575 pcf8575_1(0x20);
+PCF8575 pcf8575_1(0x21);
 EnergyMonitor emon0, emon1, emon2;
 RTC_DS3231 rtc_module;
 WiFiClient client;
@@ -803,15 +803,15 @@ void setup() {
   pcf8575_1.pinMode(S3pin, OUTPUT);
 
   pcf8575_1.pinMode(pin_G1, OUTPUT);
-  pcf8575_1.digitalWrite(pin_G1, data.status_g1);
+  pcf8575_1.digitalWrite(pin_G1, HIGH);
   pcf8575_1.pinMode(pin_B1, OUTPUT);
-  pcf8575_1.digitalWrite(pin_B1, data.status_b1);
+  pcf8575_1.digitalWrite(pin_B1, HIGH);
   pcf8575_1.pinMode(pin_rst, OUTPUT);
   pcf8575_1.digitalWrite(pin_rst, HIGH);
 
   //------------------------------------
   timer.setTimeout(5000L, []() {
-    timer_I = timer1.setInterval(1083L, []() {
+    timer_I = timer1.setInterval(1483L, []() {
       readPower();
       readPower1();
       readPower2();
