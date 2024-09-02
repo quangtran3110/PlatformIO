@@ -57,7 +57,7 @@
 #define URL_fw_Bin "https://raw.githubusercontent.com/quangtran3110/PlatformIO/main/Tram_So_3/.pio/build/nodemcuv2/firmware.bin"
 String server_main = "http://sgp1.blynk.cloud/external/api/";
 //------------------
-PCF8575 pcf8575_1(0x21);
+PCF8575 pcf8575_1(0x20);
 EnergyMonitor emon0, emon1, emon2;
 RTC_DS3231 rtc_module;
 WiFiClient client;
