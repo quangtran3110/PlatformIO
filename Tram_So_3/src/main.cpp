@@ -117,6 +117,15 @@ BlynkTimer timer, timer1;
 BLYNK_CONNECTED() {
   rtc_widget.begin();
   blynk_first_connect = true;
+  String server_path = server_main + "batch/update?token=" + BLYNK_AUTH_TOKEN +
+                       "&V0=" + data.status_g1 +
+                       "&V1=" + data.status_b1 +
+                       "&V7=" + data.mode_cap2 +
+                       "&V14=" + data.key_protect +
+                       "&V15=" + data.key_noti;
+  http.begin(client, server_path.c_str());
+  http.GET();
+  http.end();
 }
 //-------------------------------------------------------------------
 void connectionstatus() {
