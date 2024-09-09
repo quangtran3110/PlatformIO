@@ -59,7 +59,7 @@
 #define BLYNK_AUTH_TOKEN "Xd_XI0fm9nIsXBvvMZ6pjEtRd0irLLR2"
 #define VOLUME_TOKEN "Q2KAjaqI3sWhET-Ax94VPYfIk2Fmsr36"
 
-#define BLYNK_FIRMWARE_VERSION "240910"
+#define BLYNK_FIRMWARE_VERSION "240909"
 #define BLYNK_PRINT Serial
 #define APP_DEBUG
 const char *ssid = "KwacoBlynk";
