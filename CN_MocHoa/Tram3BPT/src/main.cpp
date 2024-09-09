@@ -28,7 +28,7 @@
  *V25 - Thể tích
  *V26 - Còn lại
  *V27 - Độ sâu
- *V28 - status_volume
+ *V28 - datas_volume
  *V29 - LL1m3
  *V30 - RAW AG1
  *V31 - LL24h
@@ -57,6 +57,7 @@
 #define BLYNK_TEMPLATE_ID "TMPL6coHtFMJ-"
 #define BLYNK_TEMPLATE_NAME "TRẠM 3 BPT"
 #define BLYNK_AUTH_TOKEN "Xd_XI0fm9nIsXBvvMZ6pjEtRd0irLLR2"
+#define VOLUME_TOKEN "Q2KAjaqI3sWhET-Ax94VPYfIk2Fmsr36"
 
 #define BLYNK_FIRMWARE_VERSION "240910"
 #define BLYNK_PRINT Serial
@@ -70,6 +71,7 @@ const char *password = "Password";
 #include <BlynkSimpleEsp8266.h>
 #include <ESP8266WiFi.h>
 #include <SPI.h>
+#include <UrlEncode.h>
 //--------------
 #include "PCF8575.h"
 PCF8575 pcf8575(0x20);
@@ -207,6 +209,7 @@ const struct Data dataDefault = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
 #pragma endregion
 
 WidgetTerminal terminal(V10);
+WidgetTerminal volume_terminal(V28);
 WidgetRTC rtc;
 BlynkTimer timer, timeout;
 BLYNK_CONNECTED() {
@@ -1042,6 +1045,17 @@ BLYNK_WRITE(V18) // Time input
     }
   } else
     Blynk.virtualWrite(V18, 0);
+}
+BLYNK_WRITE(V28) {
+  String dataS = param.asStr();
+  if ((dataS == "rst") || (dataS == "update") || (dataS == "rst_vl") || (dataS == "i2c")) {
+    volume_terminal.clear();
+    String server_path = server_name + "batch/update?token=" + VOLUME_TOKEN +
+                         "&V0=" + urlEncode(dataS);
+    http.begin(client, server_path.c_str());
+    http.GET();
+    http.end();
+  }
 }
 BLYNK_WRITE(V29) // Lưu lượng G1_1m3
 {

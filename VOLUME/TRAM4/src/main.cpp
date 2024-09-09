@@ -1,15 +1,13 @@
-#define BLYNK_TEMPLATE_ID "TMPL6swUcB_EZ"
+#define BLYNK_TEMPLATE_ID "TMPL6wuETrZSy"
 #define BLYNK_TEMPLATE_NAME "VOLUME"
-#define BLYNK_AUTH_TOKEN "Q2KAjaqI3sWhET-Ax94VPYfIk2Fmsr36"
+#define BLYNK_AUTH_TOKEN "fQeSuHadv_EFLjXPdqE-sV_lnZ6pXWfu"
 
-#define BLYNK_FIRMWARE_VERSION "240910"
+#define BLYNK_FIRMWARE_VERSION "240911"
 #define BLYNK_PRINT Serial
 #define APP_DEBUG
 
-const char *ssid = "KwacoBlynk";
-const char *password = "Password";
-// const char* ssid = "tram bom so 4";
-// const char* password = "0943950555";
+const char* ssid = "tram bom so 4";
+const char* password = "0943950555";
 
 #include <BlynkSimpleEsp8266.h>
 #include <ESP8266WiFi.h>
@@ -30,11 +28,11 @@ const char *password = "Password";
 WiFiClient client;
 HTTPClient http;
 String server_name = "http://sgp1.blynk.cloud/external/api/";
-String Main_TOKEN = "Xd_XI0fm9nIsXBvvMZ6pjEtRd0irLLR2";
-#define URL_fw_Bin "https://raw.githubusercontent.com/quangtran3110/PlatformIO/main/VOLUME/TRAM3BPT/.pio/build/nodemcuv2/firmware.bin"
+String Main_TOKEN = "ra1gZtR0irrwiTH1L-L_nhXI6TMRH7M9";
+#define URL_fw_Bin "https://raw.githubusercontent.com/quangtran3110/PlatformIO/main/VOLUME/TRAM4/.pio/build/nodemcuv2/firmware.bin"
 
-String LL24h = "&V31=";
-String LL1m3 = "&V29=";
+String LL24h = "&V35=";
+String LL1m3 = "&V37=";
 String terminal_main = "&V28=";
 String text;
 

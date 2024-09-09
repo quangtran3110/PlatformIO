@@ -27,7 +27,7 @@
  *V25 - I4 - Van điện rửa lọc
  *V26 - I1 - Bơm 1
  *V27 - I0 - Giếng
- *V28 - STATUS VOLUME
+ *V28 - DATAS_VOLUME
  *V29 - Info
  *V30 - I3 - Nén khí
  *V31 -
@@ -69,8 +69,9 @@
 #define BLYNK_TEMPLATE_ID "TMPL67lOs7dLq"
 #define BLYNK_TEMPLATE_NAME "TRẠM SỐ 4"
 #define BLYNK_AUTH_TOKEN "ra1gZtR0irrwiTH1L-L_nhXI6TMRH7M9"
+#define VOLUME_TOKEN "fQeSuHadv_EFLjXPdqE-sV_lnZ6pXWfu"
 
-#define BLYNK_FIRMWARE_VERSION "240828"
+#define BLYNK_FIRMWARE_VERSION "240910"
 const char *ssid = "tram bom so 4";
 const char *password = "0943950555";
 #define APP_DEBUG
@@ -79,6 +80,7 @@ const char *password = "0943950555";
 #include <BlynkSimpleEsp8266.h>
 #include <ESP8266WiFi.h>
 #include <SPI.h>
+#include <UrlEncode.h>
 //-------------------
 #include "PCF8575.h"
 PCF8575 pcf8575_1(0x20);
@@ -212,6 +214,9 @@ struct Data {
 } data, dataCheck;
 const struct Data dataDefault = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
 
+#pragma endregion
+
+WidgetTerminal volume_terminal(V28);
 WidgetTerminal terminal(V10);
 WidgetRTC rtc_widget;
 
@@ -1203,6 +1208,17 @@ BLYNK_WRITE(V18) // Time input
     }
   } else
     Blynk.virtualWrite(V18, 0);
+}
+BLYNK_WRITE(V28) {
+  String dataS = param.asStr();
+  if ((dataS == "rst") || (dataS == "update") || (dataS == "rst_vl") || (dataS == "i2c")) {
+    volume_terminal.clear();
+    String server_path = server_name + "batch/update?token=" + VOLUME_TOKEN +
+                         "&V0=" + urlEncode(dataS);
+    http.begin(client, server_path.c_str());
+    http.GET();
+    http.end();
+  }
 }
 BLYNK_WRITE(V29) // Info
 {

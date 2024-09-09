@@ -1,6 +1,6 @@
 #define BLYNK_TEMPLATE_ID "TMPL6swUcB_EZ"
 #define BLYNK_TEMPLATE_NAME "VOLUME"
-#define BLYNK_AUTH_TOKEN "Q2KAjaqI3sWhET-Ax94VPYfIk2Fmsr36"
+#define BLYNK_AUTH_TOKEN "AdXbklpLJKTZQ5hK9Qpy7Sg5DdwgmQ8z"
 
 #define BLYNK_FIRMWARE_VERSION "240910"
 #define BLYNK_PRINT Serial
@@ -59,6 +59,7 @@ BlynkTimer timer;
 BLYNK_CONNECTED() {
   rtc_widget.begin();
   blynk_first_connect = true;
+  Blynk.virtualWrite(V1, BLYNK_FIRMWARE_VERSION, "-EEPROM ", data.save_num);
 }
 
 ICACHE_RAM_ATTR void buttonPressed() {
