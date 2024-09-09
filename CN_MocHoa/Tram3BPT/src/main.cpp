@@ -102,7 +102,7 @@ static Eeprom24C32_64 eeprom(EEPROM_ADDRESS);
 #include <WiFiClientSecure.h>
 WiFiClient client;
 HTTPClient http;
-#define URL_fw_Bin "https://raw.githubusercontent.com/quangtran3110/IOT/main/Arduino/MocHoa/MocHoa_Moi/main/build/esp8266.esp8266.nodemcuv2/main.ino.bin"
+#define URL_fw_Bin "https://raw.githubusercontent.com/quangtran3110/PlatformIO/main/CN_MocHoa/Tram3BPT/.pio/build/nodemcuv2/firmware.bin"
 String server_name = "http://sgp1.blynk.cloud/external/api/";
 //--------------
 #define filterSamples 121
