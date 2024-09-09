@@ -58,7 +58,7 @@
 #define BLYNK_TEMPLATE_NAME "TRẠM 3 BPT"
 #define BLYNK_AUTH_TOKEN "Xd_XI0fm9nIsXBvvMZ6pjEtRd0irLLR2"
 
-#define BLYNK_FIRMWARE_VERSION "240909"
+#define BLYNK_FIRMWARE_VERSION "240910"
 #define BLYNK_PRINT Serial
 #define APP_DEBUG
 const char *ssid = "KwacoBlynk";
