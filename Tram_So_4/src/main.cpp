@@ -71,13 +71,14 @@
 #define BLYNK_AUTH_TOKEN "ra1gZtR0irrwiTH1L-L_nhXI6TMRH7M9"
 
 #define BLYNK_FIRMWARE_VERSION "240828"
+const char *ssid = "tram bom so 4";
+const char *password = "0943950555";
 #define APP_DEBUG
 
+#pragma region
 #include <BlynkSimpleEsp8266.h>
 #include <ESP8266WiFi.h>
 #include <SPI.h>
-const char *ssid = "tram bom so 4";
-const char *password = "0943950555";
 //-------------------
 #include "PCF8575.h"
 PCF8575 pcf8575_1(0x20);
