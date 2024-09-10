@@ -375,7 +375,7 @@ void readPressure() // C0 - Ap Luc
   pcf8575_1.digitalWrite(S3pin, LOW);
   sensorValue_pre = analogRead(A0);
   float Result;
-  Result = ((sensorValue_pre - 186.2) * 10) / (931 - 186.2);
+  Result = ((sensorValue_pre - 189) * 10) / (780 - 189);
   if (Result > 0) {
     value += Result;
     Result1 = value / 4;
@@ -392,7 +392,7 @@ void MeasureCmForSmoothing() { // C1 - Muc nuoc
   pcf8575_1.digitalWrite(S2pin, LOW);
   pcf8575_1.digitalWrite(S3pin, LOW);
   sensorValue_tank = analogRead(A0);
-  distance1 = (((sensorValue_tank - 196.5) * 500) / (980 - 196.5));
+  distance1 = (((sensorValue_tank - 218) * 500) / (780 - 218));
   if (distance1 > 0) {
     smoothDistance = digitalSmooth(distance1, sensSmoothArray1);
     volume1 = (dai * smoothDistance * rong) / 1000000;
