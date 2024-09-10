@@ -47,7 +47,7 @@ V43- thời gian chạy B1 - 24h
 #define BLYNK_AUTH_TOKEN "YZXkYAgH44t-kjJPKapydw5vMlR7MGAC"
 
 #define VOLUME_TOKEN "dXbklpLJKTZQ5hK9Qpy7Sg5DdwgmQ8z"
-#define BLYNK_FIRMWARE_VERSION "240909"
+#define BLYNK_FIRMWARE_VERSION "240910"
 
 const char *ssid = "BPT2";
 const char *password = "0919126757";
