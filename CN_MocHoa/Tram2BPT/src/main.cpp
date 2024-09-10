@@ -32,16 +32,6 @@ V41- thời gian chạy G1-24h
 V42- thời gian chạy B1
 V43- thời gian chạy B1 - 24h
 */
-/*
-#define BLYNK_TEMPLATE_ID "TMPL6sp_uYXmC"
-#define BLYNK_TEMPLATE_NAME "MH TRAM 2 BPT"
-#define BLYNK_AUTH_TOKEN "CJNSfOtHYJ0poN7g4Qaswwqopwzko_Ux"
-*/
-/*
-#define BLYNK_TEMPLATE_ID "TMPL6D2ion8Uo"
-#define BLYNK_TEMPLATE_NAME "TRẠM 2 BPT"
-#define BLYNK_AUTH_TOKEN "YZXkYAgH44t-kjJPKapydw5vMlR7MGAC"
-*/
 #define BLYNK_TEMPLATE_ID "TMPL6D2ion8Uo"
 #define BLYNK_TEMPLATE_NAME "TRẠM 2 BPT"
 #define BLYNK_AUTH_TOKEN "YZXkYAgH44t-kjJPKapydw5vMlR7MGAC"
