@@ -383,7 +383,7 @@ void readPressure() // C0 - Ap Luc
   }
   if (Result1 >= 4) {
     Blynk.logEvent("error", String("Áp lực Tân Lập lỗi ") + Result1);
-    //pcf8575_1.digitalWrite(pin_rst, LOW);
+    // pcf8575_1.digitalWrite(pin_rst, LOW);
   }
 }
 void MeasureCmForSmoothing() { // C1 - Muc nuoc
@@ -415,10 +415,10 @@ void MeasureCmForSmoothing() { // C1 - Muc nuoc
 }
 void sensor_raw() {
   if (pre_raw) {
-    Blynk.virtualWrite(V11, "PRE: ", sensorValue_pre);
+    Blynk.virtualWrite(V11, "PRE: ", sensorValue_pre, "\n");
   }
   if (tank_raw) {
-    Blynk.virtualWrite(V11, "TANK: ", sensorValue_tank);
+    Blynk.virtualWrite(V11, "TANK: ", sensorValue_tank, "\n");
   }
 }
 //------------------
