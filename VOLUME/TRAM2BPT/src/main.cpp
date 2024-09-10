@@ -6,8 +6,8 @@
 #define BLYNK_PRINT Serial
 #define APP_DEBUG
 
-const char *ssid = "KwacoBlynk";
-const char *password = "Password";
+const char* ssid = "BPT2";
+const char* password = "0919126757";
 // const char* ssid = "tram bom so 4";
 // const char* password = "0943950555";
 
@@ -30,12 +30,12 @@ const char *password = "Password";
 WiFiClient client;
 HTTPClient http;
 String server_name = "http://sgp1.blynk.cloud/external/api/";
-String Main_TOKEN = "Xd_XI0fm9nIsXBvvMZ6pjEtRd0irLLR2";
-#define URL_fw_Bin "https://raw.githubusercontent.com/quangtran3110/PlatformIO/main/VOLUME/TRAM3BPT/.pio/build/nodemcuv2/firmware.bin"
+String Main_TOKEN = "YZXkYAgH44t-kjJPKapydw5vMlR7MGAC";
+#define URL_fw_Bin "https://raw.githubusercontent.com/quangtran3110/PlatformIO/main/VOLUME/TRAM2BPT/.pio/build/nodemcuv2/firmware.bin"
 
-String LL24h = "&V31=";
-String LL1m3 = "&V29=";
-String terminal_main = "&V28=";
+String LL24h = "&V25=";
+String LL1m3 = "&V24=";
+String terminal_main = "&V23=";
 String text;
 
 bool blynk_first_connect = false, key_i2c = false;
@@ -59,7 +59,6 @@ BlynkTimer timer;
 BLYNK_CONNECTED() {
   rtc_widget.begin();
   blynk_first_connect = true;
-  Blynk.virtualWrite(V1, BLYNK_FIRMWARE_VERSION, "-EEPROM ", data.save_num);
 }
 
 ICACHE_RAM_ATTR void buttonPressed() {
