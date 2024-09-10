@@ -39,7 +39,7 @@
 #define BLYNK_TEMPLATE_NAME "TRẠM TÂN LẬP"
 #define BLYNK_AUTH_TOKEN "91thFYXxhfcs2ij5GDVg6NTjEgMqFBwi"
 
-#define BLYNK_FIRMWARE_VERSION "2409011"
+#define BLYNK_FIRMWARE_VERSION "2409010"
 #define BLYNK_PRINT Serial
 #define APP_DEBUG
 const char *ssid = "Tram Nuoc";
@@ -53,8 +53,8 @@ const char *password = "0917173339";
 //------------------
 #include "PCF8575.h"
 PCF8575 pcf8575_1(0x20);
-const int pin_B1 = P1;
-const int pin_B2 = P2;
+const int pin_B1 = P2;
+const int pin_B2 = P1;
 const int pin_rst = P4;
 const int pin_VFD = P5;
 
