@@ -71,7 +71,7 @@
 #define BLYNK_AUTH_TOKEN "ra1gZtR0irrwiTH1L-L_nhXI6TMRH7M9"
 #define VOLUME_TOKEN "fQeSuHadv_EFLjXPdqE-sV_lnZ6pXWfu"
 
-#define BLYNK_FIRMWARE_VERSION "240910"
+#define BLYNK_FIRMWARE_VERSION "240912"
 const char *ssid = "tram bom so 4";
 const char *password = "0943950555";
 #define APP_DEBUG
@@ -182,8 +182,8 @@ bool key = false, keyp = true, keytank = true;
 bool timer_updata_status, timer_I_status;
 bool time_run1 = false, time_run2 = false;
 bool noti_1 = true, noti_2 = true, noti_3 = true, noti_4 = true, noti_5 = true, noti_6 = true;
-bool blynk_first_connect = false;
-float clo_cache = 0, value, Result1;
+bool blynk_first_connect = false, pre_raw = false, tank_raw = false;
+float clo_cache = 0, value, Result1, sensorValue_pre, sensorValue_tank;
 uint32_t timestamp;
 int a, c, b, f = 0;
 int timer_2, timer_1, timer_3, timer_4, timer_5;
@@ -211,6 +211,7 @@ struct Data {
   byte key_noti;
   byte reset_day;
   int timerun_G1, timerun_B1, timerun_B2;
+
 } data, dataCheck;
 const struct Data dataDefault = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
 
@@ -667,9 +668,9 @@ void readPressure() // C0 - Ap Luc
   pcf8575_1.digitalWrite(S1pin, LOW);
   pcf8575_1.digitalWrite(S2pin, LOW);
   pcf8575_1.digitalWrite(S3pin, LOW);
-  float sensorValue = analogRead(A0);
+  sensorValue_pre = analogRead(A0);
   float Result;
-  Result = (((sensorValue - 186) * 6) / (805 - 186));
+  Result = (((sensorValue_pre - 186) * 6) / (805 - 186));
   if (Result > 0) {
     value += Result;
     Result1 = value / 16.0;
@@ -697,6 +698,14 @@ void MeasureCmForSmoothing() // C1 - Muc Nuoc
       timer1.setTimeout(15 * m, []() { keytank = true; });
     } else
       keytank = true;
+  }
+}
+void sensor_raw() {
+  if (pre_raw) {
+    Blynk.virtualWrite(V10, "PRE: ", sensorValue_pre, "\n");
+  }
+  if (tank_raw) {
+    Blynk.virtualWrite(V10, "TANK: ", sensorValue_tank, "\n");
   }
 }
 //-------------------------------------------------------------------
@@ -1052,6 +1061,14 @@ BLYNK_WRITE(V10) // String
       terminal.clear();
       Blynk.virtualWrite(V10, "Đã lưu - CLO:", data.clo, "kg");
     }
+  } else if (dataS == "pre") {
+    terminal.clear();
+    pre_raw = !pre_raw;
+  } else if (dataS == "tank") {
+    terminal.clear();
+    tank_raw = !tank_raw;
+  } else if (dataS == "clr") {
+    terminal.clear();
   } else {
     Blynk.virtualWrite(V10, "Mật mã sai.\nVui lòng nhập lại!\n");
   }

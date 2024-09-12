@@ -8,8 +8,8 @@
 
 const char *ssid = "KwacoBlynk";
 const char *password = "Password";
-// const char* ssid = "tram bom so 4";
-// const char* password = "0943950555";
+//const char* ssid = "tram bom so 4";
+//const char* password = "0943950555";
 
 #include <BlynkSimpleEsp8266.h>
 #include <ESP8266WiFi.h>
@@ -262,7 +262,7 @@ void scanI2C() {
 }
 //-------------------------
 void setup() {
-  Serial.begin(9600);
+  Serial.begin(115200);
   WiFi.mode(WIFI_STA);
   WiFi.begin(ssid, password);
   Blynk.config(BLYNK_AUTH_TOKEN);
