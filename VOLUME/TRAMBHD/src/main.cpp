@@ -30,12 +30,12 @@ const char* password = "0919126757";
 WiFiClient client;
 HTTPClient http;
 String server_name = "http://sgp1.blynk.cloud/external/api/";
-String Main_TOKEN = "Xd_XI0fm9nIsXBvvMZ6pjEtRd0irLLR2";
-#define URL_fw_Bin "https://raw.githubusercontent.com/quangtran3110/PlatformIO/main/VOLUME/TRAM3BPT/.pio/build/nodemcuv2/firmware.bin"
+String Main_TOKEN = "8rYwP5-2nYyA6G1txMqXMamUNITRd-k9";
+#define URL_fw_Bin "https://raw.githubusercontent.com/quangtran3110/PlatformIO/main/VOLUME/TRAMBHD/.pio/build/nodemcuv2/firmware.bin"
 
-String LL24h = "&V31=";
-String LL1m3 = "&V29=";
-String terminal_main = "&V28=";
+String terminal_main = "&V31=";
+String LL1m3 = "&V32=";
+String LL24h = "&V33=";
 String text;
 
 bool blynk_first_connect = false, key_i2c = false;
