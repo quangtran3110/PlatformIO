@@ -1,15 +1,15 @@
-#define BLYNK_TEMPLATE_ID "TMPL6swUcB_EZ"
+#define BLYNK_TEMPLATE_ID "TMPL6PNVY0BY7"
 #define BLYNK_TEMPLATE_NAME "VOLUME"
-#define BLYNK_AUTH_TOKEN "Q2KAjaqI3sWhET-Ax94VPYfIk2Fmsr36"
+#define BLYNK_AUTH_TOKEN "PWYW_mopMTAAnpmZOeGH3h4D4QOzZi9X"
 
-#define BLYNK_FIRMWARE_VERSION "240910"
+#define BLYNK_FIRMWARE_VERSION "241020"
 #define BLYNK_PRINT Serial
 #define APP_DEBUG
 
-const char *ssid = "KwacoBlynk";
-const char *password = "Password";
-//const char *ssid = "tram bom so 4";
-//const char *password = "0943950555";
+const char* ssid = "Cap Nuoc";
+const char* password = "0919126757";
+// const char *ssid = "tram bom so 4";
+// const char *password = "0943950555";
 
 #include <BlynkSimpleEsp8266.h>
 #include <ESP8266WiFi.h>
