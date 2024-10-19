@@ -66,7 +66,7 @@
 #define BLYNK_AUTH_TOKEN "8rYwP5-2nYyA6G1txMqXMamUNITRd-k9"
 #define VOLUME_TOKEN "PWYW_mopMTAAnpmZOeGH3h4D4QOzZi9X"
 
-#define BLYNK_FIRMWARE_VERSION "241020"
+#define BLYNK_FIRMWARE_VERSION "241021"
 const char *ssid = "Cap Nuoc";
 const char *password = "0919126757";
 // const char* ssid = "tram bom so 4";
