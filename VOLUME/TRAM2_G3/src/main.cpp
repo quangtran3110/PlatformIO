@@ -260,11 +260,12 @@ void scanI2C() {
 }
 //-------------------------
 void setup() {
-  Serial.begin(9600);
+  Serial.begin(115200);
   WiFi.mode(WIFI_STA);
   WiFi.begin(ssid, password);
   Blynk.config(BLYNK_AUTH_TOKEN);
   delay(5000);
+
 
   Wire.begin();
   ee.begin();
@@ -276,6 +277,7 @@ void setup() {
   timer.setInterval(61005, connectionstatus);
   timer.setInterval(15003, rtc_time);
   timer.setInterval(5013, scanI2C);
+  
 }
 
 void loop() {

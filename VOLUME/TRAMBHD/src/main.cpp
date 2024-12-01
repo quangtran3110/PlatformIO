@@ -63,7 +63,7 @@ BLYNK_CONNECTED() {
 
 ICACHE_RAM_ATTR void buttonPressed() {
   data.pulse++;
-  // Serial.println(data.pulse);
+  //Serial.println(data.pulse);
 }
 
 //-------------------------
