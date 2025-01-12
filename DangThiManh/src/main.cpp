@@ -6,30 +6,26 @@
 #include <SPI.h>
 //-------------------
 #include "PCF8575.h"
-PCF8575 pcf8575_1(0x20);
-PCF8575 pcf8575_2(0x21);
-const int pin_read_p0 = P0;
-const int pin_read_p1 = P1;
-const int pin_read_p2 = P2;
-const int pin_read_p3 = P3;
-const int pin_read_p4 = P4;
-const int pin_read_p5 = P5;
+PCF8575 pcf8575_1(0x21);
+PCF8575 pcf8575_2(0x20);
+const int IN_MODE_RUALOC = P0;
+const int IN_LOC_1 = P1;
+const int IN_LOC_2 = P2;
+const int IN_TIMER_LOC_1 = P3;
+const int IN_TIMER_LOC_2 = P4;
 
-const int van_loc_1 = P0;
-const int van_nguon_loc_1 = P1;
+const int nguon_220v = P0;
+const int van_loc_1 = P1;
 const int van_khi_loc_1 = P2;
-const int van_loc_2 = P3;
-const int van_nguon_loc_2 = P4;
+const int van_nguon_loc_1 = P3;
+const int van_loc_2 = P4;
 const int van_khi_loc_2 = P5;
-const int van_xa_be = P6;
-const int thoi_khi = P7;
+const int van_nguon_loc_2 = P6;
+const int van_xa_be = P7;
 const int bom_loc = P8;
-const int nguon_220v = P9;
+const int thoi_khi = P9;
+const int thoi_gio = P10;
 
-const int S0pin = P15;
-const int S1pin = P14;
-const int S2pin = P13;
-const int S3pin = P12;
 //-------------------
 #include <OneWire.h>
 #include <Wire.h>
@@ -41,8 +37,10 @@ const word address = 0;
 //-------------------
 int thoi_gian_rua_loc_1, thoi_gian_rua_loc_2;
 int timer_nguon_220;
+int timer_loc12, timer_loc1, timer_loc2;
 byte status_rualoc1 = HIGH;
 byte status_rualoc2 = HIGH;
+bool key_loc12 = true, key_loc1 = true, key_loc2 = true;
 struct Data {
   byte status_rualoc1123;
 
@@ -62,65 +60,172 @@ void nguon_220VAC() {
 void loc1() {
   pcf8575_1.digitalWrite(van_loc_1, !status_rualoc1);
   pcf8575_1.digitalWrite(van_khi_loc_1, !status_rualoc1);
-  pcf8575_1.digitalWrite(van_xa_be, !status_rualoc1);
 }
 void loc2() {
   pcf8575_1.digitalWrite(van_loc_2, !status_rualoc2);
   pcf8575_1.digitalWrite(van_khi_loc_2, !status_rualoc2);
-  pcf8575_1.digitalWrite(van_xa_be, !status_rualoc2);
 }
 void rualoc() {
-  if ((pcf8575_2.digitalRead(pin_read_p1) == HIGH) || (pcf8575_2.digitalRead(pin_read_p2) == HIGH)) {
-    if ((pcf8575_2.digitalRead(pin_read_p1) == HIGH) && (pcf8575_2.digitalRead(pin_read_p2) == HIGH)) {
-      pcf8575_1.digitalWrite(van_nguon_loc_1, LOW);
-      pcf8575_1.digitalWrite(van_nguon_loc_2, LOW);
-    } else if (pcf8575_2.digitalRead(pin_read_p1) == HIGH) {
+  byte in_loc_1 = pcf8575_2.digitalRead(IN_LOC_1);
+  byte in_loc_2 = pcf8575_2.digitalRead(IN_LOC_2);
+  byte in_mode_RL = pcf8575_2.digitalRead(IN_MODE_RUALOC);
+  byte in_timer_loc_1 = pcf8575_2.digitalRead(IN_TIMER_LOC_1);
+  byte in_timer_loc_2 = pcf8575_2.digitalRead(IN_TIMER_LOC_2);
+  // Serial.print(in_loc_1);
+  // Serial.print(in_loc_2);
+  // Serial.println(in_mode_RL);
+  if ((in_loc_1 == HIGH) && (in_loc_2 == HIGH)) {                              // Nếu công tắc cơ lọc 1 và lọc 2 đều mở
+    if ((in_timer_loc_1 == HIGH) || (in_timer_loc_2 == HIGH)) {                // Nếu timer rửa lọc 1 hoặc lọc 2 mở
+      if ((in_timer_loc_1 == HIGH) && (in_timer_loc_2 == HIGH) && key_loc12) { // Nếu timer rửa lọc 1 và lọc 2 mở
+        pcf8575_1.digitalWrite(van_xa_be, LOW);
+        pcf8575_1.digitalWrite(van_nguon_loc_1, HIGH);
+        pcf8575_1.digitalWrite(van_nguon_loc_2, HIGH);
+        key_loc12 = false;
+        status_rualoc1 = true;
+        status_rualoc2 = true;
+        loc1();
+        loc2();
+        timer.setTimeout(1500, []() {
+          pcf8575_1.digitalWrite(thoi_khi, LOW);
+        });
+        timer_loc12 = timer.setTimeout(10 * 1000, []() {
+          pcf8575_1.digitalWrite(bom_loc, LOW);
+          key_loc12 = true;
+        });
+      } else if (in_timer_loc_1 == HIGH && key_loc1) { // Nếu timer rửa lọc 1 mở
+        pcf8575_1.digitalWrite(van_xa_be, LOW);
+        pcf8575_1.digitalWrite(van_nguon_loc_1, HIGH);
+        pcf8575_1.digitalWrite(van_nguon_loc_2, LOW);
+        key_loc1 = false;
+        status_rualoc1 = true;
+        status_rualoc2 = false;
+        loc1();
+        loc2();
+        timer.setTimeout(1500, []() {
+          pcf8575_1.digitalWrite(thoi_khi, LOW);
+        });
+        timer_loc1 = timer.setTimeout(10 * 1000, []() {
+          pcf8575_1.digitalWrite(bom_loc, LOW);
+          key_loc1 = true;
+        });
+      } else if (in_timer_loc_2 == HIGH && key_loc2) { // Nếu timer rửa lọc 2 mở
+        pcf8575_1.digitalWrite(van_xa_be, LOW);
+        pcf8575_1.digitalWrite(van_nguon_loc_1, LOW);
+        pcf8575_1.digitalWrite(van_nguon_loc_2, HIGH);
+        key_loc2 = false;
+        status_rualoc1 = false;
+        status_rualoc2 = true;
+        loc1();
+        loc2();
+        timer.setTimeout(1500, []() {
+          pcf8575_1.digitalWrite(thoi_khi, LOW);
+        });
+        timer_loc2 = timer.setTimeout(10 * 1000, []() {
+          pcf8575_1.digitalWrite(bom_loc, LOW);
+          key_loc2 = true;
+        });
+      }
+    } else if (in_mode_RL == HIGH && key_loc12) { // Nếu công tắc cơ ở chế độ rửa lọc
+      pcf8575_1.digitalWrite(van_xa_be, LOW);
       pcf8575_1.digitalWrite(van_nguon_loc_1, HIGH);
-      pcf8575_1.digitalWrite(van_nguon_loc_2, LOW);
-    } else if (pcf8575_2.digitalRead(pin_read_p2) == HIGH) {
-      pcf8575_1.digitalWrite(van_nguon_loc_1, LOW);
       pcf8575_1.digitalWrite(van_nguon_loc_2, HIGH);
-    }
-  }
-  if (pcf8575_2.digitalRead(pin_read_p0) == HIGH) { // Nếu ở chế độ rửa lọc
-    if ((pcf8575_2.digitalRead(pin_read_p1) == HIGH) && (pcf8575_2.digitalRead(pin_read_p2) == HIGH)) {
+      key_loc12 = false;
       status_rualoc1 = true;
       status_rualoc2 = true;
       loc1();
       loc2();
-      timer.setTimeout(10 * 1000, []() {
-        pcf8575_1.digitalWrite(thoi_khi, !status_rualoc1);
-        pcf8575_1.digitalWrite(bom_loc, !status_rualoc1);
+      timer.setTimeout(1500, []() {
+        pcf8575_1.digitalWrite(thoi_khi, LOW);
       });
-    } else if (pcf8575_2.digitalRead(pin_read_p1) == HIGH) {
-      status_rualoc1 = true;
-      status_rualoc2 = false;
-      loc1();
-      loc2();
-      timer.setTimeout(10 * 1000, []() {
-        pcf8575_1.digitalWrite(thoi_khi, !status_rualoc1);
-        pcf8575_1.digitalWrite(bom_loc, !status_rualoc1);
+      timer_loc12 = timer.setTimeout(10 * 1000, []() {
+        pcf8575_1.digitalWrite(bom_loc, LOW);
+        key_loc12 = true;
       });
-    } else if (pcf8575_2.digitalRead(pin_read_p2) == HIGH) {
+    } else if ((in_timer_loc_1 == LOW) && (in_timer_loc_2 == LOW) && (in_mode_RL == LOW)) {
       status_rualoc1 = false;
-      status_rualoc2 = true;
+      status_rualoc2 = false;
+      key_loc1 = true;
+      key_loc2 = true;
       loc1();
       loc2();
-      timer.setTimeout(10 * 1000, []() {
-        pcf8575_1.digitalWrite(thoi_khi, !status_rualoc2);
-        pcf8575_1.digitalWrite(bom_loc, !status_rualoc2);
-      });
+      pcf8575_1.digitalWrite(van_nguon_loc_1, HIGH);
+      pcf8575_1.digitalWrite(van_nguon_loc_2, HIGH);
+      pcf8575_1.digitalWrite(thoi_khi, HIGH);
+      pcf8575_1.digitalWrite(van_xa_be, HIGH);
+      pcf8575_1.digitalWrite(bom_loc, HIGH);
+      timer.deleteTimer(timer_loc12);
+      timer.deleteTimer(timer_loc1);
+      timer.deleteTimer(timer_loc2);
     }
-  } else {
+
+  } else if (in_loc_1 == HIGH) {
+    pcf8575_1.digitalWrite(van_nguon_loc_1, HIGH);
+    pcf8575_1.digitalWrite(van_nguon_loc_2, LOW);
+    if (((in_mode_RL == HIGH) || (in_timer_loc_1 == HIGH)) && key_loc1) {
+      pcf8575_1.digitalWrite(van_xa_be, LOW);
+      key_loc1 = false;
+      status_rualoc1 = true;
+      loc1();
+      timer.setTimeout(1500, []() {
+        pcf8575_1.digitalWrite(thoi_khi, LOW);
+      });
+      timer_loc1 = timer.setTimeout(10 * 1000, []() {
+        pcf8575_1.digitalWrite(bom_loc, LOW);
+        key_loc1 = true;
+      });
+    } else if ((in_timer_loc_1 == LOW) && (in_mode_RL == LOW)) {
+      status_rualoc1 = false;
+      key_loc1 = true;
+      loc1();
+      pcf8575_1.digitalWrite(van_nguon_loc_1, HIGH);
+      pcf8575_1.digitalWrite(thoi_khi, HIGH);
+      pcf8575_1.digitalWrite(van_xa_be, HIGH);
+      pcf8575_1.digitalWrite(bom_loc, HIGH);
+      timer.deleteTimer(timer_loc1);
+    }
+  } else if (in_loc_2 == HIGH) {
+    pcf8575_1.digitalWrite(van_nguon_loc_1, LOW);
+    pcf8575_1.digitalWrite(van_nguon_loc_2, HIGH);
+    if (((in_mode_RL == HIGH) || (in_timer_loc_2 == HIGH)) && key_loc2) {
+      pcf8575_1.digitalWrite(van_xa_be, LOW);
+      key_loc2 = false;
+      status_rualoc2 = true;
+      loc2();
+      timer.setTimeout(1500, []() {
+        pcf8575_1.digitalWrite(thoi_khi, LOW);
+      });
+      timer_loc2 = timer.setTimeout(10 * 1000, []() {
+        pcf8575_1.digitalWrite(bom_loc, LOW);
+        key_loc2 = true;
+      });
+    } else if ((in_timer_loc_2 == LOW) && (in_mode_RL == LOW)) {
+      status_rualoc2 = false;
+      key_loc2 = true;
+      loc2();
+      pcf8575_1.digitalWrite(van_nguon_loc_2, HIGH);
+      pcf8575_1.digitalWrite(thoi_khi, HIGH);
+      pcf8575_1.digitalWrite(van_xa_be, HIGH);
+      pcf8575_1.digitalWrite(bom_loc, HIGH);
+      timer.deleteTimer(timer_loc2);
+    }
+  } else if ((in_loc_1 == LOW) && (in_loc_2 == LOW)) {
+    pcf8575_1.digitalWrite(van_nguon_loc_1, LOW);
+    pcf8575_1.digitalWrite(van_nguon_loc_2, LOW);
+    pcf8575_1.digitalWrite(thoi_khi, HIGH);
+    pcf8575_1.digitalWrite(van_xa_be, HIGH);
+    pcf8575_1.digitalWrite(bom_loc, HIGH);
     status_rualoc1 = false;
     status_rualoc2 = false;
     loc1();
     loc2();
-    pcf8575_1.digitalWrite(thoi_khi, !status_rualoc1);
-    pcf8575_1.digitalWrite(bom_loc, !status_rualoc1);
+    key_loc1 = true;
+    key_loc2 = true;
+    key_loc12 = true;
+    timer.deleteTimer(timer_loc12);
+    timer.deleteTimer(timer_loc1);
+    timer.deleteTimer(timer_loc2);
   }
 }
-
 void setup() {
   Serial.begin(115200);
   Wire.begin();
@@ -128,29 +233,49 @@ void setup() {
   eeprom.readBytes(address, sizeof(dataDefault), (byte *)&data);
 
   pcf8575_1.begin();
-  pcf8575_2.begin();
-  pcf8575_2.pinMode(pin_read_p0, INPUT);
-  pcf8575_2.pinMode(pin_read_p1, INPUT);
-  pcf8575_2.pinMode(pin_read_p2, INPUT);
-  pcf8575_2.pinMode(pin_read_p3, INPUT);
-  pcf8575_2.pinMode(pin_read_p4, INPUT);
-  pcf8575_2.pinMode(pin_read_p5, INPUT);
+  pcf8575_1.pinMode(van_loc_1, OUTPUT);
+  pcf8575_1.digitalWrite(van_loc_1, HIGH);
+  pcf8575_1.pinMode(van_loc_2, OUTPUT);
+  pcf8575_1.digitalWrite(van_loc_2, HIGH);
+  pcf8575_1.pinMode(van_nguon_loc_1, OUTPUT);
+  pcf8575_1.digitalWrite(van_nguon_loc_1, HIGH);
+  pcf8575_1.pinMode(van_khi_loc_1, OUTPUT);
+  pcf8575_1.digitalWrite(van_khi_loc_1, HIGH);
+  pcf8575_1.pinMode(van_nguon_loc_2, OUTPUT);
+  pcf8575_1.digitalWrite(van_nguon_loc_2, HIGH);
+  pcf8575_1.pinMode(van_khi_loc_2, OUTPUT);
+  pcf8575_1.digitalWrite(van_khi_loc_2, HIGH);
+  pcf8575_1.pinMode(van_xa_be, OUTPUT);
+  pcf8575_1.digitalWrite(van_xa_be, HIGH);
+  pcf8575_1.pinMode(thoi_khi, OUTPUT);
+  pcf8575_1.digitalWrite(thoi_khi, HIGH);
+  pcf8575_1.pinMode(bom_loc, OUTPUT);
+  pcf8575_1.digitalWrite(bom_loc, HIGH);
+  pcf8575_1.pinMode(nguon_220v, OUTPUT);
+  pcf8575_1.digitalWrite(nguon_220v, LOW);
+  pcf8575_1.pinMode(P10, OUTPUT);
+  pcf8575_1.digitalWrite(P10, HIGH);
+  pcf8575_1.pinMode(P11, OUTPUT);
+  pcf8575_1.digitalWrite(P11, HIGH);
+  pcf8575_1.pinMode(P12, OUTPUT);
+  pcf8575_1.digitalWrite(P12, HIGH);
+  pcf8575_1.pinMode(P13, OUTPUT);
+  pcf8575_1.digitalWrite(P13, HIGH);
+  pcf8575_1.pinMode(P14, OUTPUT);
+  pcf8575_1.digitalWrite(P14, HIGH);
+  pcf8575_1.pinMode(P15, OUTPUT);
+  pcf8575_1.digitalWrite(P15, HIGH);
 
-  timer.setTimeout(5000L, []() {
-    timer.setInterval(3000, []() {
-      Serial.print("P0: ");
-      Serial.println(pcf8575_2.digitalRead(pin_read_p0));
-      Serial.print("P1: ");
-      Serial.println(pcf8575_2.digitalRead(pin_read_p1));
-      Serial.print("P2: ");
-      Serial.println(pcf8575_2.digitalRead(pin_read_p2));
-      Serial.print("P3: ");
-      Serial.println(pcf8575_2.digitalRead(pin_read_p3));
-      Serial.print("P4: ");
-      Serial.println(pcf8575_2.digitalRead(pin_read_p4));
-      Serial.print("P5: ");
-      Serial.println(pcf8575_2.digitalRead(pin_read_p5));
-      Serial.println(" ");
+  pcf8575_2.begin();
+  pcf8575_2.pinMode(IN_MODE_RUALOC, INPUT_PULLUP);
+  pcf8575_2.pinMode(IN_LOC_1, INPUT_PULLUP);
+  pcf8575_2.pinMode(IN_LOC_2, INPUT_PULLUP);
+  pcf8575_2.pinMode(IN_TIMER_LOC_1, INPUT_PULLUP);
+  pcf8575_2.pinMode(IN_TIMER_LOC_2, INPUT_PULLUP);
+
+  timer.setTimeout(1000, []() {
+    timer.setInterval(1000, []() {
+      rualoc();
     });
   });
 }

@@ -2,12 +2,15 @@
 #define BLYNK_TEMPLATE_NAME "VOLUME"
 #define BLYNK_AUTH_TOKEN "JTnEpJjGVVJ8DM1aJx7zZT4cyNYJrhr_"
 
-#define BLYNK_FIRMWARE_VERSION "241019"
+#define BLYNK_FIRMWARE_VERSION "241201"
 #define BLYNK_PRINT Serial
 #define APP_DEBUG
 
-const char *ssid = "Hiddennet";
-const char *password = "Password";
+//const char *ssid = "Hiddennet";
+//const char *password = "Password";
+
+const char *ssid = "tram bom so 4";
+const char *password = "0943950555";
 
 #include <BlynkSimpleEsp8266.h>
 #include <ESP8266WiFi.h>
@@ -277,7 +280,7 @@ void setup() {
   timer.setInterval(61005, connectionstatus);
   timer.setInterval(15003, rtc_time);
   timer.setInterval(5013, scanI2C);
-  
+
 }
 
 void loop() {
