@@ -40,7 +40,7 @@ const char *ssid = "net";
 const char *password = "Abcd@1234";
 //-------------------------------------------------------------------
 #define BLYNK_PRINT Serial
-#define BLYNK_FIRMWARE_VERSION "250112"
+#define BLYNK_FIRMWARE_VERSION "250119"
 #define APP_DEBUG
 
 #pragma region // Library
@@ -252,6 +252,7 @@ void readPower() // C3 - Cấp 1  - I0
           trip0 = true;
           timer1.setTimeout(50 * 60 * 1000, []() {
             trip0 = false;
+            on_cap1();
           });
           if (data.noti) {
             Blynk.logEvent("error", String("Cấp 1 lỗi: ") + Irms0 + String(" A"));
@@ -290,6 +291,7 @@ void readPower1() // C4 - Bơm    - I1
           trip1 = true;
           timer1.setTimeout(50 * 60 * 1000, []() {
             trip1 = false;
+            on_bom();
           });
           if (data.noti) {
             Blynk.logEvent("error", String("Cấp 2 lỗi: ") + Irms1 + String(" A"));
