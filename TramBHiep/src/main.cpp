@@ -40,7 +40,7 @@ const char *ssid = "net";
 const char *password = "Abcd@1234";
 //-------------------------------------------------------------------
 #define BLYNK_PRINT Serial
-#define BLYNK_FIRMWARE_VERSION "250119"
+#define BLYNK_FIRMWARE_VERSION "250127"
 #define APP_DEBUG
 
 #pragma region // Library
@@ -289,7 +289,7 @@ void readPower1() // C4 - Bơm    - I1
           off_bom();
           xSetAmpe1 = 0;
           trip1 = true;
-          timer1.setTimeout(50 * 60 * 1000, []() {
+          timer1.setTimeout(20 * 60 * 1000, []() {
             trip1 = false;
             on_bom();
           });

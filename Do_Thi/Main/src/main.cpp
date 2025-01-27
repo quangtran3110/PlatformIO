@@ -98,6 +98,14 @@ V58 - Irms
 #define dhvuong_TOKEN "eBeqi9ZJhRK3r66cUzgdD1gp2xGxG7kS"
 #define thpt1_TOKEN "H3VsCxfjXq67ALREdZcKOANCQ_kdFqfg"
 #define thpt2_TOKEN "H04PY3egc4KE3YnBQkOFEMNAGohM_oGo"
+//------------------
+#define T2_G1_TOKEN "L_2oEOyv4bmrdsesIoasyKiEEOFZVgBO"
+#define T2_G2_TOKEN "Hc5DgCBzl4Oi5hW_JOaNZ6oBKoGy5kFI"
+#define T2_G3_TOKEN "JTnEpJjGVVJ8DM1aJx7zZT4cyNYJrhr_"
+#define T2BPT_TOKEN "AdXbklpLJKTZQ5hK9Qpy7Sg5DdwgmQ8z"
+#define T3BPT_TOKEN "Q2KAjaqI3sWhET-Ax94VPYfIk2Fmsr36"
+#define T4_TOKEN "fQeSuHadv_EFLjXPdqE-sV_lnZ6pXWfu"
+#define BHD_TOKEN "PWYW_mopMTAAnpmZOeGH3h4D4QOzZi9X"
 #pragma endregion
 //-----------------------------
 #define BLYNK_PRINT Serial
@@ -2005,6 +2013,26 @@ void check_status() {
         i_thpt2++;
         if (i_thpt2 == 60)
           Blynk.logEvent("error", "Module thpt2 offline!");
+      }
+    }
+  }
+  //------------------------- Volume T2-G1
+  {
+    server_path = main_sever + "isHardwareConnected?token=" + T2_G1_TOKEN;
+    http.begin(client, server_path.c_str());
+    int httpResponseCode = http.GET();
+    if (httpResponseCode > 0) {
+      payload = http.getString();
+    }
+    http.end();
+    if (payload == "true") {
+      i_ccd = 0;
+    } else {
+      hidden_ccd();
+      if (time_run) {
+        i_ccd++;
+        if (i_ccd == 60)
+          Blynk.logEvent("error", "Module ccd offline!");
       }
     }
   }
