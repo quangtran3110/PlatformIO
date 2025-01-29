@@ -36,7 +36,7 @@
 #define BLYNK_TEMPLATE_ID "TMPL6usi7FSqp"
 #define BLYNK_TEMPLATE_NAME "TRẠM SỐ 3"
 #define BLYNK_AUTH_TOKEN "R_V1bJ9xeyl6Yokg1rhlaLhK-NYcDVpx"
-#define BLYNK_FIRMWARE_VERSION "240905"
+#define BLYNK_FIRMWARE_VERSION "250129"
 //------------------
 #include "EmonLib.h"
 #include "PCF8575.h"
@@ -345,7 +345,7 @@ void readPower1() { // C3 - Bơm    - I1
   if (rms1 < 2) {
     Irms1 = 0;
     yIrms1 = 0;
-    if ((data.status_b1 == HIGH) && (conlai > 180)) {
+    if ((data.status_b1 == HIGH) && (conlai > 190)) {
       xIrms1++;
       if ((xIrms1 > 3) && (data.key_protect)) {
         xIrms1 = 0;
