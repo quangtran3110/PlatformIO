@@ -135,55 +135,55 @@ uint32_t start_, stop_;
 
 #pragma region // Khai báo biến của các tủ
 //------------------- Cầu Cửa Đông
-int i_ccd = 0;
+byte i_ccd = 0;
 byte sta_v1_ccd, mode_ccd;
 byte hidden_key_ccd = 3;
 //------------------- UBND P2
-int i_ubndp2 = 0;
+byte i_ubndp2 = 0;
 byte sta_v1_ubndp2, mode_ubndp2;
 byte hidden_key_ubndp2 = 3;
 //------------------- Ao lục bình
-int i_alb = 0;
+byte i_alb = 0;
 byte sta_v1_alb, sta_v2_alb;
 byte mode_alb;
 byte hidden_key_alb = 3;
 //------------------- N.T.Bình
-int i_ntbinh = 0;
+byte i_ntbinh = 0;
 byte sta_v1_ntbinh;
 byte mode_ntbinh;
 byte hidden_key_ntbinh = 3;
 //------------------- D.H.Vuong
-int i_dhvuong = 0;
+byte i_dhvuong = 0;
 byte sta_v1_dhvuong;
 byte mode_dhvuong;
 byte hidden_key_dhvuong = 3;
 //------------------- THPT 1
-int i_thpt1 = 0;
+byte i_thpt1 = 0;
 byte sta_v1_thpt1;
 byte mode_thpt1;
 byte hidden_key_thpt1 = 3;
 //------------------- THPT 2
-int i_thpt2 = 0;
+byte i_thpt2 = 0;
 byte sta_v1_thpt2;
 byte mode_thpt2;
 byte hidden_key_thpt2 = 3;
 //------------------- Bờ kè 1
-int i_boke1 = 0;
+byte i_boke1 = 0;
 byte sta_v1_boke1;
 byte mode_boke1;
 byte hidden_key_boke1 = 3;
 //------------------- Bờ kè 2
-int i_boke2 = 0;
+byte i_boke2 = 0;
 byte sta_v1_boke2;
 byte mode_boke2;
 byte hidden_key_boke2 = 3;
 //------------------- Bờ kè 3
-int i_boke3 = 0;
+byte i_boke3 = 0;
 byte sta_v1_boke3;
 byte mode_boke3;
 byte hidden_key_boke3 = 3;
 //------------------- Bờ kè 4
-int i_boke4 = 0;
+byte i_boke4 = 0;
 byte sta_v1_boke4;
 byte mode_boke4;
 byte hidden_key_boke4 = 3;
@@ -223,9 +223,7 @@ void connectionstatus() {
       WiFi.begin(ssid, password);
     }
     if (reboot_num % 5 == 0) {
-      WiFi.disconnect();
-      delay(1000);
-      WiFi.begin(ssid, password);
+      ESP.restart();
     }
   }
   if (Blynk.connected()) {
@@ -552,26 +550,24 @@ BLYNK_WRITE(V3) { // Chọn van
   }
 }
 BLYNK_WRITE(V4) { // Time input
-  if (key_set) {
-    TimeInputParam t(param);
-    if (t.hasStartTime()) {
-      start_ = t.getStartHour() * 3600 + t.getStartMinute() * 60;
-    }
-    if (t.hasStopTime()) {
-      stop_ = t.getStopHour() * 3600 + t.getStopMinute() * 60;
-    }
-    memset(A, '\0', sizeof(A));
-    for (int i = 1; i <= 7; i++) {
-      // Nếu ngày i được chọn
-      if (t.isWeekdaySelected(i) == 1) {
-        // Thêm giá trị i vào mảng A
-        strcat(A, String(i).c_str());
-        strcat(A, ",");
-      }
-    }
-    // Xóa ký tự cuối cùng là dấu phẩy
-    A[strlen(A) - 1] = '\0';
+  TimeInputParam t(param);
+  if (t.hasStartTime()) {
+    start_ = t.getStartHour() * 3600 + t.getStartMinute() * 60;
   }
+  if (t.hasStopTime()) {
+    stop_ = t.getStopHour() * 3600 + t.getStopMinute() * 60;
+  }
+  memset(A, '\0', sizeof(A));
+  for (int i = 1; i <= 7; i++) {
+    // Nếu ngày i được chọn
+    if (t.isWeekdaySelected(i) == 1) {
+      // Thêm giá trị i vào mảng A
+      strcat(A, String(i).c_str());
+      strcat(A, ",");
+    }
+  }
+  // Xóa ký tự cuối cùng là dấu phẩy
+  A[strlen(A) - 1] = '\0';
 }
 BLYNK_WRITE(V5) { // Save time input
   if (key_set) {
@@ -602,6 +598,7 @@ BLYNK_WRITE(V5) { // Save time input
           http.begin(client, server_path.c_str());
           http.GET();
           http.end();
+          Serial.println(server_path);
         } else if (dia_diem == 3) { // UBND P2
           String server_path = main_sever + "batch/update?token=" + ubndp2_TOKEN + "&V1=" + start_ + "&V1=" + stop_ + "&V1=" + tz + "&V1=" + String(A);
           http.begin(client, server_path.c_str());
@@ -2016,7 +2013,7 @@ void check_status() {
       }
     }
   }
-  //------------------------- Volume T2-G1
+  /*//------------------------- Volume T2-G1
   {
     server_path = main_sever + "isHardwareConnected?token=" + T2_G1_TOKEN;
     http.begin(client, server_path.c_str());
@@ -2035,7 +2032,7 @@ void check_status() {
           Blynk.logEvent("error", "Module ccd offline!");
       }
     }
-  }
+  }/**/
 }
 
 void setup() {
