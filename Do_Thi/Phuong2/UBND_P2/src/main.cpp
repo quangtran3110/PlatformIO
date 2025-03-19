@@ -1,13 +1,13 @@
-#define BLYNK_TEMPLATE_ID "TMPL6VP9MY4gS"
-#define BLYNK_TEMPLATE_NAME "Cau Cua Dong"
-#define BLYNK_AUTH_TOKEN "jaQFoaOgdcZcKbyI_ME_oi6tThEf4FR5"
-#define BLYNK_FIRMWARE_VERSION "250319"
+#define BLYNK_TEMPLATE_ID "TMPL65p6kPQP0"
+#define BLYNK_TEMPLATE_NAME "UBND P2"
+#define BLYNK_AUTH_TOKEN "gvfnRXv14oMohtqMWTPQXbduFKww1zfu"
+#define BLYNK_FIRMWARE_VERSION "250318"
 
 #define Main_TOKEN "w3ZZc7F4pvOIwqozyrzYcBFVUE3XxSiW"
-const char *ssid = "net";
-const char *password = "Abcd@1234";
-// const char* ssid = "Wifi";
-// const char* password = "Password";
+// const char* ssid = "net";
+// const char* password = "Abcd@1234";
+const char *ssid = "tram bom so 4";
+const char *password = "0943950555";
 //-------------------------------------------------------------------
 #define BLYNK_PRINT Serial
 #define APP_DEBUG
@@ -47,24 +47,15 @@ const word address = 0;
 #include <WiFiClientSecure.h>
 WiFiClient client;
 HTTPClient http;
-#define URL_fw_Bin "https://raw.githubusercontent.com/quangtran3110/PlatformIO/main/Do_Thi/Phuong2/Caucuadong/.pio/build/nodemcuv2/firmware.bin"
+#define URL_fw_Bin "https://raw.githubusercontent.com/quangtran3110/PlatformIO/main/Do_Thi/Phuong2/UBND_P2/.pio/build/nodemcuv2/firmware.bin"
 String server_name = "http://sgp1.blynk.cloud/external/api/";
 //-----------------------------
-#define pin_mode "&V8="
-#define pin_terminal "&V6="
-#define pin_G "&V9="
-String location = urlEncode("Phường 2 - Cầu Cửa Đông\n");
+#define pin_terminal "&V10="
+#define pin_G "&V11="
+#define pin_mode "&V12="
+String location = urlEncode("Phường 2 - CV UBND P2\n");
 //-----------------------------
-struct Data {
-  byte mode;
-  byte reboot_num;
-  byte save_num;
-  uint32_t rl1_r, rl1_s;
-  byte MonWeekDay, TuesWeekDay, WedWeekDay, ThuWeekDay, FriWeekDay, SatWeekend, SunWeekend;
-} data, dataCheck;
-const struct Data dataDefault = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
-//-----------------------------
-byte prev_mode = 3;
+byte reboot_num, prev_mode = 3;
 int hour_start_rl1 = 0, minute_start_rl1 = 0, hour_stop_rl1 = 0, minute_stop_rl1 = 0;
 int timer_I;
 int dayadjustment = -1;
@@ -75,7 +66,16 @@ char s_day[50] = "";
 char B[50] = "";
 String s_timer_van_1;
 String s_weekday;
-
+//-----------------------------
+struct Data {
+  byte mode;
+  byte reboot_num;
+  byte save_num;
+  uint32_t rl1_r, rl1_s;
+  byte MonWeekDay, TuesWeekDay, WedWeekDay, ThuWeekDay, FriWeekDay, SatWeekend, SunWeekend;
+} data, dataCheck;
+const struct Data dataDefault = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+//-----------------------------
 WidgetTerminal DATAS(V0);
 WidgetRTC rtc_widget;
 //-------------------------------------------------------------------
@@ -84,38 +84,29 @@ BLYNK_CONNECTED() {
   rtc_widget.begin();
   blynk_first_connect = true;
 }
-//-------------------------------------------------------------------
-void savedata() {
-  if (memcmp(&data, &dataCheck, sizeof(dataDefault)) == 0) {
-    // Serial.println("structures same no need to write to EEPROM");
-  } else {
-    // Serial.println("\nWrite bytes to EEPROM memory...");
-    data.save_num = data.save_num + 1;
-    eeprom.writeBytes(address, sizeof(dataDefault), (byte *)&data);
-    // Blynk.setProperty(V0, "label", BLYNK_FIRMWARE_VERSION, "-EEPROM ", data.save_num);
-  }
-}
 //-------------------------
 void connectionstatus() {
   if ((WiFi.status() != WL_CONNECTED)) {
-    // Serial.println("Khong ket noi WIFI");
+    Serial.println("Khong ket noi WIFI");
+    WiFi.begin(ssid, password);
   }
   if ((WiFi.status() == WL_CONNECTED) && (!Blynk.connected())) {
-    data.reboot_num = data.reboot_num + 1;
-    savedata();
-    if ((data.reboot_num == 1) || (data.reboot_num == 2)) {
+    reboot_num = reboot_num + 1;
+    if ((reboot_num == 1) || (reboot_num == 2)) {
+      Serial.println("...");
+      WiFi.disconnect();
       delay(1000);
-      ESP.restart();
+      WiFi.begin(ssid, password);
     }
-    if (data.reboot_num % 5 == 0) {
+    if (reboot_num % 5 == 0) {
+      WiFi.disconnect();
       delay(1000);
-      ESP.restart();
+      WiFi.begin(ssid, password);
     }
   }
   if (Blynk.connected()) {
-    if (data.reboot_num != 0) {
-      data.reboot_num = 0;
-      savedata();
+    if (reboot_num != 0) {
+      reboot_num = 0;
     }
   }
 }
@@ -153,21 +144,17 @@ void update_fw() {
   }
 }
 //-------------------------
-void check_and_update() {
-  if (data.mode != prev_mode || sta_rl1 != prev_sta_rl1) {
-    // Có sự thay đổi, thực hiện gửi dữ liệu
-    byte g;
-    bitWrite(g, 0, data.mode);
-    bitWrite(g, 1, sta_rl1);
-    String server_path = server_name + "batch/update?token=" + Main_TOKEN + pin_G + g;
-    http.begin(client, server_path.c_str());
-    int httpResponseCode = http.GET();
-    http.end();
-    // Cập nhật giá trị trước đó
-    prev_mode = data.mode;
-    prev_sta_rl1 = sta_rl1;
+void savedata() {
+  if (memcmp(&data, &dataCheck, sizeof(dataDefault)) == 0) {
+    // Serial.println("structures same no need to write to EEPROM");
+  } else {
+    // Serial.println("\nWrite bytes to EEPROM memory...");
+    data.save_num = data.save_num + 1;
+    eeprom.writeBytes(address, sizeof(dataDefault), (byte *)&data);
+    // Blynk.setProperty(V0, "label", BLYNK_FIRMWARE_VERSION, "-EEPROM ", data.save_num);
   }
 }
+//-------------------------
 void weekday_() {
   //---------------------Day
   int A[7] = {data.MonWeekDay, data.TuesWeekDay, data.WedWeekDay, data.ThuWeekDay, data.FriWeekDay, data.SatWeekend, data.SunWeekend};
@@ -215,7 +202,7 @@ void print_terminal() {
   http.begin(client, server_path.c_str());
   httpResponseCode = http.GET();
   http.end();
-  Serial.println(server_path);
+  // Serial.println(server_path);
 }
 void print_terminal_main() {
   String server_path = server_name + "batch/update?token=" + Main_TOKEN + "&V0=" + "clr";
@@ -227,6 +214,21 @@ void print_terminal_main() {
   httpResponseCode = http.GET();
   http.end();
 }
+void check_and_update() {
+  if (data.mode != prev_mode || sta_rl1 != prev_sta_rl1) {
+    // Có sự thay đổi, thực hiện gửi dữ liệu
+    byte g;
+    bitWrite(g, 0, data.mode);
+    bitWrite(g, 1, sta_rl1);
+    String server_path = server_name + "batch/update?token=" + Main_TOKEN + pin_G + g;
+    http.begin(client, server_path.c_str());
+    int httpResponseCode = http.GET();
+    http.end();
+    // Cập nhật giá trị trước đó
+    prev_mode = data.mode;
+    prev_sta_rl1 = sta_rl1;
+  }
+}
 //-------------------------
 void on_van1() {
   sta_rl1 = HIGH;
@@ -236,6 +238,7 @@ void off_van1() {
   sta_rl1 = LOW;
   pcf8575_1.digitalWrite(pin_RL1, !sta_rl1);
 }
+//-------------------------
 void rtctime() {
   DateTime now = rtc_module.now();
   if (blynk_first_connect == true) {
@@ -288,9 +291,9 @@ BLYNK_WRITE(V0) {
   } else if (dataS == "a") { // auto
     data.mode = 1;
     savedata();
-  } else if (dataS == "info") { // info?
+  } else if (dataS == "info") { // mode?
     print_terminal();
-  } else if (dataS == "van1") { // Chọn van 1
+  } else if (dataS == "van1") { // mode?
     num_van = "van1";
     print_terminal_main();
   } else if (dataS == "van1_on") { // RL1 on
@@ -303,6 +306,7 @@ BLYNK_WRITE(V0) {
 }
 BLYNK_WRITE(V1) {
   TimeInputParam t(param);
+  //-------------------------
   data.MonWeekDay = t.isWeekdaySelected(1);
   data.TuesWeekDay = t.isWeekdaySelected(2);
   data.WedWeekDay = t.isWeekdaySelected(3);
@@ -337,7 +341,6 @@ BLYNK_WRITE(V1) {
   weekday_();
   print_terminal_main();
 }
-//-------------------------
 //-------------------------------------------------------------------
 void setup() {
   Serial.begin(115200);
@@ -352,6 +355,7 @@ void setup() {
   //-----------------------
   Wire.begin();
   pcf8575_1.begin();
+
   pcf8575_1.pinMode(S0, OUTPUT);
   pcf8575_1.pinMode(S1, OUTPUT);
   pcf8575_1.pinMode(S2, OUTPUT);
