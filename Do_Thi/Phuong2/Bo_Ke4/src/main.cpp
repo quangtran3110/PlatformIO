@@ -1,7 +1,7 @@
 #define BLYNK_TEMPLATE_ID "TMPL0DBjAEt-"
 #define BLYNK_TEMPLATE_NAME "BỜ KÈ"
 #define BLYNK_AUTH_TOKEN "pTbMkuYkt_SOcW4JWPY2kqDEvxN_XXK0"
-#define BLYNK_FIRMWARE_VERSION "240731"
+#define BLYNK_FIRMWARE_VERSION "250320"
 
 #define Main_TOKEN "w3ZZc7F4pvOIwqozyrzYcBFVUE3XxSiW"
 const char *ssid = "net";
@@ -66,15 +66,15 @@ char tz[] = "Asia/Ho_Chi_Minh";
 char s_day[50] = "";
 char B[50] = "";
 float temp;
-float Irms0, SetAmpemax = 18, SetAmpemin = 12;
+float Irms0, prev_Irms0 = 0, SetAmpemax = 18, SetAmpemin = 12;
 unsigned long int xIrms0 = 0;
 unsigned long int yIrms0 = 0;
-byte reboot_num;
+byte reboot_num, prev_mode = 3;
 String num_van;
 String s_timer_van_1, s_temp;
 String s_weekday;
 bool key = false, blynk_first_connect = false, dayOfTheWeek_ = false;
-bool sta_rl1 = LOW, sta_rl3 = LOW;
+bool sta_rl1 = LOW, sta_rl3 = LOW, prev_sta_rl1 = LOW;
 bool trip0 = false;
 int hour_start_rl1 = 0, minute_start_rl1 = 0, hour_stop_rl1 = 0, minute_stop_rl1 = 0;
 int timer_I;
@@ -228,14 +228,21 @@ void print_terminal_main() {
   http.GET();
   http.end();
 }
-void up() {
-  byte g;
-  bitWrite(g, 0, data.mode);
-  bitWrite(g, 1, sta_rl1);
-  String server_path = server_name + "batch/update?token=" + Main_TOKEN + pin_G + g + pin_Irms + Irms0;
-  http.begin(client, server_path.c_str());
-  http.GET();
-  http.end();
+void check_and_update() {
+  if (data.mode != prev_mode || sta_rl1 != prev_sta_rl1 || abs(Irms0 - prev_Irms0) >= 0.1) {
+    // Có sự thay đổi, thực hiện gửi dữ liệu
+    byte g;
+    bitWrite(g, 0, data.mode);
+    bitWrite(g, 1, sta_rl1);
+    String server_path = server_name + "batch/update?token=" + Main_TOKEN + pin_G + g + pin_Irms + Irms0;
+    http.begin(client, server_path.c_str());
+    http.GET();
+    http.end();
+    // Cập nhật giá trị trước đó
+    prev_mode = data.mode;
+    prev_sta_rl1 = sta_rl1;
+    prev_Irms0 = Irms0;
+  }
 }
 //-------------------------
 void on_van1() {
@@ -445,13 +452,12 @@ void setup() {
     timer_I = timer.setInterval(589, []() {
       readcurrent();
     });
-    timer.setInterval(2589, []() {
-      up();
-      temperature();
-      timer.restartTimer(timer_I);
+    timer.setInterval(3106, []() {
+      check_and_update();
     });
     timer.setInterval(15005L, []() {
       rtctime();
+      temperature();
       timer.restartTimer(timer_I);
     });
     timer.setInterval(900005L, []() {
