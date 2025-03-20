@@ -21,7 +21,7 @@ const char *password = "Abcd@1234";
 EnergyMonitor emon0;
 bool trip0 = false;
 int xSetAmpe = 0;
-float Irms0, SetAmpemax = 16.5, SetAmpemin = 0;
+float Irms0, prev_Irms0 = 0, SetAmpemax = 16.5, SetAmpemin = 0;
 unsigned long int xIrms0 = 0;
 unsigned long int yIrms0 = 0;
 //-----------------------------
@@ -82,13 +82,13 @@ struct Data {
 } data, dataCheck;
 const struct Data dataDefault = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
 //-----------------------------
-byte reboot_num;
+byte reboot_num, prev_mode = 3;
 int hour_start_rl1 = 0, minute_start_rl1 = 0, hour_stop_rl1 = 0, minute_stop_rl1 = 0;
 int timer_I, time_cycle, timer_cycle;
 ;
 int dayadjustment = -1;
 bool key = false, blynk_first_connect = false, dayOfTheWeek_ = false;
-bool sta_rl1 = LOW, sta_rl3 = LOW;
+bool sta_rl1 = LOW, sta_rl3 = LOW, prev_sta_rl1 = LOW;
 String num_van;
 char s_day[50] = "";
 char B[50] = "";
@@ -243,14 +243,21 @@ void print_terminal_main() {
   httpResponseCode = http.GET();
   http.end();
 }
-void up() {
-  byte g;
-  bitWrite(g, 0, data.mode);
-  bitWrite(g, 1, sta_rl1);
-  String server_path = server_name + "batch/update?token=" + Main_TOKEN + pin_G + g + pin_Irms + Irms0;
-  http.begin(client, server_path.c_str());
-  int httpResponseCode = http.GET();
-  http.end();
+void check_and_update() {
+  if (data.mode != prev_mode || sta_rl1 != prev_sta_rl1 || abs(Irms0 - prev_Irms0) >= 0.1) {
+    // Có sự thay đổi, thực hiện gửi dữ liệu
+    byte g;
+    bitWrite(g, 0, data.mode);
+    bitWrite(g, 1, sta_rl1);
+    String server_path = server_name + "batch/update?token=" + Main_TOKEN + pin_G + g + pin_Irms + Irms0;
+    http.begin(client, server_path.c_str());
+    int httpResponseCode = http.GET();
+    http.end();
+    // Cập nhật giá trị trước đó
+    prev_mode = data.mode;
+    prev_sta_rl1 = sta_rl1;
+    prev_Irms0 = Irms0;
+  }
 }
 //-------------------------
 void on_van1() {
@@ -373,31 +380,6 @@ void temperature() { // Nhiệt độ
       off_fan();
   }
 }
-void up_cycle() {
-  if (Irms0 != 0) {
-    if (time_cycle != 1712) {
-      time_cycle = 1712;
-      up();
-      timer.deleteTimer(timer_cycle);
-      timer_cycle = timer.setInterval(time_cycle, []() {
-        up();
-        temperature();
-        timer.restartTimer(timer_I);
-      });
-    }
-  } else {
-    if (time_cycle != 10013) {
-      time_cycle = 10013;
-      up();
-      timer.deleteTimer(timer_cycle);
-      timer_cycle = timer.setInterval(time_cycle, []() {
-        up();
-        temperature();
-        timer.restartTimer(timer_I);
-      });
-    }
-  }
-}
 //-------------------------
 void rtctime() {
   DateTime now = rtc_module.now();
@@ -485,10 +467,13 @@ void setup() {
     weekday_();
     timer_I = timer.setInterval(589, []() {
       readcurrent();
-      up_cycle();
+    });
+    timer.setInterval(3106, []() {
+      check_and_update();
     });
     timer.setInterval(15005L, []() {
       rtctime();
+      temperature();
       timer.restartTimer(timer_I);
     });
     timer.setInterval(900005L, []() {
