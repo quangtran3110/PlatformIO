@@ -1,7 +1,7 @@
 #define BLYNK_TEMPLATE_ID "TMPL7Z9cnaGi"
 #define BLYNK_TEMPLATE_NAME "Truong THPT"
 #define BLYNK_AUTH_TOKEN "H3VsCxfjXq67ALREdZcKOANCQ_kdFqfg"
-#define BLYNK_FIRMWARE_VERSION "240602"
+#define BLYNK_FIRMWARE_VERSION "250321"
 
 #define Main_TOKEN "w3ZZc7F4pvOIwqozyrzYcBFVUE3XxSiW"
 const char *ssid = "net";
@@ -213,15 +213,6 @@ void print_terminal_main() {
   server_path = server_name + "batch/update?token=" + Main_TOKEN + "&V0=" + location + "&V0=" + s_weekday + "&V0=" + s_timer_van_1;
   http.begin(client, server_path.c_str());
   httpResponseCode = http.GET();
-  http.end();
-}
-void up() {
-  byte g;
-  bitWrite(g, 0, data.mode);
-  bitWrite(g, 1, sta_rl1);
-  String server_path = server_name + "batch/update?token=" + Main_TOKEN + pin_G + g;
-  http.begin(client, server_path.c_str());
-  int httpResponseCode = http.GET();
   http.end();
 }
 void check_and_update() {
