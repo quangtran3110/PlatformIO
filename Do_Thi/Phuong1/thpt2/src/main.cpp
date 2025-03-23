@@ -197,7 +197,7 @@ void print_terminal() {
   int httpResponseCode = http.GET();
   http.end();
 
-  server_path = server_name + "batch/update?token=" + Main_TOKEN + pin_terminal + location + pin_terminal + s_weekday + pin_terminal + s_timer_van_1;
+  server_path = server_name + "batch/update?token=" + Main_TOKEN + pin_terminal + location + pin_terminal + s_weekday + pin_terminal + s_timer_van_1 + pin_terminal + BLYNK_AUTH_TOKEN;
   http.begin(client, server_path.c_str());
   httpResponseCode = http.GET();
   http.end();
