@@ -74,7 +74,7 @@ V58 - Irms
 #define BLYNK_TEMPLATE_ID "TMPL6m-lD0Zt7"
 #define BLYNK_TEMPLATE_NAME "ĐÈN ĐƯỜNG"
 #define BLYNK_AUTH_TOKEN "Ol3VH8Hv_OX2JKUWl4ENBk6Rqgh3P3MQ"
-#define BLYNK_FIRMWARE_VERSION "250303"
+#define BLYNK_FIRMWARE_VERSION "250326"
 //-----------------------------
 #include <BlynkSimpleEsp8266.h>
 #include <ESP8266HTTPClient.h>
@@ -86,7 +86,7 @@ V58 - Irms
 #include <WidgetRTC.h>
 //-----------------------------
 #pragma region // ALL TOKEN ID
-#define tu1_TOKEN "cJYG1njo_6K7WDMjCgq70yNFrGd-vWhP"
+#define tu1_TOKEN "tCAptndMM6EXqRkWvj_6tK76_mi7gbKf"
 #define tu2_TOKEN "1"
 #define alb_TOKEN "1"
 #define ntbinh_TOKEN "1"
