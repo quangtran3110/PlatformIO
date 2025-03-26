@@ -1,7 +1,7 @@
 #define BLYNK_TEMPLATE_ID "TMPLdGfzkVvi"
 #define BLYNK_TEMPLATE_NAME "Đèn đường"
 #define BLYNK_AUTH_TOKEN "tCAptndMM6EXqRkWvj_6tK76_mi7gbKf"
-#define BLYNK_FIRMWARE_VERSION "250303"
+#define BLYNK_FIRMWARE_VERSION "250326"
 
 #define Main_TOKEN "Ol3VH8Hv_OX2JKUWl4ENBk6Rqgh3P3MQ"
 const char *ssid = "net";
@@ -9,7 +9,7 @@ const char *password = "Abcd@1234";
 // const char *ssid = "tram bom so 4";
 // const char *password = "0943950555";
 //-------------------------------------------------------------------
-
+#include "myBlynkAir.h"
 #include "EmonLib.h"
 #include "PCF8575.h"
 #include "RTClib.h"
@@ -150,7 +150,7 @@ void weekday_() {
   //---------------------Day
   int A[7] = {data.MonWeekDay, data.TuesWeekDay, data.WedWeekDay, data.ThuWeekDay, data.FriWeekDay, data.SatWeekend, data.SunWeekend};
   memset(s_day, '\0', sizeof(s_day));
-  strcat(s_day, "DAY: ");
+  strcat(s_day, "Day: ");
   memset(B, '\0', sizeof(B));
   for (int i = 0; i < 7; i++) {
     // Nếu ngày i được chọn
@@ -200,7 +200,7 @@ void print_terminal_main() {
 }
 
 void check_and_update() {
-  if (data.mode != prev_mode || sta_rl3 != prev_sta_rl3 || abs(Irms0 - prev_Irms0) >= 0.1) {
+  if (data.mode != prev_mode || sta_rl3 != prev_sta_rl3 || abs(Irms0 - prev_Irms0) >= 0.05) {
     // Có sự thay đổi, thực hiện gửi dữ liệu
     byte g;
     bitWrite(g, 0, data.mode);
@@ -316,7 +316,7 @@ void readcurrent() // C2
   pcf8575_1.digitalWrite(S1, HIGH);
   pcf8575_1.digitalWrite(S2, LOW);
   pcf8575_1.digitalWrite(S3, LOW);
-  float rms0 = emon0.calcIrms(1480);
+  float rms0 = emon0.calcIrms(2960);
   if (rms0 < 2) {
     Irms0 = 0;
     yIrms0 = 0;
@@ -464,7 +464,7 @@ void setup() {
     timer_I = timer.setInterval(589, []() {
       readcurrent();
     });
-    timer.setInterval(2589, []() {
+    timer.setInterval(3089, []() {
       check_and_update();
       temperature();
       timer.restartTimer(timer_I);
