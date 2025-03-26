@@ -1,7 +1,7 @@
 #define BLYNK_TEMPLATE_ID "TMPL7Z9cnaGi"
 #define BLYNK_TEMPLATE_NAME "Truong THPT"
 #define BLYNK_AUTH_TOKEN "H3VsCxfjXq67ALREdZcKOANCQ_kdFqfg"
-#define BLYNK_FIRMWARE_VERSION "250325"
+#define BLYNK_FIRMWARE_VERSION "250326"
 
 #define Main_TOKEN "w3ZZc7F4pvOIwqozyrzYcBFVUE3XxSiW"
 const char *ssid = "net";
@@ -55,7 +55,7 @@ String server_name = "http://sgp1.blynk.cloud/external/api/";
 #define pin_terminal "&V31="
 #define pin_G "&V32="
 #define pin_mode "&V33="
-String location = urlEncode("P1-THPT1\n");
+String location = urlEncode(" P1-THPT1\n");
 //-----------------------------
 struct Data {
   byte mode;
@@ -161,7 +161,7 @@ void weekday_() {
   //---------------------Day
   int A[7] = {data.MonWeekDay, data.TuesWeekDay, data.WedWeekDay, data.ThuWeekDay, data.FriWeekDay, data.SatWeekend, data.SunWeekend};
   memset(s_day, '\0', sizeof(s_day));
-  strcat(s_day, "Lịch chạy: ");
+  strcat(s_day, "Day: ");
   memset(B, '\0', sizeof(B));
   for (int i = 0; i < 7; i++) {
     // Nếu ngày i được chọn
@@ -197,14 +197,14 @@ void weekday_() {
 void print_terminal() {
   String server_path = server_name + "batch/update?token=" + Main_TOKEN + pin_terminal + location + pin_terminal + s_weekday + pin_terminal + s_timer_van_1 + pin_terminal + BLYNK_FIRMWARE_VERSION;
   http.begin(client, server_path.c_str());
-  int httpResponseCode = http.GET();
+  http.GET();
   http.end();
   // Serial.println(server_path);
 }
 void print_terminal_main() {
   String server_path = server_name + "batch/update?token=" + Main_TOKEN + "&V0=" + location + "&V0=" + s_weekday + "&V0=" + s_timer_van_1;
   http.begin(client, server_path.c_str());
-  int httpResponseCode = http.GET();
+  http.GET();
   http.end();
 }
 void check_and_update() {
@@ -215,7 +215,7 @@ void check_and_update() {
     bitWrite(g, 1, sta_rl1);
     String server_path = server_name + "batch/update?token=" + Main_TOKEN + pin_G + g;
     http.begin(client, server_path.c_str());
-    int httpResponseCode = http.GET();
+    http.GET();
     http.end();
     // Cập nhật giá trị trước đó
     prev_mode = data.mode;
