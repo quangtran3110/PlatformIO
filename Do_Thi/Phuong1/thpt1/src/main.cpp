@@ -1,7 +1,7 @@
 #define BLYNK_TEMPLATE_ID "TMPL7Z9cnaGi"
 #define BLYNK_TEMPLATE_NAME "Truong THPT"
 #define BLYNK_AUTH_TOKEN "H3VsCxfjXq67ALREdZcKOANCQ_kdFqfg"
-#define BLYNK_FIRMWARE_VERSION "250321"
+#define BLYNK_FIRMWARE_VERSION "250325"
 
 #define Main_TOKEN "w3ZZc7F4pvOIwqozyrzYcBFVUE3XxSiW"
 const char *ssid = "net";
@@ -11,6 +11,7 @@ const char *password = "Abcd@1234";
 //-------------------------------------------------------------------
 #define BLYNK_PRINT Serial
 #define APP_DEBUG
+#include "myBlynkAir.h"
 #include <BlynkSimpleEsp8266.h>
 #include <ESP8266WiFi.h>
 //-----------------------------
@@ -194,25 +195,16 @@ void weekday_() {
   s_timer_van_1 = urlEncode(s_timer_van_1_);
 }
 void print_terminal() {
-  String server_path = server_name + "batch/update?token=" + Main_TOKEN + pin_terminal + "clr";
+  String server_path = server_name + "batch/update?token=" + Main_TOKEN + pin_terminal + location + pin_terminal + s_weekday + pin_terminal + s_timer_van_1 + pin_terminal + BLYNK_FIRMWARE_VERSION;
   http.begin(client, server_path.c_str());
   int httpResponseCode = http.GET();
-  http.end();
-
-  server_path = server_name + "batch/update?token=" + Main_TOKEN + pin_terminal + location + pin_terminal + s_weekday + pin_terminal + s_timer_van_1 + pin_terminal + BLYNK_FIRMWARE_VERSION;
-  http.begin(client, server_path.c_str());
-  httpResponseCode = http.GET();
   http.end();
   // Serial.println(server_path);
 }
 void print_terminal_main() {
-  String server_path = server_name + "batch/update?token=" + Main_TOKEN + "&V0=" + "clr";
+  String server_path = server_name + "batch/update?token=" + Main_TOKEN + "&V0=" + location + "&V0=" + s_weekday + "&V0=" + s_timer_van_1;
   http.begin(client, server_path.c_str());
   int httpResponseCode = http.GET();
-  http.end();
-  server_path = server_name + "batch/update?token=" + Main_TOKEN + "&V0=" + location + "&V0=" + s_weekday + "&V0=" + s_timer_van_1;
-  http.begin(client, server_path.c_str());
-  httpResponseCode = http.GET();
   http.end();
 }
 void check_and_update() {

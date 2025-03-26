@@ -1,11 +1,11 @@
 #define BLYNK_TEMPLATE_ID "TMPLdGfzkVvi"
 #define BLYNK_TEMPLATE_NAME "Đèn đường"
-#define BLYNK_AUTH_TOKEN "tCAptndMM6EXqRkWvj_6tK76_mi7gbKf"
-#define BLYNK_FIRMWARE_VERSION "250303"
+#define BLYNK_AUTH_TOKEN "f_sYprdrQ685jdaLTx4Pt_F13-4Ck9ru"
+#define BLYNK_FIRMWARE_VERSION "250323"
 
 #define Main_TOKEN "Ol3VH8Hv_OX2JKUWl4ENBk6Rqgh3P3MQ"
-const char *ssid = "net";
-const char *password = "Abcd@1234";
+const char *ssid = "KTX A2";
+const char *password = "kytucxaa";
 // const char *ssid = "tram bom so 4";
 // const char *password = "0943950555";
 //-------------------------------------------------------------------
@@ -30,14 +30,14 @@ const char *password = "Abcd@1234";
 #define APP_DEBUG
 #define EEPROM_ADDRESS 0x57
 static Eeprom24C32_64 eeprom(EEPROM_ADDRESS);
-#define URL_fw_Bin "https://raw.githubusercontent.com/quangtran3110/PlatformIO/main/Den_Duong/Tu_1/.pio/build/nodemcuv2/firmware.bin"
+#define URL_fw_Bin "https://raw.githubusercontent.com/quangtran3110/PlatformIO/main/Den_Duong/Tu_2/.pio/build/nodemcuv2/firmware.bin"
 String server_name = "http://sgp1.blynk.cloud/external/api/";
 //-----------------------------
-#define pin_dataS "&V6="
-#define pin_G "&V9="
-#define pin_mode "&V8="
-#define pin_Irms "&V10="
-String location = urlEncode(" Tủ 1\n");
+#define pin_dataS "&V11="
+#define pin_mode "&V13="
+#define pin_G "&V14="
+#define pin_Irms "&V15="
+String location = urlEncode(" Tủ 2\n");
 //-----------------------------
 EnergyMonitor emon0;
 PCF8575 pcf8575_1(0x20);
@@ -47,7 +47,6 @@ DallasTemperature sensors(&oneWire);
 WiFiClient client;
 HTTPClient http;
 //-----------------------------
-
 const int S0 = P15;
 const int S1 = P14;
 const int S2 = P13;
