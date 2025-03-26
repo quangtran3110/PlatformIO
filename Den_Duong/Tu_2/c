@@ -1,0 +1,100 @@
+#include <Arduino.h>
+#include <BlynkSimpleEsp8266.h>  // Thay bằng BlynkSimpleEsp32.h nếu bạn dùng ESP32
+
+#if defined(ESP8266)
+  #include <ESP8266httpUpdate.h>
+  #include <ESP8266HTTPClient.h>
+  #include <ESP8266WiFi.h>
+  #include <WiFiClient.h>
+#elif defined(ESP32)
+  #include <Update.h>
+  #include <HTTPClient.h>
+  #include <WiFi.h>
+  #include <WiFiClient.h>
+#endif
+
+// Thêm watchdog cho ESP8266
+#if defined(ESP8266)
+  #include <Esp.h>
+#endif
+
+void reboot()
+{
+#if defined(ARDUINO_ARCH_MEGAAVR)
+  wdt_enable(WDT_PERIOD_8CLK_gc);
+#elif defined(__AVR__)
+  wdt_enable(WDTO_15MS);
+#elif defined(__arm__)
+  NVIC_SystemReset();
+#elif defined(ESP8266) || defined(ESP32)
+  ESP.restart();
+#else
+  #error "MCU reset procedure not implemented"
+#endif
+  for (;;) {}
+}
+
+//________________________________________________________________
+String overTheAirURL = "";
+BLYNK_WRITE(InternalPinOTA) {
+  overTheAirURL = param.asString();
+  Blynk.disconnect();  
+
+#if defined(ESP8266)
+  WiFiClient client;
+  HTTPClient http;
+  http.begin(client, overTheAirURL);
+#elif defined(ESP32)
+  HTTPClient http;
+  http.begin(overTheAirURL);
+#endif
+
+  int httpCode = http.GET();
+  if (httpCode != HTTP_CODE_OK) { 
+    Serial.println("HTTP GET failed with code: " + String(httpCode));
+    Blynk.connect(); 
+    return; 
+  }
+  
+  int contentLength = http.getSize();
+  if (contentLength <= 0) { 
+    Serial.println("Content length is invalid: " + String(contentLength));
+    Blynk.connect(); 
+    return; 
+  }
+  
+  bool canBegin = Update.begin(contentLength);
+  if (!canBegin) { 
+    Serial.println("Not enough space to begin OTA");
+    Blynk.connect(); 
+    return; 
+  }
+  
+#if defined(ESP8266)
+  WiFiClient& stream = client;
+#elif defined(ESP32)
+  WiFiClient& stream = http.getStream();
+#endif
+
+  int written = Update.writeStream(stream);
+  if (written != contentLength) { 
+    Serial.println("Written data size doesn't match content length");
+    Blynk.connect(); 
+    return; 
+  }
+  
+  if (!Update.end()) { 
+    Serial.println("Error from Update.end(): " + String(Update.getError()));
+    Blynk.connect(); 
+    return; 
+  }
+  
+  if (!Update.isFinished()) { 
+    Serial.println("Update not finished");
+    Blynk.connect(); 
+    return; 
+  }
+  
+  Serial.println("Update successfully completed. Rebooting...");
+  reboot();
+}

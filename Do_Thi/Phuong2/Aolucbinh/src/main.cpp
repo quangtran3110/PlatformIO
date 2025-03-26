@@ -1,7 +1,7 @@
 #define BLYNK_TEMPLATE_ID "TMPL6dX9wTvCm"
 #define BLYNK_TEMPLATE_NAME "AoLucBinh"
 #define BLYNK_AUTH_TOKEN "1v4Fr0n4m4-GaYP26MMZ3bHbTi5k68nP"
-#define BLYNK_FIRMWARE_VERSION "250322"
+#define BLYNK_FIRMWARE_VERSION "250326"
 
 #define Main_TOKEN "w3ZZc7F4pvOIwqozyrzYcBFVUE3XxSiW"
 const char *ssid = "net";
@@ -374,16 +374,26 @@ BLYNK_WRITE(V1) {
   }
   //-------------------------
   if (t.hasStartTime()) {
-    if (num_van == "van1")
-      data.rl1_r = t.getStartHour() * 3600 + t.getStartMinute() * 60;
-    else if (num_van == "van2")
-      data.rl2_r = t.getStartHour() * 3600 + t.getStartMinute() * 60;
+    if (num_van == "van1") {
+      hour_start_rl1 = t.getStartHour();
+      minute_start_rl1 = t.getStartMinute();
+      data.rl1_r = hour_start_rl1 * 3600 + minute_start_rl1 * 60;
+    } else if (num_van == "van2") {
+      hour_start_rl2 = t.getStartHour();
+      minute_start_rl2 = t.getStartMinute();
+      data.rl2_r = hour_start_rl2 * 3600 + minute_start_rl2 * 60;
+    }
   }
   if (t.hasStopTime()) {
-    if (num_van == "van1")
-      data.rl1_s = t.getStopHour() * 3600 + t.getStopMinute() * 60;
-    else if (num_van == "van2")
-      data.rl2_s = t.getStopHour() * 3600 + t.getStopMinute() * 60;
+    if (num_van == "van1") {
+      hour_stop_rl1 = t.getStopHour();
+      minute_stop_rl1 = t.getStopMinute();
+      data.rl1_s = hour_stop_rl1 * 3600 + minute_stop_rl1 * 60;
+    } else if (num_van == "van2") {
+      hour_stop_rl2 = t.getStopHour();
+      minute_stop_rl2 = t.getStopMinute();
+      data.rl2_s = hour_stop_rl2 * 3600 + minute_stop_rl2 * 60;
+    }
   }
   //-------------------------
   savedata();
