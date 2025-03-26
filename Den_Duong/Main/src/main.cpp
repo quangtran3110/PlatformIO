@@ -86,7 +86,7 @@ V58 - Irms
 #include <WidgetRTC.h>
 //-----------------------------
 #pragma region // ALL TOKEN ID
-#define tu1_TOKEN "tCAptndMM6EXqRkWvj_6tK76_mi7gbKf"
+#define tu1_TOKEN "cJYG1njo_6K7WDMjCgq70yNFrGd-vWhP"
 #define tu2_TOKEN "1"
 #define alb_TOKEN "1"
 #define ntbinh_TOKEN "1"
