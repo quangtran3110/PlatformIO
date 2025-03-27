@@ -1,7 +1,7 @@
 #define BLYNK_TEMPLATE_ID "TMPLdGfzkVvi"
 #define BLYNK_TEMPLATE_NAME "Đèn đường"
 #define BLYNK_AUTH_TOKEN "tCAptndMM6EXqRkWvj_6tK76_mi7gbKf"
-#define BLYNK_FIRMWARE_VERSION "250326"
+#define BLYNK_FIRMWARE_VERSION "250327"
 
 #define Main_TOKEN "Ol3VH8Hv_OX2JKUWl4ENBk6Rqgh3P3MQ"
 const char *ssid = "net";
@@ -186,7 +186,7 @@ void weekday_() {
 void print_terminal() {
   String s_ampe = "Ampe: " + String(data.SetAmpemin) + "A - " + String(data.SetAmpemax) + "A\n";
 
-  String server_path = server_name + "batch/update?token=" + Main_TOKEN + pin_dataS + location + pin_dataS + s_weekday + pin_dataS + s_timer_van_1 + pin_dataS + urlEncode(s_ampe) + pin_dataS + urlEncode(s_temp);
+  String server_path = server_name + "batch/update?token=" + Main_TOKEN + pin_dataS + location + pin_dataS + s_weekday + pin_dataS + s_timer_van_1 + pin_dataS + urlEncode(s_ampe) + pin_dataS + urlEncode(s_temp) + pin_dataS + BLYNK_FIRMWARE_VERSION;
   http.begin(client, server_path.c_str());
   http.GET();
   http.end();
@@ -402,6 +402,10 @@ void connectionstatus() {
   if ((WiFi.status() != WL_CONNECTED)) {
     Serial.println("Khong ket noi WIFI");
     WiFi.begin(ssid, password);
+    reboot_num = reboot_num + 1;
+    if (reboot_num >= 5) {
+      reset_board();
+    }
   }
   if ((WiFi.status() == WL_CONNECTED) && (!Blynk.connected())) {
     reboot_num = reboot_num + 1;
