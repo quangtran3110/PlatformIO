@@ -2,7 +2,7 @@
 #define BLYNK_TEMPLATE_NAME "DHVuong"
 #define BLYNK_AUTH_TOKEN "eBeqi9ZJhRK3r66cUzgdD1gp2xGxG7kS"
 
-#define BLYNK_FIRMWARE_VERSION "250327"
+#define BLYNK_FIRMWARE_VERSION "250328"
 
 #define Main_TOKEN "w3ZZc7F4pvOIwqozyrzYcBFVUE3XxSiW"
 const char *ssid = "net";
@@ -118,9 +118,7 @@ void connectionstatus() {
       WiFi.begin(ssid, password);
     }
     if (reboot_num % 5 == 0) {
-      WiFi.disconnect();
-      delay(1000);
-      WiFi.begin(ssid, password);
+      ESP.restart();
     }
   }
   if (Blynk.connected()) {
