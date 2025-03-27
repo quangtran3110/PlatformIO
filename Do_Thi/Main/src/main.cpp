@@ -75,7 +75,7 @@ V58 - Irms
 #define BLYNK_TEMPLATE_ID "TMPL67uSt4c-z"
 #define BLYNK_TEMPLATE_NAME "ĐÔ THỊ"
 #define BLYNK_AUTH_TOKEN "w3ZZc7F4pvOIwqozyrzYcBFVUE3XxSiW"
-#define BLYNK_FIRMWARE_VERSION "280608"
+#define BLYNK_FIRMWARE_VERSION "250329"
 //-----------------------------
 #include <BlynkSimpleEsp8266.h>
 #include <ESP8266HTTPClient.h>
@@ -131,6 +131,8 @@ byte t2, t3, t4, t5, t6, t7, cn;
 byte reboot_num;
 bool blynk_first_connect = false, key_set = false, key = false;
 bool time_run = false;
+int previous_status = 0;
+
 uint32_t start_, stop_;
 
 #pragma region // Khai báo biến của các tủ
@@ -1788,6 +1790,7 @@ BLYNK_WRITE(V57) { // Btn Van 1
 }
 //-------------------------------------------------------------------
 //-------------------------------------------------------------------
+/*
 void check_status() {
   String payload;
   String server_path;
@@ -2013,7 +2016,7 @@ void check_status() {
       }
     }
   }
-  /*//------------------------- Volume T2-G1
+  //------------------------- Volume T2-G1
   {
     server_path = main_sever + "isHardwareConnected?token=" + T2_G1_TOKEN;
     http.begin(client, server_path.c_str());
@@ -2032,10 +2035,126 @@ void check_status() {
           Blynk.logEvent("error", "Module ccd offline!");
       }
     }
-  }/**/
+  }
 }
+*/
+void decode_status(int g) {
+  // Mảng chứa tên của các module để hiển thị và debug
+  const char *moduleNames[] = {
+      "Cầu cửa đông",     // Bit 0
+      "UBND P2",          // Bit 1
+      "Ao lục bình",      // Bit 2
+      "N.T.Bình",         // Bit 3
+      "Bờ kè 1",          // Bit 4
+      "Bờ kè 2",          // Bit 5
+      "Bờ kè 3",          // Bit 6
+      "Bờ kè 4",          // Bit 7
+      "Đường Hùng Vương", // Bit 8
+      "THPT 1",           // Bit 9
+      "THPT 2"            // Bit 10
+  };
 
+  const int moduleCount = sizeof(moduleNames) / sizeof(moduleNames[0]);
+  int changed_bits = g ^ previous_status;
+  if (changed_bits == 0) {
+    return;
+  }
+
+  for (int i = 0; i < moduleCount; i++) {
+    if (bitRead(changed_bits, i)) {
+      bool isOnline = bitRead(g, i);
+      switch (i) {
+      case 0: // Cầu cửa đông
+        if (isOnline)
+          visible_ccd();
+        else
+          hidden_ccd();
+        break;
+      case 1: // UBND P2
+        if (isOnline)
+          visible_ubndp2();
+        else
+          hidden_ubndp2();
+        break;
+      case 2: // Ao lục bình
+        if (isOnline)
+          visible_alb();
+        else
+          hidden_alb();
+        break;
+      case 3: // N.T.Bình
+        if (isOnline)
+          visible_ntbinh();
+        else
+          hidden_ntbinh();
+        break;
+      case 4: // Bờ kè 1
+        if (isOnline)
+          visible_boke1();
+        else
+          hidden_boke1();
+        break;
+      case 5: // Bờ kè 2
+        if (isOnline)
+          visible_boke2();
+        else
+          hidden_boke2();
+        break;
+      case 6: // Bờ kè 3
+        if (isOnline)
+          visible_boke3();
+        else
+          hidden_boke3();
+        break;
+      case 7: // Bờ kè 4
+        if (isOnline)
+          visible_boke4();
+        else
+          hidden_boke4();
+        break;
+      case 8: // Đường Hùng Vương
+        if (isOnline)
+          visible_dhvuong();
+        else
+          hidden_dhvuong();
+        break;
+      case 9: // THPT 1
+        if (isOnline)
+          visible_thpt1();
+        else
+          hidden_thpt1();
+        break;
+      case 10: // THPT 2
+        if (isOnline)
+          visible_thpt2();
+        else
+          hidden_thpt2();
+        break;
+      }
+      // In thông tin debug cho module có thay đổi
+      // Serial.print("Status changed - ");
+      // Serial.print(moduleNames[i]);
+      // Serial.print(": ");
+      // Serial.println(isOnline ? "Online" : "Offline");
+    }
+  }
+  previous_status = g;
+}
+BLYNK_WRITE(V99) {
+  // Đọc giá trị từ chân V99
+  int g = param.asInt();
+  // In giá trị nhận được để debug
+  // Serial.print("Received status value: ");
+  // Serial.print(g);
+  // Serial.print(" (Binary: ");
+  // Serial.print(g, BIN);
+  // Serial.println(")");
+  decode_status(g);
+}
+//-------------------------------------------------------------------
 void setup() {
+  ESP.wdtDisable();
+  ESP.wdtEnable(300000);
   Serial.begin(115200);
   WiFi.mode(WIFI_STA);
   WiFi.begin(ssid, password);
@@ -2046,9 +2165,9 @@ void setup() {
   timer.setInterval(900005L, []() {
     connectionstatus();
   });
-  timer.setInterval(5000, check_status);
 }
 void loop() {
+  ESP.wdtFeed();
   Blynk.run();
   timer.run();
 }
