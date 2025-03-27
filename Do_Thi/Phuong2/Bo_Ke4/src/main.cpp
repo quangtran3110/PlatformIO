@@ -1,7 +1,7 @@
 #define BLYNK_TEMPLATE_ID "TMPL0DBjAEt-"
 #define BLYNK_TEMPLATE_NAME "BỜ KÈ"
 #define BLYNK_AUTH_TOKEN "pTbMkuYkt_SOcW4JWPY2kqDEvxN_XXK0"
-#define BLYNK_FIRMWARE_VERSION "250326"
+#define BLYNK_FIRMWARE_VERSION "250327"
 
 #define Main_TOKEN "w3ZZc7F4pvOIwqozyrzYcBFVUE3XxSiW"
 const char *ssid = "net";
@@ -174,7 +174,7 @@ void weekday_() {
   //---------------------Day
   int A[7] = {data.MonWeekDay, data.TuesWeekDay, data.WedWeekDay, data.ThuWeekDay, data.FriWeekDay, data.SatWeekend, data.SunWeekend};
   memset(s_day, '\0', sizeof(s_day));
-  strcat(s_day, "Lịch chạy: ");
+  strcat(s_day, "Day: ");
   memset(B, '\0', sizeof(B));
   for (int i = 0; i < 7; i++) {
     // Nếu ngày i được chọn
@@ -221,7 +221,7 @@ void print_terminal_main() {
   http.end();
 }
 void check_and_update() {
-  if (data.mode != prev_mode || sta_rl1 != prev_sta_rl1 || abs(Irms0 - prev_Irms0) >= 0.1) {
+  if (data.mode != prev_mode || sta_rl1 != prev_sta_rl1 || abs(Irms0 - prev_Irms0) >= 0.05) {
     // Có sự thay đổi, thực hiện gửi dữ liệu
     byte g;
     bitWrite(g, 0, data.mode);
