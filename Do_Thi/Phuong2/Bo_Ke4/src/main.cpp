@@ -1,7 +1,7 @@
 #define BLYNK_TEMPLATE_ID "TMPL0DBjAEt-"
 #define BLYNK_TEMPLATE_NAME "BỜ KÈ"
 #define BLYNK_AUTH_TOKEN "pTbMkuYkt_SOcW4JWPY2kqDEvxN_XXK0"
-#define BLYNK_FIRMWARE_VERSION "250321"
+#define BLYNK_FIRMWARE_VERSION "250326"
 
 #define Main_TOKEN "w3ZZc7F4pvOIwqozyrzYcBFVUE3XxSiW"
 const char *ssid = "net";
@@ -13,6 +13,7 @@ const char *password = "Abcd@1234";
 #include "EmonLib.h"
 #include "PCF8575.h"
 #include "RTClib.h"
+#include "myBlynkAir.h"
 #include <BlynkSimpleEsp8266.h>
 #include <DallasTemperature.h>
 #include <ESP8266HTTPClient.h>
@@ -37,7 +38,7 @@ String server_name = "http://sgp1.blynk.cloud/external/api/";
 #define pin_G "&V55="
 #define pin_mode "&V56="
 #define pin_Irms "&V58="
-String location = urlEncode("Phường 2 - Bờ kè 4\n");
+String location = urlEncode(" P2 - Bờ kè 4\n");
 //-----------------------------
 EnergyMonitor emon0;
 PCF8575 pcf8575_1(0x20);
@@ -207,23 +208,14 @@ void weekday_() {
   s_timer_van_1 = urlEncode(s_timer_van_1_);
 }
 void print_terminal() {
-  String server_path = server_name + "batch/update?token=" + Main_TOKEN + pin_terminal + "clr";
-  http.begin(client, server_path.c_str());
-  http.GET();
-  http.end();
-
-  server_path = server_name + "batch/update?token=" + Main_TOKEN + pin_terminal + location + pin_terminal + s_weekday + pin_terminal + s_timer_van_1 + pin_terminal + urlEncode(s_temp) + pin_terminal + BLYNK_FIRMWARE_VERSION;
+  String server_path = server_name + "batch/update?token=" + Main_TOKEN + pin_terminal + location + pin_terminal + s_weekday + pin_terminal + s_timer_van_1 + pin_terminal + urlEncode(s_temp) + pin_terminal + BLYNK_FIRMWARE_VERSION;
   http.begin(client, server_path.c_str());
   http.GET();
   http.end();
   // Serial.println(server_path);
 }
 void print_terminal_main() {
-  String server_path = server_name + "batch/update?token=" + Main_TOKEN + "&V0=" + "clr";
-  http.begin(client, server_path.c_str());
-  http.GET();
-  http.end();
-  server_path = server_name + "batch/update?token=" + Main_TOKEN + "&V0=" + location + "&V0=" + s_weekday + "&V0=" + s_timer_van_1;
+  String server_path = server_name + "batch/update?token=" + Main_TOKEN + "&V0=" + location + "&V0=" + s_weekday + "&V0=" + s_timer_van_1;
   http.begin(client, server_path.c_str());
   http.GET();
   http.end();
@@ -411,6 +403,8 @@ void rtctime() {
 }
 //-------------------------------------------------------------------
 void setup() {
+  ESP.wdtDisable();
+  ESP.wdtEnable(300000);
   Serial.begin(115200);
   WiFi.mode(WIFI_STA);
   WiFi.begin(ssid, password);
@@ -467,6 +461,7 @@ void setup() {
   });
 }
 void loop() {
+  ESP.wdtFeed();
   Blynk.run();
   timer.run();
 }
