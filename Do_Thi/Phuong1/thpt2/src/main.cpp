@@ -1,7 +1,7 @@
 #define BLYNK_TEMPLATE_ID "TMPL7Z9cnaGi"
 #define BLYNK_TEMPLATE_NAME "Truong THPT"
 #define BLYNK_AUTH_TOKEN "H04PY3egc4KE3YnBQkOFEMNAGohM_oGo"
-#define BLYNK_FIRMWARE_VERSION "250326"
+#define BLYNK_FIRMWARE_VERSION "250328"
 
 #define Main_TOKEN "w3ZZc7F4pvOIwqozyrzYcBFVUE3XxSiW"
 const char *ssid = "net";
@@ -69,7 +69,7 @@ const struct Data dataDefault = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
 int hour_start_rl1 = 0, minute_start_rl1 = 0, hour_stop_rl1 = 0, minute_stop_rl1 = 0;
 int timer_I;
 int dayadjustment = -1;
-byte prev_mode = 3;
+byte prev_mode = 3, reboot_num = 0;
 bool key = false, blynk_first_connect = false, dayOfTheWeek_ = false;
 bool sta_rl1 = LOW, sta_rl3 = LOW, prev_sta_rl1 = LOW;
 String num_van;
@@ -100,24 +100,24 @@ void savedata() {
 //-------------------------
 void connectionstatus() {
   if ((WiFi.status() != WL_CONNECTED)) {
-    // Serial.println("Khong ket noi WIFI");
+    Serial.println("Khong ket noi WIFI");
+    WiFi.begin(ssid, password);
   }
   if ((WiFi.status() == WL_CONNECTED) && (!Blynk.connected())) {
-    data.reboot_num = data.reboot_num + 1;
-    savedata();
-    if ((data.reboot_num == 1) || (data.reboot_num == 2)) {
+    reboot_num = reboot_num + 1;
+    if ((reboot_num == 1) || (reboot_num == 2)) {
+      Serial.println("...");
+      WiFi.disconnect();
       delay(1000);
-      ESP.restart();
+      WiFi.begin(ssid, password);
     }
-    if (data.reboot_num % 5 == 0) {
-      delay(1000);
+    if (reboot_num % 5 == 0) {
       ESP.restart();
     }
   }
   if (Blynk.connected()) {
-    if (data.reboot_num != 0) {
-      data.reboot_num = 0;
-      savedata();
+    if (reboot_num != 0) {
+      reboot_num = 0;
     }
   }
 }
@@ -250,7 +250,6 @@ void rtctime() {
   if (blynk_first_connect == true) {
     if ((now.day() != day()) || (now.hour() != hour()) || ((now.minute() - minute() > 2) || (minute() - now.minute() > 2))) {
       rtc_module.adjust(DateTime(year(), month(), day(), hour(), minute(), second()));
-      now = rtc_module.now();
     }
   }
   float nowtime = (now.hour() * 3600 + now.minute() * 60);
@@ -350,6 +349,8 @@ BLYNK_WRITE(V1) {
 }
 //-------------------------------------------------------------------
 void setup() {
+  ESP.wdtDisable();
+  ESP.wdtEnable(300000);
   Serial.begin(115200);
   WiFi.mode(WIFI_STA);
   WiFi.begin(ssid, password);
@@ -397,6 +398,7 @@ void setup() {
   });
 }
 void loop() {
+  ESP.wdtFeed();
   Blynk.run();
   timer.run();
 }

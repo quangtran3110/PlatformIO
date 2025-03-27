@@ -198,7 +198,7 @@ void print_terminal_main() {
   http.GET();
   http.end();
 }
-
+//-------------------------
 void check_and_update() {
   if (data.mode != prev_mode || sta_rl3 != prev_sta_rl3 || abs(Irms0 - prev_Irms0) >= 0.05) {
     // Có sự thay đổi, thực hiện gửi dữ liệu

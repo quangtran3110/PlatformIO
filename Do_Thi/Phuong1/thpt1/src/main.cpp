@@ -1,7 +1,7 @@
 #define BLYNK_TEMPLATE_ID "TMPL7Z9cnaGi"
 #define BLYNK_TEMPLATE_NAME "Truong THPT"
 #define BLYNK_AUTH_TOKEN "H3VsCxfjXq67ALREdZcKOANCQ_kdFqfg"
-#define BLYNK_FIRMWARE_VERSION "250326"
+#define BLYNK_FIRMWARE_VERSION "250328"
 
 #define Main_TOKEN "w3ZZc7F4pvOIwqozyrzYcBFVUE3XxSiW"
 const char *ssid = "net";
@@ -252,7 +252,6 @@ void rtctime() {
   if (blynk_first_connect == true) {
     if ((now.day() != day()) || (now.hour() != hour()) || ((now.minute() - minute() > 2) || (minute() - now.minute() > 2))) {
       rtc_module.adjust(DateTime(year(), month(), day(), hour(), minute(), second()));
-      DateTime now = rtc_module.now();
     }
   }
   float nowtime = (now.hour() * 3600 + now.minute() * 60);
@@ -353,6 +352,8 @@ BLYNK_WRITE(V1) {
 }
 //-------------------------------------------------------------------
 void setup() {
+  ESP.wdtDisable();
+  ESP.wdtEnable(300000);
   Serial.begin(115200);
   WiFi.mode(WIFI_STA);
   WiFi.begin(ssid, password);
@@ -400,6 +401,7 @@ void setup() {
   });
 }
 void loop() {
+  ESP.wdtFeed();
   Blynk.run();
   timer.run();
 }

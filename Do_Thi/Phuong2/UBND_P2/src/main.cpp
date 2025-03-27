@@ -1,7 +1,7 @@
 #define BLYNK_TEMPLATE_ID "TMPL65p6kPQP0"
 #define BLYNK_TEMPLATE_NAME "UBND P2"
 #define BLYNK_AUTH_TOKEN "gvfnRXv14oMohtqMWTPQXbduFKww1zfu"
-#define BLYNK_FIRMWARE_VERSION "250321"
+#define BLYNK_FIRMWARE_VERSION "250328"
 
 #define Main_TOKEN "w3ZZc7F4pvOIwqozyrzYcBFVUE3XxSiW"
 // const char* ssid = "net";
@@ -11,6 +11,7 @@ const char *password = "0943950555";
 //-------------------------------------------------------------------
 #define BLYNK_PRINT Serial
 #define APP_DEBUG
+#include "myBlynkAir.h"
 #include <BlynkSimpleEsp8266.h>
 #include <ESP8266WiFi.h>
 //-----------------------------
@@ -53,7 +54,7 @@ String server_name = "http://sgp1.blynk.cloud/external/api/";
 #define pin_terminal "&V10="
 #define pin_G "&V11="
 #define pin_mode "&V12="
-String location = urlEncode("Phường 2 - CV UBND P2\n");
+String location = urlEncode(" P2 - CV UBND P2\n");
 //-----------------------------
 byte reboot_num, prev_mode = 3;
 int hour_start_rl1 = 0, minute_start_rl1 = 0, hour_stop_rl1 = 0, minute_stop_rl1 = 0;
@@ -99,9 +100,7 @@ void connectionstatus() {
       WiFi.begin(ssid, password);
     }
     if (reboot_num % 5 == 0) {
-      WiFi.disconnect();
-      delay(1000);
-      WiFi.begin(ssid, password);
+      ESP.restart();
     }
   }
   if (Blynk.connected()) {
@@ -159,7 +158,7 @@ void weekday_() {
   //---------------------Day
   int A[7] = {data.MonWeekDay, data.TuesWeekDay, data.WedWeekDay, data.ThuWeekDay, data.FriWeekDay, data.SatWeekend, data.SunWeekend};
   memset(s_day, '\0', sizeof(s_day));
-  strcat(s_day, "Lịch chạy: ");
+  strcat(s_day, "Day: ");
   memset(B, '\0', sizeof(B));
   for (int i = 0; i < 7; i++) {
     // Nếu ngày i được chọn
@@ -193,25 +192,16 @@ void weekday_() {
   s_timer_van_1 = urlEncode(s_timer_van_1_);
 }
 void print_terminal() {
-  String server_path = server_name + "batch/update?token=" + Main_TOKEN + pin_terminal + "clr";
+  String server_path = server_name + "batch/update?token=" + Main_TOKEN + pin_terminal + location + pin_terminal + s_weekday + pin_terminal + s_timer_van_1 + pin_terminal + BLYNK_FIRMWARE_VERSION;
   http.begin(client, server_path.c_str());
-  int httpResponseCode = http.GET();
-  http.end();
-
-  server_path = server_name + "batch/update?token=" + Main_TOKEN + pin_terminal + location + pin_terminal + s_weekday + pin_terminal + s_timer_van_1 + pin_terminal + BLYNK_FIRMWARE_VERSION;
-  http.begin(client, server_path.c_str());
-  httpResponseCode = http.GET();
+  http.GET();
   http.end();
   // Serial.println(server_path);
 }
 void print_terminal_main() {
-  String server_path = server_name + "batch/update?token=" + Main_TOKEN + "&V0=" + "clr";
+  String server_path = server_name + "batch/update?token=" + Main_TOKEN + "&V0=" + location + "&V0=" + s_weekday + "&V0=" + s_timer_van_1;
   http.begin(client, server_path.c_str());
-  int httpResponseCode = http.GET();
-  http.end();
-  server_path = server_name + "batch/update?token=" + Main_TOKEN + "&V0=" + location + "&V0=" + s_weekday + "&V0=" + s_timer_van_1;
-  http.begin(client, server_path.c_str());
-  httpResponseCode = http.GET();
+  http.GET();
   http.end();
 }
 void check_and_update() {
@@ -222,7 +212,7 @@ void check_and_update() {
     bitWrite(g, 1, sta_rl1);
     String server_path = server_name + "batch/update?token=" + Main_TOKEN + pin_G + g;
     http.begin(client, server_path.c_str());
-    int httpResponseCode = http.GET();
+    http.GET();
     http.end();
     // Cập nhật giá trị trước đó
     prev_mode = data.mode;
@@ -244,7 +234,6 @@ void rtctime() {
   if (blynk_first_connect == true) {
     if ((now.day() != day()) || (now.hour() != hour()) || ((now.minute() - minute() > 2) || (minute() - now.minute() > 2))) {
       rtc_module.adjust(DateTime(year(), month(), day(), hour(), minute(), second()));
-      DateTime now = rtc_module.now();
     }
   }
   float nowtime = (now.hour() * 3600 + now.minute() * 60);
@@ -343,6 +332,8 @@ BLYNK_WRITE(V1) {
 }
 //-------------------------------------------------------------------
 void setup() {
+  ESP.wdtDisable();
+  ESP.wdtEnable(300000);
   Serial.begin(115200);
   WiFi.mode(WIFI_STA);
   WiFi.begin(ssid, password);
@@ -391,6 +382,7 @@ void setup() {
   });
 }
 void loop() {
+  ESP.wdtFeed();
   Blynk.run();
   timer.run();
 }
