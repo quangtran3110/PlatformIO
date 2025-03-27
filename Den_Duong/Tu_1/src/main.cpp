@@ -9,10 +9,10 @@ const char *password = "Abcd@1234";
 // const char *ssid = "tram bom so 4";
 // const char *password = "0943950555";
 //-------------------------------------------------------------------
-#include "myBlynkAir.h"
 #include "EmonLib.h"
 #include "PCF8575.h"
 #include "RTClib.h"
+#include "myBlynkAir.h"
 #include <BlynkSimpleEsp8266.h>
 #include <DallasTemperature.h>
 #include <ESP8266HTTPClient.h>
@@ -424,6 +424,8 @@ void connectionstatus() {
 
 //-------------------------------------------------------------------
 void setup() {
+  ESP.wdtDisable();
+  ESP.wdtEnable(300000);
   Serial.begin(115200);
   WiFi.mode(WIFI_STA);
   WiFi.begin(ssid, password);
@@ -480,6 +482,7 @@ void setup() {
   });
 }
 void loop() {
+  ESP.wdtFeed();
   Blynk.run();
   timer.run();
 }
