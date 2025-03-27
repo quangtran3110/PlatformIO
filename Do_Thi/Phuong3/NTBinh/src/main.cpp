@@ -199,7 +199,7 @@ void weekday_() {
   s_timer_van_1 = urlEncode(s_timer_van_1_);
 }
 void print_terminal() {
-  String server_path = server_name + "batch/update?token=" + Main_TOKEN + pin_terminal + location + pin_terminal + s_weekday + pin_terminal + s_timer_van_1;
+  String server_path = server_name + "batch/update?token=" + Main_TOKEN + pin_terminal + location + pin_terminal + s_weekday + pin_terminal + s_timer_van_1 + pin_terminal + BLYNK_FIRMWARE_VERSION;
   http.begin(client, server_path.c_str());
   http.GET();
   http.end();
