@@ -1,7 +1,7 @@
 #define BLYNK_TEMPLATE_ID "TMPL0DBjAEt-"
 #define BLYNK_TEMPLATE_NAME "BỜ KÈ"
 #define BLYNK_AUTH_TOKEN "T86HBKpJBPvMbJeGRF8mKPEUf83Oik9A"
-#define BLYNK_FIRMWARE_VERSION "250321"
+#define BLYNK_FIRMWARE_VERSION "250326"
 
 #define Main_TOKEN "w3ZZc7F4pvOIwqozyrzYcBFVUE3XxSiW"
 const char *ssid = "net";
@@ -13,6 +13,7 @@ const char *password = "Abcd@1234";
 #define APP_DEBUG
 
 #pragma region // Library
+#include "myBlynkAir.h"
 #include <BlynkSimpleEsp8266.h>
 #include <ESP8266WiFi.h>
 #include <SPI.h>
@@ -418,6 +419,8 @@ void rtctime() {
 }
 //-------------------------------------------------------------------
 void setup() {
+  ESP.wdtDisable();
+  ESP.wdtEnable(300000);
   Serial.begin(115200);
   WiFi.mode(WIFI_STA);
   WiFi.begin(ssid, password);
@@ -473,6 +476,7 @@ void setup() {
   });
 }
 void loop() {
+  ESP.wdtFeed();
   Blynk.run();
   timer.run();
 }
