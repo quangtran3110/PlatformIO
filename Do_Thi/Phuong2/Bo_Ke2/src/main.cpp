@@ -214,25 +214,16 @@ void weekday_() {
   s_timer_van_1 = urlEncode(s_timer_van_1_);
 }
 void print_terminal() {
-  String server_path = server_name + "batch/update?token=" + Main_TOKEN + pin_terminal + "clr";
+  String server_path = server_name + "batch/update?token=" + Main_TOKEN + pin_terminal + location + pin_terminal + s_weekday + pin_terminal + s_timer_van_1 + pin_terminal + urlEncode(s_temp) + pin_terminal + BLYNK_FIRMWARE_VERSION;
   http.begin(client, server_path.c_str());
-  int httpResponseCode = http.GET();
-  http.end();
-
-  server_path = server_name + "batch/update?token=" + Main_TOKEN + pin_terminal + location + pin_terminal + s_weekday + pin_terminal + s_timer_van_1 + pin_terminal + urlEncode(s_temp) + pin_terminal + BLYNK_FIRMWARE_VERSION;
-  http.begin(client, server_path.c_str());
-  httpResponseCode = http.GET();
+  http.GET();
   http.end();
   // Serial.println(server_path);
 }
 void print_terminal_main() {
-  String server_path = server_name + "batch/update?token=" + Main_TOKEN + "&V0=" + "clr";
+  String server_path = server_name + "batch/update?token=" + Main_TOKEN + "&V0=" + location + "&V0=" + s_weekday + "&V0=" + s_timer_van_1;
   http.begin(client, server_path.c_str());
-  int httpResponseCode = http.GET();
-  http.end();
-  server_path = server_name + "batch/update?token=" + Main_TOKEN + "&V0=" + location + "&V0=" + s_weekday + "&V0=" + s_timer_van_1;
-  http.begin(client, server_path.c_str());
-  httpResponseCode = http.GET();
+  http.GET();
   http.end();
 }
 void check_and_update() {
