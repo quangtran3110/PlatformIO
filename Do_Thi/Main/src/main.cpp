@@ -75,7 +75,7 @@ V58 - Irms
 #define BLYNK_TEMPLATE_ID "TMPL67uSt4c-z"
 #define BLYNK_TEMPLATE_NAME "ĐÔ THỊ"
 #define BLYNK_AUTH_TOKEN "w3ZZc7F4pvOIwqozyrzYcBFVUE3XxSiW"
-#define BLYNK_FIRMWARE_VERSION "250329"
+#define BLYNK_FIRMWARE_VERSION "250330"
 //-----------------------------
 #include <BlynkSimpleEsp8266.h>
 #include <ESP8266HTTPClient.h>
@@ -651,6 +651,8 @@ void hidden_ccd() {
   if (hidden_key_ccd != true) {
     Blynk.setProperty(V6, V8, V7, "isDisabled", "true");
     hidden_key_ccd = true;
+    if (time_run)
+      Blynk.logEvent("offline", "ccd OFFLINE!");
   }
 }
 void visible_ccd() {
@@ -753,6 +755,8 @@ void hidden_ubndp2() {
   if (hidden_key_ubndp2 != true) {
     Blynk.setProperty(V10, V12, V13, "isDisabled", "true");
     hidden_key_ubndp2 = true;
+    if (time_run)
+      Blynk.logEvent("offline", "ubnd_p2 OFFLINE!");
   }
 }
 void visible_ubndp2() {
@@ -855,6 +859,8 @@ void hidden_alb() {
   if (hidden_key_alb != true) {
     Blynk.setProperty(V14, V16, V17, V18, "isDisabled", "true");
     hidden_key_alb = true;
+    if (time_run)
+      Blynk.logEvent("offline", "alb OFFLINE!");
   }
 }
 void visible_alb() {
@@ -977,6 +983,8 @@ void hidden_ntbinh() {
   if (hidden_key_ntbinh != true) {
     Blynk.setProperty(V23, V25, V26, "isDisabled", "true");
     hidden_key_ntbinh = true;
+    if (time_run)
+      Blynk.logEvent("offline", "ntbinh OFFLINE!");
   }
 }
 void visible_ntbinh() {
@@ -1079,6 +1087,7 @@ void hidden_dhvuong() {
   if (hidden_key_dhvuong != true) {
     Blynk.setProperty(V27, V29, V30, "isDisabled", "true");
     hidden_key_dhvuong = true;
+    Blynk.logEvent("offline", "dhvuong OFFLINE!");
   }
 }
 void visible_dhvuong() {
@@ -1181,6 +1190,8 @@ void hidden_thpt1() {
   if (hidden_key_thpt1 != true) {
     Blynk.setProperty(V31, V33, V34, "isDisabled", "true");
     hidden_key_thpt1 = true;
+    if (time_run)
+      Blynk.logEvent("offline", "thpt1 OFFLINE!");
   }
 }
 void visible_thpt1() {
@@ -1283,6 +1294,8 @@ void hidden_thpt2() {
   if (hidden_key_thpt2 != true) {
     Blynk.setProperty(V35, V37, V38, "isDisabled", "true");
     hidden_key_thpt2 = true;
+    if (time_run)
+      Blynk.logEvent("offline", "thpt2 OFFLINE!");
   }
 }
 void visible_thpt2() {
@@ -1385,6 +1398,7 @@ void hidden_boke1() {
   if (hidden_key_boke1 != true) {
     Blynk.setProperty(V39, V41, V42, V43, "isDisabled", "true");
     hidden_key_boke1 = true;
+    Blynk.logEvent("offline", "boke1 OFFLINE!");
   }
 }
 void visible_boke1() {
@@ -1487,6 +1501,7 @@ void hidden_boke2() {
   if (hidden_key_boke2 != true) {
     Blynk.setProperty(V44, V46, V47, V48, "isDisabled", "true");
     hidden_key_boke2 = true;
+    Blynk.logEvent("offline", "boke2 OFFLINE!");
   }
 }
 void visible_boke2() {
@@ -1589,6 +1604,7 @@ void hidden_boke3() {
   if (hidden_key_boke3 != true) {
     Blynk.setProperty(V49, V51, V52, V53, "isDisabled", "true");
     hidden_key_boke3 = true;
+    Blynk.logEvent("offline", "boke3 OFFLINE!");
   }
 }
 void visible_boke3() {
@@ -1691,6 +1707,7 @@ void hidden_boke4() {
   if (hidden_key_boke4 != true) {
     Blynk.setProperty(V54, V56, V57, V58, "isDisabled", "true");
     hidden_key_boke4 = true;
+    Blynk.logEvent("offline", "boke4 OFFLINE!");
   }
 }
 void visible_boke4() {
@@ -1789,255 +1806,12 @@ BLYNK_WRITE(V57) { // Btn Van 1
     Blynk.virtualWrite(V57, sta_v1_boke4);
 }
 //-------------------------------------------------------------------
-//-------------------------------------------------------------------
-/*
-void check_status() {
-  String payload;
-  String server_path;
-
+void rtc() {
   if (((hour() >= time_on) || (hour() < time_off)) && (blynk_first_connect)) {
     time_run = true;
   } else
     time_run = false;
-  //-------- Cầu cửa đông
-  {
-    server_path = main_sever + "isHardwareConnected?token=" + ccd_TOKEN;
-    http.begin(client, server_path.c_str());
-    int httpResponseCode = http.GET();
-    if (httpResponseCode > 0) {
-      payload = http.getString();
-    }
-    http.end();
-    if (payload == "true") {
-      visible_ccd();
-      i_ccd = 0;
-    } else {
-      hidden_ccd();
-      if (time_run) {
-        i_ccd++;
-        if (i_ccd == 60)
-          Blynk.logEvent("error", "Module ccd offline!");
-      }
-    }
-  }
-  //-------- UBND P2
-  {
-    server_path = main_sever + "isHardwareConnected?token=" + ubndp2_TOKEN;
-    http.begin(client, server_path.c_str());
-    int httpResponseCode = http.GET();
-    if (httpResponseCode > 0) {
-      payload = http.getString();
-    }
-    http.end();
-    if (payload == "true") {
-      visible_ubndp2();
-      i_ubndp2 = 0;
-    } else {
-      hidden_ubndp2();
-      if (time_run) {
-        i_ubndp2++;
-        if (i_ubndp2 == 60)
-          Blynk.logEvent("error", "Module ubndp2 offline!");
-      }
-    }
-  }
-  //-------- Ao lục bình
-  {
-    server_path = main_sever + "isHardwareConnected?token=" + alb_TOKEN;
-    http.begin(client, server_path.c_str());
-    int httpResponseCode = http.GET();
-    if (httpResponseCode > 0) {
-      payload = http.getString();
-    }
-    http.end();
-    if (payload == "true") {
-      visible_alb();
-      i_alb = 0;
-    } else {
-      hidden_alb();
-      if (time_run) {
-        i_alb++;
-        if (i_alb == 60)
-          Blynk.logEvent("error", "Module alb offline!");
-      }
-    }
-  }
-  //-------- N.T.Bình
-  {
-    server_path = main_sever + "isHardwareConnected?token=" + ntbinh_TOKEN;
-    http.begin(client, server_path.c_str());
-    int httpResponseCode = http.GET();
-    if (httpResponseCode > 0) {
-      payload = http.getString();
-    }
-    http.end();
-    if (payload == "true") {
-      visible_ntbinh();
-      i_ntbinh = 0;
-    } else {
-      hidden_ntbinh();
-      if (time_run) {
-        i_ntbinh++;
-        if (i_ntbinh == 60)
-          Blynk.logEvent("error", "Module ntbinh offline!");
-      }
-    }
-  }
-  //-------- Bờ kè 1
-  {
-    server_path = main_sever + "isHardwareConnected?token=" + boke1_TOKEN;
-    http.begin(client, server_path.c_str());
-    int httpResponseCode = http.GET();
-    if (httpResponseCode > 0) {
-      payload = http.getString();
-    }
-    http.end();
-    if (payload == "true") {
-      visible_boke1();
-      i_boke1 = 0;
-    } else {
-      hidden_boke1();
-      i_boke1++;
-      if (i_boke1 == 60)
-        Blynk.logEvent("error", "Module boke1 offline!");
-    }
-  }
-  //-------- Bờ kè 2
-  {
-    server_path = main_sever + "isHardwareConnected?token=" + boke2_TOKEN;
-    http.begin(client, server_path.c_str());
-    int httpResponseCode = http.GET();
-    if (httpResponseCode > 0) {
-      payload = http.getString();
-    }
-    http.end();
-    if (payload == "true") {
-      visible_boke2();
-      i_boke2 = 0;
-    } else {
-      hidden_boke2();
-      i_boke2++;
-      if (i_boke2 == 60)
-        Blynk.logEvent("error", "Module boke2 offline!");
-    }
-  }
-  //-------- Bờ kè 3
-  {
-    server_path = main_sever + "isHardwareConnected?token=" + boke3_TOKEN;
-    http.begin(client, server_path.c_str());
-    int httpResponseCode = http.GET();
-    if (httpResponseCode > 0) {
-      payload = http.getString();
-    }
-    http.end();
-    if (payload == "true") {
-      visible_boke3();
-      i_boke3 = 0;
-    } else {
-      hidden_boke3();
-      i_boke3++;
-      if (i_boke3 == 60)
-        Blynk.logEvent("error", "Module boke3 offline!");
-    }
-  }
-  //-------- Bờ kè 4
-  {
-    server_path = main_sever + "isHardwareConnected?token=" + boke4_TOKEN;
-    http.begin(client, server_path.c_str());
-    int httpResponseCode = http.GET();
-    if (httpResponseCode > 0) {
-      payload = http.getString();
-    }
-    http.end();
-    if (payload == "true") {
-      visible_boke4();
-      i_boke4 = 0;
-    } else {
-      hidden_boke4();
-      i_boke4++;
-      if (i_boke4 == 60)
-        Blynk.logEvent("error", "Module boke4 offline!");
-    }
-  }
-  //-------- Đường Hùng Vương
-  {
-    server_path = main_sever + "isHardwareConnected?token=" + dhvuong_TOKEN;
-    http.begin(client, server_path.c_str());
-    int httpResponseCode = http.GET();
-    if (httpResponseCode > 0) {
-      payload = http.getString();
-    }
-    http.end();
-    if (payload == "true") {
-      visible_dhvuong();
-    } else {
-      hidden_dhvuong();
-    }
-  }
-  //-------- THPT 1
-  {
-    server_path = main_sever + "isHardwareConnected?token=" + thpt1_TOKEN;
-    http.begin(client, server_path.c_str());
-    int httpResponseCode = http.GET();
-    if (httpResponseCode > 0) {
-      payload = http.getString();
-    }
-    http.end();
-    if (payload == "true") {
-      visible_thpt1();
-      i_thpt1 = 0;
-    } else {
-      hidden_thpt1();
-      if (time_run) {
-        i_thpt1++;
-        if (i_thpt1 == 60)
-          Blynk.logEvent("error", "Module thpt1 offline!");
-      }
-    }
-  }
-  //-------- THPT 2
-  {
-    server_path = main_sever + "isHardwareConnected?token=" + thpt2_TOKEN;
-    http.begin(client, server_path.c_str());
-    int httpResponseCode = http.GET();
-    if (httpResponseCode > 0) {
-      payload = http.getString();
-    }
-    http.end();
-    if (payload == "true") {
-      visible_thpt2();
-      i_thpt2 = 0;
-    } else {
-      hidden_thpt2();
-      if (time_run) {
-        i_thpt2++;
-        if (i_thpt2 == 60)
-          Blynk.logEvent("error", "Module thpt2 offline!");
-      }
-    }
-  }
-  //------------------------- Volume T2-G1
-  {
-    server_path = main_sever + "isHardwareConnected?token=" + T2_G1_TOKEN;
-    http.begin(client, server_path.c_str());
-    int httpResponseCode = http.GET();
-    if (httpResponseCode > 0) {
-      payload = http.getString();
-    }
-    http.end();
-    if (payload == "true") {
-      i_ccd = 0;
-    } else {
-      hidden_ccd();
-      if (time_run) {
-        i_ccd++;
-        if (i_ccd == 60)
-          Blynk.logEvent("error", "Module ccd offline!");
-      }
-    }
-  }
 }
-*/
 void decode_status(int g) {
   // Mảng chứa tên của các module để hiển thị và debug
   const char *moduleNames[] = {
@@ -2164,6 +1938,9 @@ void setup() {
 
   timer.setInterval(900005L, []() {
     connectionstatus();
+  });
+  timer.setInterval(60002, []() {
+    rtc();
   });
 }
 void loop() {

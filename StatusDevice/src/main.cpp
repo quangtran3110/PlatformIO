@@ -113,6 +113,12 @@ void update_fw() {
   }
 }
 //-------------------------------------------------------------------
+// Biến toàn cục để lưu trạng thái cũ
+// Biến toàn cục để lưu trạng thái cũ và thời gian
+static int previous_g = -1; // -1 để lần đầu tiên luôn gửi
+static unsigned long last_send_time = 0;
+const unsigned long SEND_INTERVAL = 15 * 60 * 1000; // 30 phút tính bằng milliseconds
+
 void check_status() {
   String server_path;
   int g = 0;
@@ -133,25 +139,36 @@ void check_status() {
 
   // Số lượng module cần kiểm tra
   const int moduleCount = sizeof(tokens) / sizeof(tokens[0]);
-
   // Kiểm tra trạng thái của từng module
   for (int i = 0; i < moduleCount; i++) {
     server_path = server_name + "isHardwareConnected?token=" + tokens[i];
     http.begin(client, server_path.c_str());
     int httpResponseCode = http.GET();
-
     if (httpResponseCode > 0) {
       String payload = http.getString();
-      bitWrite(g, i, payload == "true" ? 1 : 0);
+      payload.trim(); // Loại bỏ khoảng trắng thừa
+      // So sánh không phân biệt chữ hoa/thường
+      bool isConnected = (payload.equalsIgnoreCase("true"));
+      bitWrite(g, i, isConnected);
     }
     http.end();
   }
+  // Kiểm tra xem có cần gửi dữ liệu không
+  // Gửi dữ liệu nếu:
+  // 1. Có sự thay đổi trạng thái (g khác previous_g)
+  // 2. Hoặc đã đủ 30 phút kể từ lần gửi cuối
+  if (g != previous_g || (millis() - last_send_time >= SEND_INTERVAL)) {
+    // Gửi dữ liệu
+    server_path = server_name + "batch/update?token=" + main_dothi_TOKEN + pin_G_main_dothi + g;
+    http.begin(client, server_path.c_str());
+    http.GET();
+    http.end();
 
-  // Gửi dữ liệu sau khi đã chạy xong for
-  server_path = server_name + "batch/update?token=" + main_dothi_TOKEN + pin_G_main_dothi + g;
-  http.begin(client, server_path.c_str());
-  http.GET();
-  http.end();
+    // Cập nhật thời gian gửi cuối và trạng thái cũ
+    last_send_time = millis();
+    previous_g = g;
+    Serial.println(g);
+  }
 }
 //-------------------------------------------------------------------
 void setup() {
