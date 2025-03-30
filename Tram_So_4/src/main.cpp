@@ -71,12 +71,13 @@
 #define BLYNK_AUTH_TOKEN "ra1gZtR0irrwiTH1L-L_nhXI6TMRH7M9"
 #define VOLUME_TOKEN "fQeSuHadv_EFLjXPdqE-sV_lnZ6pXWfu"
 
-#define BLYNK_FIRMWARE_VERSION "240912"
+#define BLYNK_FIRMWARE_VERSION "250330"
 const char *ssid = "tram bom so 4";
 const char *password = "0943950555";
 #define APP_DEBUG
 
 #pragma region
+#include "myBlynkAir.h"
 #include <BlynkSimpleEsp8266.h>
 #include <ESP8266WiFi.h>
 #include <SPI.h>
@@ -241,9 +242,7 @@ void connectionstatus() {
       WiFi.begin(ssid, password);
     }
     if (reboot_num % 5 == 0) {
-      WiFi.disconnect();
-      delay(1000);
-      WiFi.begin(ssid, password);
+      ESP.restart();
     }
   }
   if (Blynk.connected()) {
@@ -308,7 +307,7 @@ void up() {
 void up_timerun_motor() {
   String server_path = server_name + "batch/update?token=" + BLYNK_AUTH_TOKEN + "&V40=" + float(data.timerun_G1) / 1000 / 60 / 60 + "&V42=" + float(data.timerun_B1) / 1000 / 60 / 60 + "&V44=" + float(data.timerun_B2) / 1000 / 60 / 60;
   http.begin(client, server_path.c_str());
-  int httpResponseCode = http.GET();
+  http.GET();
   http.end();
 }
 void savedata() {
@@ -416,7 +415,7 @@ void visible_man() {
 void rst_board() {
   pcf8575_1.digitalWrite(pin_rst, LOW);
 }
-//--------------------------------
+//-------------------------------------------------------------------
 void readPower() // C2 - Giếng    - I0
 {
   pcf8575_1.digitalWrite(S0pin, LOW);
@@ -429,7 +428,7 @@ void readPower() // C2 - Giếng    - I0
     yIrms0 = 0;
     xIrms0++;
     if (xIrms0 > 3) {
-      if ((status_g1 == HIGH) && (keyp)) {
+      if ((status_g1 == HIGH) && (keyp) && (volume1 < 170)) {
         offcap1();
         trip0 = true;
         if (data.key_noti)
@@ -714,7 +713,6 @@ void rtctime() {
   if (blynk_first_connect == true) {
     if ((now.day() != day()) || (now.hour() != hour()) || ((now.minute() - minute() > 2) || (minute() - now.minute() > 2))) {
       rtc_module.adjust(DateTime(year(), month(), day(), hour(), minute(), second()));
-      DateTime now = rtc_module.now();
     }
   }
   timestamp = now.unixtime();
@@ -1328,6 +1326,8 @@ BLYNK_WRITE(V37) { // LLG1_1m3
 }
 //-------------------------------------------------------------------
 void setup() {
+  ESP.wdtDisable();
+  ESP.wdtEnable(300000);
   Serial.begin(9600);
   WiFi.mode(WIFI_STA);
   WiFi.begin(ssid, password);
@@ -1395,6 +1395,7 @@ void setup() {
     terminal.clear(); });
 }
 void loop() {
+  ESP.wdtFeed();
   Blynk.run();
   timer.run();
   timer1.run();

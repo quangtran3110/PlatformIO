@@ -130,7 +130,7 @@ byte khu_vuc = 0, dia_diem = 0, van = 0;
 byte t2, t3, t4, t5, t6, t7, cn;
 byte reboot_num;
 bool blynk_first_connect = false, key_set = false, key = false;
-bool time_run = false;
+bool time_run = false, noti = true;
 int previous_status = 0;
 
 uint32_t start_, stop_;
@@ -301,6 +301,14 @@ BLYNK_WRITE(V0) { // String
     terminal.clear();
     Blynk.virtualWrite(V0, "MAIN UPDATE...");
     update_fw();
+  } else if (dataS == "noti_off") {
+    terminal.clear();
+    noti = false;
+    Blynk.virtualWrite(V0, "Notification off");
+  } else if (dataS == "noti_on") {
+    terminal.clear();
+    noti = true;
+    Blynk.virtualWrite(V0, "Notification on");
   }
 }
 BLYNK_WRITE(V1) { // Khu vực
@@ -651,7 +659,7 @@ void hidden_ccd() {
   if (hidden_key_ccd != true) {
     Blynk.setProperty(V6, V8, V7, "isDisabled", "true");
     hidden_key_ccd = true;
-    if (time_run)
+    if ((time_run) && (noti))
       Blynk.logEvent("offline", "ccd OFFLINE!");
   }
 }
@@ -755,7 +763,7 @@ void hidden_ubndp2() {
   if (hidden_key_ubndp2 != true) {
     Blynk.setProperty(V10, V12, V13, "isDisabled", "true");
     hidden_key_ubndp2 = true;
-    if (time_run)
+    if ((time_run) && (noti))
       Blynk.logEvent("offline", "ubnd_p2 OFFLINE!");
   }
 }
@@ -859,7 +867,7 @@ void hidden_alb() {
   if (hidden_key_alb != true) {
     Blynk.setProperty(V14, V16, V17, V18, "isDisabled", "true");
     hidden_key_alb = true;
-    if (time_run)
+    if ((time_run) && (noti))
       Blynk.logEvent("offline", "alb OFFLINE!");
   }
 }
@@ -983,7 +991,7 @@ void hidden_ntbinh() {
   if (hidden_key_ntbinh != true) {
     Blynk.setProperty(V23, V25, V26, "isDisabled", "true");
     hidden_key_ntbinh = true;
-    if (time_run)
+    if ((time_run) && (noti))
       Blynk.logEvent("offline", "ntbinh OFFLINE!");
   }
 }
@@ -1190,7 +1198,7 @@ void hidden_thpt1() {
   if (hidden_key_thpt1 != true) {
     Blynk.setProperty(V31, V33, V34, "isDisabled", "true");
     hidden_key_thpt1 = true;
-    if (time_run)
+    if ((time_run) && (noti))
       Blynk.logEvent("offline", "thpt1 OFFLINE!");
   }
 }
@@ -1294,7 +1302,7 @@ void hidden_thpt2() {
   if (hidden_key_thpt2 != true) {
     Blynk.setProperty(V35, V37, V38, "isDisabled", "true");
     hidden_key_thpt2 = true;
-    if (time_run)
+    if ((time_run) && (noti))
       Blynk.logEvent("offline", "thpt2 OFFLINE!");
   }
 }
