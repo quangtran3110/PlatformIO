@@ -40,10 +40,11 @@ const char *ssid = "net";
 const char *password = "Abcd@1234";
 //-------------------------------------------------------------------
 #define BLYNK_PRINT Serial
-#define BLYNK_FIRMWARE_VERSION "250127"
+#define BLYNK_FIRMWARE_VERSION "250330"
 #define APP_DEBUG
 
 #pragma region // Library
+#include "myBlynkAir.h"
 #include <BlynkSimpleEsp8266.h>
 #include <ESP8266HTTPClient.h>
 #include <ESP8266WiFi.h>
@@ -502,6 +503,8 @@ BLYNK_WRITE(V15) // Thông báo
 }
 //-------------------------------------------------------------------
 void setup() {
+  ESP.wdtDisable();
+  ESP.wdtEnable(300000);
   pinMode(S0pin, OUTPUT);
   pinMode(S1pin, OUTPUT);
   pinMode(S2pin, OUTPUT);
@@ -569,6 +572,7 @@ void setup() {
 }
 
 void loop() {
+  ESP.wdtFeed();
   Blynk.run();
   timer.run();
   timer1.run();
