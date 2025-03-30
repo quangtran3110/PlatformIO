@@ -6,11 +6,11 @@
 #define BLYNK_PRINT Serial
 #define APP_DEBUG
 
-//const char *ssid = "Hiddennet";
-//const char *password = "Password";
+const char *ssid = "Hiddennet";
+const char *password = "Password";
 
-const char *ssid = "tram bom so 4";
-const char *password = "0943950555";
+//const char *ssid = "tram bom so 4";
+//const char *password = "0943950555";
 
 #include <BlynkSimpleEsp8266.h>
 #include <ESP8266WiFi.h>
