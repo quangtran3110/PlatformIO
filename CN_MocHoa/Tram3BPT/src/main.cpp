@@ -59,7 +59,7 @@
 #define BLYNK_AUTH_TOKEN "Xd_XI0fm9nIsXBvvMZ6pjEtRd0irLLR2"
 #define VOLUME_TOKEN "Q2KAjaqI3sWhET-Ax94VPYfIk2Fmsr36"
 
-#define BLYNK_FIRMWARE_VERSION "240909"
+#define BLYNK_FIRMWARE_VERSION "250331"
 #define BLYNK_PRINT Serial
 #define APP_DEBUG
 const char *ssid = "KwacoBlynk";
@@ -68,6 +68,7 @@ const char *password = "Password";
 // const char* password = "Password";
 
 #pragma region
+#include "myBlynkAir.h"
 #include <BlynkSimpleEsp8266.h>
 #include <ESP8266WiFi.h>
 #include <SPI.h>
@@ -633,7 +634,6 @@ void rtctime() {
   if (blynk_first_connect == true) {
     if ((now.day() != day()) || (now.hour() != hour()) || ((now.minute() - minute() > 2) || (minute() - now.minute() > 2))) {
       rtc_module.adjust(DateTime(year(), month(), day(), hour(), minute(), second()));
-      DateTime now = rtc_module.now();
     }
   }
   Blynk.virtualWrite(V9, daysOfTheWeek[now.dayOfTheWeek()], ", ", now.day(), "/", now.month(), "/", now.year(), " - ", now.hour(), ":", now.minute(), ":", now.second());
@@ -1064,6 +1064,8 @@ BLYNK_WRITE(V29) // Lưu lượng G1_1m3
 //-------------------------------------------------------------------
 //-------------------------------------------------------------------
 void setup() {
+  ESP.wdtDisable();
+  ESP.wdtEnable(300000);
   Serial.begin(9600);
   WiFi.mode(WIFI_STA);
   WiFi.begin(ssid, password);
@@ -1131,6 +1133,7 @@ void setup() {
 }
 
 void loop() {
+  ESP.wdtFeed();
   Blynk.run();
   timeout.run();
   timer.run();
