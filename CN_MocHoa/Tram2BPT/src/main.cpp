@@ -37,7 +37,7 @@ V43- thời gian chạy B1 - 24h
 #define BLYNK_AUTH_TOKEN "YZXkYAgH44t-kjJPKapydw5vMlR7MGAC"
 
 #define VOLUME_TOKEN "dXbklpLJKTZQ5hK9Qpy7Sg5DdwgmQ8z"
-#define BLYNK_FIRMWARE_VERSION "240910"
+#define BLYNK_FIRMWARE_VERSION "250331"
 
 const char *ssid = "BPT2";
 const char *password = "0919126757";
@@ -46,6 +46,7 @@ const char *password = "0919126757";
 #define APP_DEBUG
 
 #pragma region
+#include "myBlynkAir.h"
 #include <BlynkSimpleEsp8266.h>
 #include <ESP8266WiFi.h>
 #include <SPI.h>
@@ -283,13 +284,13 @@ void up() {
   String server_path = server_name + "batch/update?token=" + BLYNK_AUTH_TOKEN + "&V5=" + Irms0 + "&V6=" + I_vdf + "&V8=" + Irms3 + "&V13=" + hz + "&V14=" + pre + "&V15=" + smoothDistance + "&V16=" + volume + "&V19=" + temp_vdf + "&V40=" + float(data.timerun_G1) / 1000 / 60 / 60 + "&V42=" + float(data.timerun_B1) / 1000 / 60 / 60;
   //+ "&V21=" + temp[0]
   http.begin(client, server_path.c_str());
-  int httpResponseCode = http.GET();
+  http.GET();
   http.end();
 }
 void up_timerun_motor() {
   String server_path = server_name + "batch/update?token=" + BLYNK_AUTH_TOKEN + "&V41=" + float(data.timerun_G1) / 1000 / 60 / 60 + "&V43=" + float(data.timerun_B1) / 1000 / 60 / 60;
   http.begin(client, server_path.c_str());
-  int httpResponseCode = http.GET();
+  http.GET();
   http.end();
 }
 void time_run_motor() {
@@ -569,7 +570,6 @@ void rtctime() {
   if (blynk_first_connect == true) {
     if ((now.day() != day()) || (now.hour() != hour()) || ((now.minute() - minute() > 2) || (minute() - now.minute() > 2))) {
       rtc_module.adjust(DateTime(year(), month(), day(), hour(), minute(), second()));
-      DateTime now = rtc_module.now();
     }
   }
   Blynk.virtualWrite(V20, daysOfTheWeek[now.dayOfTheWeek()], ", ", now.day(), "/", now.month(), "/", now.year(), " - ", now.hour(), ":", now.minute(), ":", now.second());
@@ -1029,6 +1029,8 @@ BLYNK_WRITE(V27) // Rửa lọc
 }
 //-------------------------------------------------------------------
 void setup() {
+  ESP.wdtDisable();
+  ESP.wdtEnable(300000);
   pinMode(D4, OUTPUT);
   pinMode(D3, INPUT);
   pinMode(S0, OUTPUT);
@@ -1105,6 +1107,7 @@ void setup() {
   });
 }
 void loop() {
+  ESP.wdtFeed();
   Blynk.run();
   timer.run();
   timer1.run();
