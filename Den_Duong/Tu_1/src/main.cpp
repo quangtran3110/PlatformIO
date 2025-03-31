@@ -1,7 +1,7 @@
 #define BLYNK_TEMPLATE_ID "TMPLdGfzkVvi"
 #define BLYNK_TEMPLATE_NAME "Đèn đường"
 #define BLYNK_AUTH_TOKEN "tCAptndMM6EXqRkWvj_6tK76_mi7gbKf"
-#define BLYNK_FIRMWARE_VERSION "250327"
+#define BLYNK_FIRMWARE_VERSION "250331"
 
 #define Main_TOKEN "Ol3VH8Hv_OX2JKUWl4ENBk6Rqgh3P3MQ"
 const char *ssid = "net";
@@ -69,7 +69,7 @@ float temp;
 float Irms0, prev_Irms0 = 0;
 unsigned long int xIrms0 = 0;
 unsigned long int yIrms0 = 0;
-byte reboot_num, prev_mode = 0;
+byte reboot_num, prev_mode = 3;
 String num_KDT = "KDT1";
 String s_timer_van_1, s_temp;
 String s_weekday;
