@@ -2,16 +2,17 @@
 #define BLYNK_TEMPLATE_NAME "VOLUME"
 #define BLYNK_AUTH_TOKEN "JTnEpJjGVVJ8DM1aJx7zZT4cyNYJrhr_"
 
-#define BLYNK_FIRMWARE_VERSION "241201"
+#define BLYNK_FIRMWARE_VERSION "250401"
 #define BLYNK_PRINT Serial
 #define APP_DEBUG
 
 const char *ssid = "Hiddennet";
 const char *password = "Password";
 
-//const char *ssid = "tram bom so 4";
-//const char *password = "0943950555";
+// const char *ssid = "tram bom so 4";
+// const char *password = "0943950555";
 
+#include "myBlynkAir.h"
 #include <BlynkSimpleEsp8266.h>
 #include <ESP8266WiFi.h>
 
@@ -39,7 +40,7 @@ String LL1m3 = "&V60=";
 String terminal_main = "&V50=";
 String text;
 
-bool blynk_first_connect = false, key_i2c = false;
+bool blynk_first_connect = false, key_i2c = false, key_pulse = true;
 int var_10m3;
 byte reboot_num;
 
@@ -63,8 +64,13 @@ BLYNK_CONNECTED() {
 }
 
 ICACHE_RAM_ATTR void buttonPressed() {
-  data.pulse++;
-  // Serial.println(data.pulse);
+  if (key_pulse) {
+    key_pulse = false;
+    data.pulse++;
+    timer.setTimeout(10000, []() {
+      key_pulse = true;
+    });
+  }
 }
 
 //-------------------------
@@ -263,12 +269,13 @@ void scanI2C() {
 }
 //-------------------------
 void setup() {
+  ESP.wdtDisable();
+  ESP.wdtEnable(300000);
   Serial.begin(115200);
   WiFi.mode(WIFI_STA);
   WiFi.begin(ssid, password);
   Blynk.config(BLYNK_AUTH_TOKEN);
   delay(5000);
-
 
   Wire.begin();
   ee.begin();
@@ -280,10 +287,10 @@ void setup() {
   timer.setInterval(61005, connectionstatus);
   timer.setInterval(15003, rtc_time);
   timer.setInterval(5013, scanI2C);
-
 }
 
 void loop() {
+  ESP.wdtFeed();
   Blynk.run();
   timer.run();
 }
