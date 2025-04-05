@@ -123,7 +123,7 @@ const char *password = "0943950555";
 // const char* ssid = "tram bom so 4";
 // const char* password = "0943950555";
 //-----------------------------
-char A[50] = "";
+
 char daysOfTheWeek[7][12] = {"CN", "T2", "T3", "T4", "T5", "T6", "T7"};
 char tz[] = "Asia/Ho_Chi_Minh";
 byte time_on = 19;
@@ -288,7 +288,7 @@ BLYNK_WRITE(V0) { // String
     key_set = false;
     key = false;
     Blynk.virtualWrite(V0, "Hủy kích hoạt!");
-  } else if (dataS == "caidat") { // auto
+  } else if (dataS == "den") { // auto
     terminal.clear();
     key_set = true;
     timer.setTimeout(301000, []() {
@@ -312,8 +312,8 @@ BLYNK_WRITE(V1) { // Khu vực
   switch (param.asInt()) {
   case 0: { // Kiến Tường
     khu_vuc = "kien_tuong";
-    menu.add("TỦ 1");
-    menu.add("TỦ 2");
+    menu.add("Bình Tân 1");
+    // menu.add("TỦ 2");
     Blynk.setProperty(V2, "labels", menu);
     break;
   }
@@ -332,7 +332,7 @@ BLYNK_WRITE(V2) { // Địa điểm
   switch (param.asInt()) {
   case 0: {
     dia_diem = 1;
-    if (khu_vuc == "kien_tuong") { // Tủ 1
+    if (khu_vuc == "kien_tuong") { // Bình Tân 1
       menu.add("KĐT 1");
       Blynk.setProperty(V3, "labels", menu);
     } else if (khu_vuc == "moc_hoa") { //
@@ -377,68 +377,6 @@ BLYNK_WRITE(V2) { // Địa điểm
   }
   Blynk.virtualWrite(V3, 100);
 }
-BLYNK_WRITE(V3) { // Chọn khởi động từ
-  switch (param.asInt()) {
-  case 0: {
-    KDT = 1;
-    if (khu_vuc == "kien_tuong") {
-      if (dia_diem == 1) {
-        String server_path = main_sever + "batch/update?token=" + tu1_TOKEN + "&V0=" + "KDT1";
-        http.begin(client, server_path.c_str());
-        http.GET();
-        http.end();
-      } else if (dia_diem == 2) {
-        String server_path = main_sever + "batch/update?token=" + tu2_TOKEN + "&V0=" + "KDT1";
-        http.begin(client, server_path.c_str());
-        http.GET();
-        http.end();
-      }
-    } else if (khu_vuc == "moc_hoa") {
-      if (dia_diem == 1) {
-        String server_path = main_sever + "batch/update?token=" + tu1_TOKEN + "&V0=" + "KDT1";
-        http.begin(client, server_path.c_str());
-        http.GET();
-        http.end();
-      } else if (dia_diem == 2) {
-        String server_path = main_sever + "batch/update?token=" + tu2_TOKEN + "&V0=" + "KDT1";
-        http.begin(client, server_path.c_str());
-        http.GET();
-        http.end();
-      }
-    }
-    break;
-  }
-  case 1: {
-    KDT = 2;
-    if (khu_vuc == "kien_tuong") {
-      if (dia_diem == 1) {
-        String server_path = main_sever + "batch/update?token=" + tu1_TOKEN + "&V0=" + "KDT2";
-        http.begin(client, server_path.c_str());
-        http.GET();
-        http.end();
-      } else if (dia_diem == 2) {
-        String server_path = main_sever + "batch/update?token=" + tu2_TOKEN + "&V0=" + "KDT2";
-        http.begin(client, server_path.c_str());
-        http.GET();
-        http.end();
-      }
-    } else if (khu_vuc == "moc_hoa") {
-      if (dia_diem == 1) {
-        String server_path = main_sever + "batch/update?token=" + tu1_TOKEN + "&V0=" + "KDT2";
-        http.begin(client, server_path.c_str());
-        http.GET();
-        http.end();
-      } else if (dia_diem == 2) {
-        String server_path = main_sever + "batch/update?token=" + tu2_TOKEN + "&V0=" + "KDT2";
-        http.begin(client, server_path.c_str());
-        http.GET();
-        http.end();
-      }
-    }
-    break;
-  }
-  }
-}
 BLYNK_WRITE(V4) { // Time input
   if (key_set) {
     TimeInputParam t(param);
@@ -448,17 +386,6 @@ BLYNK_WRITE(V4) { // Time input
     if (t.hasStopTime()) {
       stop_ = t.getStopHour() * 3600 + t.getStopMinute() * 60;
     }
-    memset(A, '\0', sizeof(A));
-    for (int i = 1; i <= 7; i++) {
-      // Nếu ngày i được chọn
-      if (t.isWeekdaySelected(i) == 1) {
-        // Thêm giá trị i vào mảng A
-        strcat(A, String(i).c_str());
-        strcat(A, ",");
-      }
-    }
-    // Xóa ký tự cuối cùng là dấu phẩy
-    A[strlen(A) - 1] = '\0';
   }
 }
 BLYNK_WRITE(V5) { // Save time input
@@ -466,13 +393,13 @@ BLYNK_WRITE(V5) { // Save time input
     if (param.asInt() == 1) {
       if (khu_vuc == "kien_tuong") {
         if (dia_diem == 1) { // Tủ 1
-          String server_path = main_sever + "batch/update?token=" + tu1_TOKEN + "&V1=" + start_ + "&V1=" + stop_ + "&V1=" + tz + "&V1=" + String(A);
+          String server_path = main_sever + "batch/update?token=" + tu1_TOKEN + "&V1=" + start_ + "&V1=" + stop_ + "&V1=" + tz;
           http.begin(client, server_path.c_str());
           http.GET();
           http.end();
           terminal.clear();
         } else if (dia_diem == 2) { // Tủ 2
-          String server_path = main_sever + "batch/update?token=" + tu2_TOKEN + "&V1=" + start_ + "&V1=" + stop_ + "&V1=" + tz + "&V1=" + String(A);
+          String server_path = main_sever + "batch/update?token=" + tu2_TOKEN + "&V1=" + start_ + "&V1=" + stop_ + "&V1=" + tz;
           http.begin(client, server_path.c_str());
           http.GET();
           http.end();
@@ -485,7 +412,7 @@ BLYNK_WRITE(V5) { // Save time input
     Blynk.virtualWrite(V0, "Hãy nhập mật mã trước khi cài đặt!");
   }
 }
-//------------------- Tủ 1
+//------------------- Bình Tân 1
 void hidden_tu1() {
   if (hidden_key_tu1 != true) {
     Blynk.setProperty(V6, V8, V7, V10, "isDisabled", "true");

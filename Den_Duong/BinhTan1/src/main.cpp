@@ -1,7 +1,7 @@
 #define BLYNK_TEMPLATE_ID "TMPLdGfzkVvi"
 #define BLYNK_TEMPLATE_NAME "Đèn đường"
 #define BLYNK_AUTH_TOKEN "tCAptndMM6EXqRkWvj_6tK76_mi7gbKf"
-#define BLYNK_FIRMWARE_VERSION "250331"
+#define BLYNK_FIRMWARE_VERSION "250504"
 
 #define Main_TOKEN "Ol3VH8Hv_OX2JKUWl4ENBk6Rqgh3P3MQ"
 const char *ssid = "net";
@@ -30,7 +30,7 @@ const char *password = "Abcd@1234";
 #define APP_DEBUG
 #define EEPROM_ADDRESS 0x57
 static Eeprom24C32_64 eeprom(EEPROM_ADDRESS);
-#define URL_fw_Bin "https://raw.githubusercontent.com/quangtran3110/PlatformIO/main/Den_Duong/Tu_1/.pio/build/nodemcuv2/firmware.bin"
+#define URL_fw_Bin "https://raw.githubusercontent.com/quangtran3110/PlatformIO/main/Den_Duong/BinhTan1/.pio/build/nodemcuv2/firmware.bin"
 String server_name = "http://sgp1.blynk.cloud/external/api/";
 //-----------------------------
 #define pin_dataS "&V6="
@@ -70,9 +70,7 @@ float Irms0, prev_Irms0 = 0;
 unsigned long int xIrms0 = 0;
 unsigned long int yIrms0 = 0;
 byte reboot_num, prev_mode = 3;
-String num_KDT = "KDT1";
 String s_timer_van_1, s_temp;
-String s_weekday;
 bool key = false, blynk_first_connect = false, dayOfTheWeek_ = false;
 bool sta_rl1 = LOW, sta_rl3 = LOW, prev_sta_rl3 = LOW;
 bool trip0 = false;
@@ -86,10 +84,9 @@ struct Data {
   byte reboot_num;
   byte save_num;
   uint32_t rl3_r, rl3_s;
-  byte MonWeekDay, TuesWeekDay, WedWeekDay, ThuWeekDay, FriWeekDay, SatWeekend, SunWeekend;
   byte SetAmpemax, SetAmpemin;
 } data, dataCheck;
-const struct Data dataDefault = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+const struct Data dataDefault = {0, 0, 0, 0, 0, 0, 0};
 //-----------------------------
 WidgetTerminal DATAS(V0);
 WidgetRTC rtc_widget;
@@ -147,31 +144,6 @@ void savedata() {
 }
 //-----------------------------
 void weekday_() {
-  //---------------------Day
-  int A[7] = {data.MonWeekDay, data.TuesWeekDay, data.WedWeekDay, data.ThuWeekDay, data.FriWeekDay, data.SatWeekend, data.SunWeekend};
-  memset(s_day, '\0', sizeof(s_day));
-  strcat(s_day, "Day: ");
-  memset(B, '\0', sizeof(B));
-  for (int i = 0; i < 7; i++) {
-    // Nếu ngày i được chọn
-    if (A[i] == 1) {
-      // Thêm giá trị i vào mảng A
-      strcat(B, String(i + 1).c_str());
-      strcat(B, ",");
-      if (i == 6) {
-        strcat(s_day, "CN");
-        strcat(s_day, ",");
-      } else {
-        strcat(s_day, "T");
-        strcat(s_day, String(i + 2).c_str());
-        strcat(s_day, ",");
-      }
-    }
-  }
-  B[strlen(B) - 1] = '\0'; // Xóa ký tự cuối cùng là dấu phẩy
-  s_day[strlen(s_day) - 1] = '\0';
-  strcat(s_day, "\n"); // Xuống dòng cuối câu
-  s_weekday = urlEncode(s_day);
   //---------------------Time RL 1
   if ((hour_start_rl3 == 0) && (minute_start_rl3 == 0) && (hour_stop_rl3 == 0) && (minute_stop_rl3 == 0)) {
     hour_start_rl3 = data.rl3_r / 3600;
@@ -186,14 +158,14 @@ void weekday_() {
 void print_terminal() {
   String s_ampe = "Ampe: " + String(data.SetAmpemin) + "A - " + String(data.SetAmpemax) + "A\n";
 
-  String server_path = server_name + "batch/update?token=" + Main_TOKEN + pin_dataS + location + pin_dataS + s_weekday + pin_dataS + s_timer_van_1 + pin_dataS + urlEncode(s_ampe) + pin_dataS + urlEncode(s_temp) + pin_dataS + BLYNK_FIRMWARE_VERSION;
+  String server_path = server_name + "batch/update?token=" + Main_TOKEN + pin_dataS + location + pin_dataS + s_timer_van_1 + pin_dataS + urlEncode(s_ampe) + pin_dataS + urlEncode(s_temp) + pin_dataS + BLYNK_FIRMWARE_VERSION;
   http.begin(client, server_path.c_str());
   http.GET();
   http.end();
   // Serial.println(server_path);
 }
 void print_terminal_main() {
-  String server_path = server_name + "batch/update?token=" + Main_TOKEN + "&V0=" + location + "&V0=" + s_weekday + "&V0=" + s_timer_van_1;
+  String server_path = server_name + "batch/update?token=" + Main_TOKEN + "&V0=" + location + "&V0=" + s_timer_van_1;
   http.begin(client, server_path.c_str());
   http.GET();
   http.end();
@@ -251,9 +223,6 @@ BLYNK_WRITE(V0) {
     savedata();
   } else if (dataS == "info") { // mode?
     print_terminal();
-  } else if (dataS == "KDT1") { // mode?
-    num_KDT = "KDT1";
-    print_terminal_main();
   } else if (dataS == "KDT1_on") { // RL1 on
     if (data.mode == 0)
       on_KDT1();
@@ -275,34 +244,15 @@ BLYNK_WRITE(V0) {
 BLYNK_WRITE(V1) {
   TimeInputParam t(param);
   //-------------------------
-  data.MonWeekDay = t.isWeekdaySelected(1);
-  data.TuesWeekDay = t.isWeekdaySelected(2);
-  data.WedWeekDay = t.isWeekdaySelected(3);
-  data.ThuWeekDay = t.isWeekdaySelected(4);
-  data.FriWeekDay = t.isWeekdaySelected(5);
-  data.SatWeekend = t.isWeekdaySelected(6);
-  data.SunWeekend = t.isWeekdaySelected(7);
-  if (memcmp(&data, &dataCheck, sizeof(dataDefault)) != 0) {
-    dataCheck.MonWeekDay = data.MonWeekDay;
-    dataCheck.TuesWeekDay = data.TuesWeekDay;
-    dataCheck.WedWeekDay = data.WedWeekDay;
-    dataCheck.ThuWeekDay = data.ThuWeekDay;
-    dataCheck.FriWeekDay = data.FriWeekDay;
-    dataCheck.SatWeekend = data.SatWeekend;
-    dataCheck.SunWeekend = data.SunWeekend;
+  if (t.hasStartTime()) {
+    hour_start_rl3 = t.getStartHour();
+    minute_start_rl3 = t.getStartMinute();
+    data.rl3_r = hour_start_rl3 * 3600 + minute_start_rl3 * 60;
   }
-  //-------------------------
-  if (num_KDT == "KDT1") {
-    if (t.hasStartTime()) {
-      hour_start_rl3 = t.getStartHour();
-      minute_start_rl3 = t.getStartMinute();
-      data.rl3_r = hour_start_rl3 * 3600 + minute_start_rl3 * 60;
-    }
-    if (t.hasStopTime()) {
-      hour_stop_rl3 = t.getStopHour();
-      minute_stop_rl3 = t.getStopMinute();
-      data.rl3_s = hour_stop_rl3 * 3600 + minute_stop_rl3 * 60;
-    }
+  if (t.hasStopTime()) {
+    hour_stop_rl3 = t.getStopHour();
+    minute_stop_rl3 = t.getStopMinute();
+    data.rl3_s = hour_stop_rl3 * 3600 + minute_stop_rl3 * 60;
   }
   //-------------------------
   savedata();
@@ -363,37 +313,24 @@ void rtctime() {
   }
   float nowtime = (now.hour() * 3600 + now.minute() * 60);
 
-  if (weekday() == 1) {
-    dayadjustment = 6; // needed for Sunday, Time library is day 1 and Blynk is day 7
-  }
-  if ((((weekday() + dayadjustment) == 1) && (data.MonWeekDay)) || (((weekday() + dayadjustment) == 2) && (data.TuesWeekDay)) || (((weekday() + dayadjustment) == 3) && (data.WedWeekDay)) || (((weekday() + dayadjustment) == 4) && (data.ThuWeekDay)) || (((weekday() + dayadjustment) == 5) && (data.FriWeekDay)) || (((weekday() + dayadjustment) == 6) && (data.SatWeekend)) || (((weekday() + dayadjustment) == 7) && (data.SunWeekend))) {
-    dayOfTheWeek_ = true;
-  } else
-    dayOfTheWeek_ = false;
   if (data.mode == 1) { // Auto
-    if (dayOfTheWeek_) {
-      if (data.rl3_r > data.rl3_s) {
-        if ((nowtime > data.rl3_s) && (nowtime < data.rl3_r)) {
-          off_KDT1();
-        }
-        if ((nowtime < data.rl3_s) || (nowtime > data.rl3_r)) {
-          if (!trip0)
-            on_KDT1();
-        }
-      }
-      if (data.rl3_r < data.rl3_s) {
-        if ((nowtime > data.rl3_s) || (nowtime < data.rl3_r)) {
-          off_KDT1();
-        }
-        if ((nowtime < data.rl3_s) && (nowtime > data.rl3_r)) {
-          if (!trip0) {
-            on_KDT1();
-          }
-        }
-      }
-    } else {
-      if (sta_rl3 == HIGH) {
+    if (data.rl3_r > data.rl3_s) {
+      if ((nowtime > data.rl3_s) && (nowtime < data.rl3_r)) {
         off_KDT1();
+      }
+      if ((nowtime < data.rl3_s) || (nowtime > data.rl3_r)) {
+        if (!trip0)
+          on_KDT1();
+      }
+    }
+    if (data.rl3_r < data.rl3_s) {
+      if ((nowtime > data.rl3_s) || (nowtime < data.rl3_r)) {
+        off_KDT1();
+      }
+      if ((nowtime < data.rl3_s) && (nowtime > data.rl3_r)) {
+        if (!trip0) {
+          on_KDT1();
+        }
       }
     }
   }
