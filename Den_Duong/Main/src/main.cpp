@@ -74,7 +74,7 @@ V58 - Irms
 #define BLYNK_TEMPLATE_ID "TMPL6m-lD0Zt7"
 #define BLYNK_TEMPLATE_NAME "ĐÈN ĐƯỜNG"
 #define BLYNK_AUTH_TOKEN "Ol3VH8Hv_OX2JKUWl4ENBk6Rqgh3P3MQ"
-#define BLYNK_FIRMWARE_VERSION "250326"
+#define BLYNK_FIRMWARE_VERSION "250405"
 //-----------------------------
 #include <BlynkSimpleEsp8266.h>
 #include <ESP8266HTTPClient.h>
