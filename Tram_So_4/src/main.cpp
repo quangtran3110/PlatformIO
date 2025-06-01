@@ -718,7 +718,7 @@ void rtctime() {
   timestamp = now.unixtime();
   Blynk.virtualWrite(V9, daysOfTheWeek[now.dayOfTheWeek()], ", ", now.day(), "/", now.month(), "/", now.year(), " - ", now.hour(), ":", now.minute(), ":", now.second());
   int nowtime = (now.hour() * 3600 + now.minute() * 60);
-  if (data.mode_cap2 == 1) {                                                                                                                                                                                                                        // Chọn chế độ chạy 2 bơm
+  if (data.mode_cap2 == 1) {
     if ((nowtime > data.b1_1_start && nowtime < data.b1_1_stop) || (nowtime > data.b1_2_start && nowtime < data.b1_2_stop) || (nowtime > data.b1_3_start && nowtime < data.b1_3_stop) || (nowtime > data.b1_4_start && nowtime < data.b1_4_stop)) { // Chạy bơm 1
       if (Irms1 == 0 && !trip1) {                                                                                                                                                                                                                   // Nếu bơm 1 đang tắt và không lỗi
         if ((Irms2 == 0 && !time_run2) || (time_run2))

@@ -18,8 +18,8 @@ const char *password = "Password";
 #include <WiFiClientSecure.h>
 #include <WidgetRTC.h>
 //-----------------------------
-#define pin_G_main_dothi "&V99="
 #pragma region // ALL TOKEN ID
+#define pin_G_main_dothi "&V99="
 #define main_dothi_TOKEN "w3ZZc7F4pvOIwqozyrzYcBFVUE3XxSiW"
 #define ccd_TOKEN "jaQFoaOgdcZcKbyI_ME_oi6tThEf4FR5"
 #define ubndp2_TOKEN "gvfnRXv14oMohtqMWTPQXbduFKww1zfu"
@@ -32,6 +32,10 @@ const char *password = "Password";
 #define dhvuong_TOKEN "eBeqi9ZJhRK3r66cUzgdD1gp2xGxG7kS"
 #define thpt1_TOKEN "H3VsCxfjXq67ALREdZcKOANCQ_kdFqfg"
 #define thpt2_TOKEN "H04PY3egc4KE3YnBQkOFEMNAGohM_oGo"
+//------------------
+#define pin_G_main_denduong "&V99="
+#define main_denduong_TOKEN "Ol3VH8Hv_OX2JKUWl4ENBk6Rqgh3P3MQ"
+#define binhtan1_TOKEN "tCAptndMM6EXqRkWvj_6tK76_mi7gbKf"
 //------------------
 #define T2_G1_TOKEN "L_2oEOyv4bmrdsesIoasyKiEEOFZVgBO"
 #define T2_G2_TOKEN "Hc5DgCBzl4Oi5hW_JOaNZ6oBKoGy5kFI"
@@ -115,15 +119,37 @@ void update_fw() {
 //-------------------------------------------------------------------
 // Biến toàn cục để lưu trạng thái cũ
 // Biến toàn cục để lưu trạng thái cũ và thời gian
-static int previous_g = -1; // -1 để lần đầu tiên luôn gửi
+static int previous_g_dothi = -1; // -1 để lần đầu tiên luôn gửi
+static int previous_g_denduong = -1;
 static unsigned long last_send_time = 0;
-const unsigned long SEND_INTERVAL = 15 * 60 * 1000; // 30 phút tính bằng milliseconds
+const unsigned long SEND_INTERVAL = 15 * 60 * 1000; // 15 phút tính bằng milliseconds
+
+void makeHttpRequest(const char *token, bool &isConnected) {
+  String server_path = server_name + "isHardwareConnected?token=" + token;
+  http.begin(client, server_path.c_str());
+  int httpResponseCode = http.GET();
+  if (httpResponseCode > 0) {
+    String payload = http.getString();
+    payload.trim();
+    isConnected = (payload.equalsIgnoreCase("true"));
+  }
+  http.end();
+}
+
+void sendBatchUpdate(const char *token, const char *pin, int value) {
+  String server_path = server_name + "batch/update?token=" + token + pin + value;
+  http.begin(client, server_path.c_str());
+  http.GET();
+  http.end();
+}
 
 void check_status() {
+  // int dem = millis();
   String server_path;
-  int g = 0;
-  // Mảng chứa các token của các module
-  const char *tokens[] = {
+  int g_dothi = 0;
+  int g_denduong = 0;
+  //-------------------------
+  const char *tokens_dothi[] = {
       ccd_TOKEN,     // Bit 0: Cầu cửa đông
       ubndp2_TOKEN,  // Bit 1: UBND P2
       alb_TOKEN,     // Bit 2: Ao lục bình
@@ -136,40 +162,42 @@ void check_status() {
       thpt1_TOKEN,   // Bit 9: THPT 1
       thpt2_TOKEN    // Bit 10: THPT 2
   };
-
   // Số lượng module cần kiểm tra
-  const int moduleCount = sizeof(tokens) / sizeof(tokens[0]);
+  const int moduleCount_dothi = sizeof(tokens_dothi) / sizeof(tokens_dothi[0]);
   // Kiểm tra trạng thái của từng module
-  for (int i = 0; i < moduleCount; i++) {
-    server_path = server_name + "isHardwareConnected?token=" + tokens[i];
-    http.begin(client, server_path.c_str());
-    int httpResponseCode = http.GET();
-    if (httpResponseCode > 0) {
-      String payload = http.getString();
-      payload.trim(); // Loại bỏ khoảng trắng thừa
-      // So sánh không phân biệt chữ hoa/thường
-      bool isConnected = (payload.equalsIgnoreCase("true"));
-      bitWrite(g, i, isConnected);
-    }
-    http.end();
+  for (int i = 0; i < moduleCount_dothi; i++) {
+    bool isConnected = false;
+    makeHttpRequest(tokens_dothi[i], isConnected);
+    bitWrite(g_dothi, i, isConnected);
   }
-  // Kiểm tra xem có cần gửi dữ liệu không
-  // Gửi dữ liệu nếu:
-  // 1. Có sự thay đổi trạng thái (g khác previous_g)
-  // 2. Hoặc đã đủ 30 phút kể từ lần gửi cuối
-  if (g != previous_g || (millis() - last_send_time >= SEND_INTERVAL)) {
+  //-------------------------
+  const char *tokens_denduong[] = {
+      binhtan1_TOKEN // Bit 0: Bình Tân 1
+  };
+  // Số lượng module cần kiểm tra
+  const int moduleCount_denduong = sizeof(tokens_denduong) / sizeof(tokens_denduong[0]);
+  // Kiểm tra trạng thái của từng module
+  for (int i = 0; i < moduleCount_denduong; i++) {
+    bool isConnected = false;
+    makeHttpRequest(tokens_denduong[i], isConnected);
+    bitWrite(g_denduong, i, isConnected);
+  }
+  //-----------------
+  if (g_dothi != previous_g_dothi || g_denduong || previous_g_denduong || (millis() - last_send_time >= SEND_INTERVAL)) {
     // Gửi dữ liệu
-    server_path = server_name + "batch/update?token=" + main_dothi_TOKEN + pin_G_main_dothi + g;
-    http.begin(client, server_path.c_str());
-    http.GET();
-    http.end();
+    sendBatchUpdate(main_dothi_TOKEN, pin_G_main_dothi, g_dothi);
+    sendBatchUpdate(main_denduong_TOKEN, pin_G_main_denduong, g_denduong);
 
     // Cập nhật thời gian gửi cuối và trạng thái cũ
     last_send_time = millis();
-    previous_g = g;
-    Serial.println(g);
+    previous_g_dothi = g_dothi;
+    previous_g_denduong = g_denduong;
+    Serial.println(g_dothi);
   }
+  // Serial.print("t = ");
+  // Serial.println(millis() - dem);
 }
+
 //-------------------------------------------------------------------
 void setup() {
   ESP.wdtDisable();
