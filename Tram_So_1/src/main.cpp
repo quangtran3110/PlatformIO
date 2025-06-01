@@ -36,7 +36,7 @@
 #define BLYNK_TEMPLATE_NAME "TRẠM SỐ 1"
 #define BLYNK_AUTH_TOKEN "SZfJItqPgAVkiB8VdBuzyl5f94BU3E4x"
 
-#define BLYNK_FIRMWARE_VERSION "240730"
+#define BLYNK_FIRMWARE_VERSION "250601"
 //------------------
 #include "EmonLib.h"
 #include "PCF8575.h"
@@ -81,6 +81,7 @@ const word address = 0;
 char daysOfTheWeek[7][12] = {"CN", "T2", "T3", "T4", "T5", "T6", "T7"};
 char tz[] = "Asia/Ho_Chi_Minh";
 
+byte calib_pre_sta = 0, range_pre = 10;
 bool key = false, keytank = true;
 bool trip0 = false, trip1 = false, trip2 = false, trip_mcp = false;
 bool key_memory = true, timer_I_status;
@@ -88,7 +89,7 @@ bool key_bom = true, key_gieng = true;
 bool blynk_first_connect = false;
 
 float volume, percent, percent1, dungtich, smoothDistance;
-float Irms0, Irms1, Irms2, value, Result1, clo_cache = 0;
+float Irms0, Irms1, Irms2, value, sensor_pre_raw, clo_cache = 0;
 
 long distance, distance1, t;
 
@@ -97,7 +98,7 @@ unsigned long int yIrms0 = 0, yIrms1 = 0, yIrms2 = 0;
 unsigned long rest_time = 0, dem_bom = 0, dem_cap1 = 0;
 uint32_t timestamp;
 
-float sensor_pre;
+float sensor_pre, Result;
 float sensor_tank;
 int LLG1_1m3;
 int reboot_num = 0;
@@ -162,8 +163,10 @@ struct Data {
   int time_clo, LLG1_RL;
   byte key_protect;
   int phao_max, phao_min;
+  byte pre_zero;
+  int pre_num;
 } data, dataCheck;
-const struct Data dataDefault = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+const struct Data dataDefault = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
 
 WidgetTerminal terminal(V11);
 WidgetRTC rtc_widget;
@@ -236,13 +239,16 @@ void up() {
   String server_path = server_name + "/batch/update?token=" + BLYNK_AUTH_TOKEN +
                        "&V2=" + Irms0 +
                        "&V3=" + Irms1 +
-                       "&V4=" + float(Result1) +
+                       "&V4=" + float(Result) +
                        "&V5=" + smoothDistance +
                        "&V6=" + volume +
                        "&V19=" + Irms2;
   http.begin(client, server_path.c_str());
   http.GET();
   http.end();
+  if (calib_pre_sta == 1) {
+    Blynk.virtualWrite(V23, sensor_pre);
+  }
 }
 void savedata() {
   if (memcmp(&data, &dataCheck, sizeof(dataDefault)) == 0) {
@@ -340,14 +346,13 @@ void readPressure() { // C0 - Ap Luc
   pcf8575_1.digitalWrite(S1pin, LOW);
   pcf8575_1.digitalWrite(S2pin, LOW);
   pcf8575_1.digitalWrite(S3pin, LOW);
-  sensor_pre = analogRead(A0);
-  float Result;
-  Result = (((sensor_pre - 148) * 10) / (1050 - 148));
-  if (Result > 0) {
-    value += Result;
-    Result1 = value / 16;
-    value -= Result1;
+  sensor_pre_raw = analogRead(A0);
+  if (sensor_pre_raw > 0) {
+    value += sensor_pre_raw;
+    sensor_pre = value / 8;
+    value -= sensor_pre;
   }
+  Result = (((sensor_pre - data.pre_zero) * range_pre) / (data.pre_num - data.pre_zero));
 }
 void MeasureCmForSmoothing() { // C1-  Muc Nuoc
   pcf8575_1.digitalWrite(S0pin, HIGH);
@@ -715,6 +720,9 @@ BLYNK_WRITE(V11) // String
     Blynk.virtualWrite(V11, "Mật mã sai.\nVui lòng nhập lại!\n");
   }
 }
+BLYNK_WRITE(V12) { // Tắt mở cân chỉnh áp lực
+  calib_pre_sta = param.asInt();
+}
 BLYNK_WRITE(V13) // Time input
 {
   if (key) {
@@ -806,6 +814,21 @@ BLYNK_WRITE(V18) // Nen Khi
   }
   Blynk.virtualWrite(V18, data.status_nk1);
 }
+BLYNK_WRITE(V22) { // Lưu giá trị Zero áp lực
+  if (calib_pre_sta == 1) {
+    if (param.asInt() == HIGH) {
+      data.pre_zero = sensor_pre;
+      savedata();
+    }
+  }
+}
+BLYNK_WRITE(V23) { // Lưu giá trị Pre_num
+  if (calib_pre_sta == 1) {
+    data.pre_num = (((sensor_pre - data.pre_zero) * range_pre) / param.asFloat()) + data.pre_zero;
+    savedata();
+  }
+}
+
 //-------------------------
 BLYNK_WRITE(V24) // Lưu lượng G1_1m3
 {
