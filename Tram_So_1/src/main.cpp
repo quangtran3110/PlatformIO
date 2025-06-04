@@ -36,7 +36,7 @@
 #define BLYNK_TEMPLATE_NAME "TRẠM SỐ 1"
 #define BLYNK_AUTH_TOKEN "SZfJItqPgAVkiB8VdBuzyl5f94BU3E4x"
 
-#define BLYNK_FIRMWARE_VERSION "250601"
+#define BLYNK_FIRMWARE_VERSION "250604"
 //------------------
 #include "EmonLib.h"
 #include "PCF8575.h"
@@ -247,7 +247,7 @@ void up() {
   http.GET();
   http.end();
   if (calib_pre_sta == 1) {
-    Blynk.virtualWrite(V23, sensor_pre);
+    Blynk.virtualWrite(V21, sensor_pre);
   }
 }
 void savedata() {
