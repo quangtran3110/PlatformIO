@@ -242,7 +242,7 @@ void check_and_update() {
     bitWrite(g, 1, sta_rl1);
     String server_path = server_name + "batch/update?token=" + Main_TOKEN + pin_G + g + pin_Irms + Irms0;
     http.begin(client, server_path.c_str());
-    int httpResponseCode = http.GET();
+    http.GET();
     http.end();
     // Cập nhật giá trị trước đó
     prev_mode = data.mode;
