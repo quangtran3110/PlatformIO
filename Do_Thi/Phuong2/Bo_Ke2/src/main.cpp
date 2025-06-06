@@ -215,7 +215,14 @@ void weekday_() {
   s_timer_van_1 = urlEncode(s_timer_van_1_);
 }
 void print_terminal() {
-  String server_path = server_name + "batch/update?token=" + Main_TOKEN + pin_terminal + location + pin_terminal + s_weekday + pin_terminal + s_timer_van_1 + pin_terminal + urlEncode(s_temp) + pin_terminal + BLYNK_FIRMWARE_VERSION;
+  String s_ampe = "Ampe: " + String(data.SetAmpemin) + "A - " + String(data.SetAmpemax) + "A\n";
+  String server_path = server_name + "batch/update?token=" + Main_TOKEN +
+                       pin_terminal + location +
+                       pin_terminal + s_weekday +
+                       pin_terminal + s_timer_van_1 +
+                       pin_terminal + urlEncode(s_ampe) +
+                       pin_terminal + urlEncode(s_temp) +
+                       pin_terminal + BLYNK_FIRMWARE_VERSION;
   http.begin(client, server_path.c_str());
   http.GET();
   http.end();
