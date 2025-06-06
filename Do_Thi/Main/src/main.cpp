@@ -75,7 +75,7 @@ V58 - Irms
 #define BLYNK_TEMPLATE_ID "TMPL67uSt4c-z"
 #define BLYNK_TEMPLATE_NAME "ĐÔ THỊ"
 #define BLYNK_AUTH_TOKEN "w3ZZc7F4pvOIwqozyrzYcBFVUE3XxSiW"
-#define BLYNK_FIRMWARE_VERSION "250330"
+#define BLYNK_FIRMWARE_VERSION "250606"
 //-----------------------------
 #include <BlynkSimpleEsp8266.h>
 #include <ESP8266HTTPClient.h>
@@ -1445,6 +1445,18 @@ BLYNK_WRITE(V39) {
     http.GET();
     http.end();
     Blynk.virtualWrite(V39, "boke1 RESTART...");
+  } else if (dataS.substring(0, 3) == "max") {
+    terminal_boke1.clear();
+    String server_path = main_sever + "batch/update?token=" + boke1_TOKEN + "&V0=" + dataS;
+    http.begin(client, server_path.c_str());
+    http.GET();
+    http.end();
+  } else if (dataS.substring(0, 3) == "min") {
+    terminal_boke1.clear();
+    String server_path = main_sever + "batch/update?token=" + boke1_TOKEN + "&V0=" + dataS;
+    http.begin(client, server_path.c_str());
+    http.GET();
+    http.end();
   }
 }
 BLYNK_WRITE(V40) { // G
@@ -1548,6 +1560,18 @@ BLYNK_WRITE(V44) {
     http.GET();
     http.end();
     Blynk.virtualWrite(V44, "boke2 RESTART...");
+  } else if (dataS.substring(0, 3) == "max") {
+    terminal_boke2.clear();
+    String server_path = main_sever + "batch/update?token=" + boke2_TOKEN + "&V0=" + dataS;
+    http.begin(client, server_path.c_str());
+    http.GET();
+    http.end();
+  } else if (dataS.substring(0, 3) == "min") {
+    terminal_boke2.clear();
+    String server_path = main_sever + "batch/update?token=" + boke2_TOKEN + "&V0=" + dataS;
+    http.begin(client, server_path.c_str());
+    http.GET();
+    http.end();
   }
 }
 BLYNK_WRITE(V45) { // G
@@ -1651,6 +1675,18 @@ BLYNK_WRITE(V49) {
     http.GET();
     http.end();
     Blynk.virtualWrite(V49, "boke3 RESTART...");
+  } else if (dataS.substring(0, 3) == "max") {
+    terminal_boke3.clear();
+    String server_path = main_sever + "batch/update?token=" + boke3_TOKEN + "&V0=" + dataS;
+    http.begin(client, server_path.c_str());
+    http.GET();
+    http.end();
+  } else if (dataS.substring(0, 3) == "min") {
+    terminal_boke3.clear();
+    String server_path = main_sever + "batch/update?token=" + boke3_TOKEN + "&V0=" + dataS;
+    http.begin(client, server_path.c_str());
+    http.GET();
+    http.end();
   }
 }
 BLYNK_WRITE(V50) { // G
@@ -1754,6 +1790,18 @@ BLYNK_WRITE(V54) {
     http.GET();
     http.end();
     Blynk.virtualWrite(V54, "boke4 RESTART...");
+  } else if (dataS.substring(0, 3) == "max") {
+    terminal_boke4.clear();
+    String server_path = main_sever + "batch/update?token=" + boke4_TOKEN + "&V0=" + dataS;
+    http.begin(client, server_path.c_str());
+    http.GET();
+    http.end();
+  } else if (dataS.substring(0, 3) == "min") {
+    terminal_boke4.clear();
+    String server_path = main_sever + "batch/update?token=" + boke4_TOKEN + "&V0=" + dataS;
+    http.begin(client, server_path.c_str());
+    http.GET();
+    http.end();
   }
 }
 BLYNK_WRITE(V55) { // G
