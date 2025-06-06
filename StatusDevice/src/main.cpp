@@ -148,7 +148,7 @@ void check_status() {
   String server_path;
   int g_dothi = 0;
   int g_denduong = 0;
-  //-------------------------
+  //---------------------------------------------------------------------------------
   const char *tokens_dothi[] = {
       ccd_TOKEN,     // Bit 0: Cầu cửa đông
       ubndp2_TOKEN,  // Bit 1: UBND P2
@@ -170,7 +170,7 @@ void check_status() {
     makeHttpRequest(tokens_dothi[i], isConnected);
     bitWrite(g_dothi, i, isConnected);
   }
-  //-------------------------
+  //---------------------------------------------------------------------------------
   const char *tokens_denduong[] = {
       binhtan1_TOKEN // Bit 0: Bình Tân 1
   };
@@ -182,7 +182,7 @@ void check_status() {
     makeHttpRequest(tokens_denduong[i], isConnected);
     bitWrite(g_denduong, i, isConnected);
   }
-  //-----------------
+  //---------------------------------------------------------------------------------
   if (g_dothi != previous_g_dothi || g_denduong || previous_g_denduong || (millis() - last_send_time >= SEND_INTERVAL)) {
     // Gửi dữ liệu
     sendBatchUpdate(main_dothi_TOKEN, pin_G_main_dothi, g_dothi);
