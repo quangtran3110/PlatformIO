@@ -36,7 +36,7 @@
 #define BLYNK_TEMPLATE_NAME "TRẠM SỐ 1"
 #define BLYNK_AUTH_TOKEN "SZfJItqPgAVkiB8VdBuzyl5f94BU3E4x"
 
-#define BLYNK_FIRMWARE_VERSION "250604"
+#define BLYNK_FIRMWARE_VERSION "250606"
 //------------------
 #include "EmonLib.h"
 #include "PCF8575.h"
@@ -349,7 +349,7 @@ void readPressure() { // C0 - Ap Luc
   sensor_pre_raw = analogRead(A0);
   if (sensor_pre_raw > 0) {
     value += sensor_pre_raw;
-    sensor_pre = value / 8;
+    sensor_pre = value / 16;
     value -= sensor_pre;
   }
   Result = (((sensor_pre - data.pre_zero) * range_pre) / (data.pre_num - data.pre_zero));
@@ -828,7 +828,6 @@ BLYNK_WRITE(V23) { // Lưu giá trị Pre_num
     savedata();
   }
 }
-
 //-------------------------
 BLYNK_WRITE(V24) // Lưu lượng G1_1m3
 {
@@ -885,7 +884,7 @@ void setup() {
 
   //------------------------------------
   timer.setTimeout(5000L, []() {
-    timer.setInterval(201L, []() {
+    timer.setInterval(121L, []() {
       readPressure();
       MeasureCmForSmoothing();
     });
