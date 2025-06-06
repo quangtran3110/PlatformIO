@@ -1,7 +1,7 @@
 #define BLYNK_TEMPLATE_ID "TMPL0DBjAEt-"
 #define BLYNK_TEMPLATE_NAME "BỜ KÈ"
 #define BLYNK_AUTH_TOKEN "pTbMkuYkt_SOcW4JWPY2kqDEvxN_XXK0"
-#define BLYNK_FIRMWARE_VERSION "250328"
+#define BLYNK_FIRMWARE_VERSION "250606"
 
 #define Main_TOKEN "w3ZZc7F4pvOIwqozyrzYcBFVUE3XxSiW"
 const char *ssid = "net";
@@ -67,7 +67,7 @@ char tz[] = "Asia/Ho_Chi_Minh";
 char s_day[50] = "";
 char B[50] = "";
 float temp;
-float Irms0, prev_Irms0 = 0, SetAmpemax = 18, SetAmpemin = 12;
+float Irms0, prev_Irms0 = 0;
 unsigned long int xIrms0 = 0;
 unsigned long int yIrms0 = 0;
 byte reboot_num, prev_mode = 3;
@@ -88,8 +88,9 @@ struct Data {
   byte save_num;
   uint32_t rl1_r, rl1_s;
   byte MonWeekDay, TuesWeekDay, WedWeekDay, ThuWeekDay, FriWeekDay, SatWeekend, SunWeekend;
+  byte SetAmpemax, SetAmpemin;
 } data, dataCheck;
-const struct Data dataDefault = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+const struct Data dataDefault = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
 //-----------------------------
 WidgetTerminal DATAS(V0);
 WidgetRTC rtc_widget;
@@ -208,7 +209,14 @@ void weekday_() {
   s_timer_van_1 = urlEncode(s_timer_van_1_);
 }
 void print_terminal() {
-  String server_path = server_name + "batch/update?token=" + Main_TOKEN + pin_terminal + location + pin_terminal + s_weekday + pin_terminal + s_timer_van_1 + pin_terminal + urlEncode(s_temp) + pin_terminal + BLYNK_FIRMWARE_VERSION;
+  String s_ampe = "Ampe: " + String(data.SetAmpemin) + "A - " + String(data.SetAmpemax) + "A\n";
+  String server_path = server_name + "batch/update?token=" + Main_TOKEN +
+                       pin_terminal + location +
+                       pin_terminal + s_weekday +
+                       pin_terminal + s_timer_van_1 +
+                       pin_terminal + urlEncode(s_ampe) +
+                       pin_terminal + urlEncode(s_temp) +
+                       pin_terminal + BLYNK_FIRMWARE_VERSION;
   http.begin(client, server_path.c_str());
   http.GET();
   http.end();
@@ -277,6 +285,16 @@ BLYNK_WRITE(V0) {
   } else if (dataS == "van1_off") { // RL1 off
     if (data.mode == 0)
       off_van1();
+  } else if (dataS.substring(0, 3) == "max") {
+    String numStr = dataS.substring(3);
+    byte a = numStr.toInt();
+    data.SetAmpemax = a;
+    savedata();
+  } else if (dataS.substring(0, 3) == "min") {
+    String numStr = dataS.substring(3);
+    byte a = numStr.toInt();
+    data.SetAmpemin = a;
+    savedata();
   }
 }
 BLYNK_WRITE(V1) {
@@ -330,14 +348,16 @@ void readcurrent() // C2
   } else if (rms0 >= 2) {
     Irms0 = rms0;
     yIrms0 = yIrms0 + 1;
-    if ((yIrms0 > 3) && ((Irms0 >= SetAmpemax) || (Irms0 <= SetAmpemin))) {
+    if ((yIrms0 > 3) && ((Irms0 >= data.SetAmpemax) || (Irms0 <= data.SetAmpemin))) {
       xSetAmpe = xSetAmpe + 1;
       if (xSetAmpe >= 4) {
         off_van1();
         xSetAmpe = 0;
         trip0 = true;
         String dataS = "Bơm bờ kè 4 lỗi! " + String(Irms0) + "A";
-        String server_path = server_name + "batch/update?token=" + Main_TOKEN + "&V100=" + urlEncode(dataS);
+        String server_path = server_name + "batch/update?token=" + Main_TOKEN +
+                             "&V100=" + urlEncode(dataS) +
+                             pin_terminal + urlEncode(dataS);
         http.begin(client, server_path.c_str());
         http.GET();
         http.end();
@@ -446,7 +466,7 @@ void setup() {
     timer_I = timer.setInterval(589, []() {
       readcurrent();
     });
-    timer.setInterval(3106, []() {
+    timer.setInterval(1106, []() {
       check_and_update();
     });
     timer.setInterval(15005L, []() {
