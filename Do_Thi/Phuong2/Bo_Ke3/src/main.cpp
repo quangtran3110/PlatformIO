@@ -369,7 +369,7 @@ void readcurrent() // C2
                              "&V100=" + urlEncode(dataS) +
                              pin_terminal + urlEncode(dataS);
         http.begin(client, server_path.c_str());
-        int httpResponseCode = http.GET();
+        http.GET();
         http.end();
       }
     }
