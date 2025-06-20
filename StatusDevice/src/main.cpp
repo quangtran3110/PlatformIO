@@ -1,7 +1,7 @@
 #define BLYNK_TEMPLATE_ID "TMPL6I6ISEvF5"
 #define BLYNK_TEMPLATE_NAME "SUPPORT ACTIVE"
 #define BLYNK_AUTH_TOKEN "KqkJXdMncWRT3Vc8n85hzIIk2xr9N76X"
-#define BLYNK_FIRMWARE_VERSION "250329"
+#define BLYNK_FIRMWARE_VERSION "060619"
 //-----------------------------
 const char *ssid = "Wifi_Modem";
 const char *password = "Password";
@@ -143,6 +143,22 @@ void sendBatchUpdate(const char *token, const char *pin, int value) {
   http.end();
 }
 
+struct DeviceInfo {
+  const char *token;
+  const char *name;
+  unsigned long offlineTimer;
+  bool notificationSent;
+};
+
+DeviceInfo devices[] = {
+    {T2_G1_TOKEN, "LLuong_T2_G1", 0, false},
+    {T2_G2_TOKEN, "LLuong_T2_G2", 0, false},
+    {T2_G3_TOKEN, "LLuong_T2_G3", 0, false},
+    {T2BPT_TOKEN, "LLuong_T2BPT", 0, false},
+    {T3BPT_TOKEN, "LLuong_T3BPT", 0, false},
+    {T4_TOKEN, "LLuong_T4", 0, false},
+    {BHD_TOKEN, "LLuong_BHD", 0, false}};
+
 void check_status() {
   // int dem = millis();
   String server_path;
@@ -182,20 +198,46 @@ void check_status() {
     makeHttpRequest(tokens_denduong[i], isConnected);
     bitWrite(g_denduong, i, isConnected);
   }
+
   //---------------------------------------------------------------------------------
-  if (g_dothi != previous_g_dothi || g_denduong || previous_g_denduong || (millis() - last_send_time >= SEND_INTERVAL)) {
+  // Kiểm tra Lưu lượng giếng
+  const int moduleCount_LLuong = sizeof(devices) / sizeof(devices[0]);
+
+  for (int i = 0; i < moduleCount_LLuong; i++) {
+    bool isConnected = false;
+    makeHttpRequest(devices[i].token, isConnected);
+
+    if (!isConnected) {
+      if (devices[i].offlineTimer == 0) {
+        devices[i].offlineTimer = millis();
+      } else if (!devices[i].notificationSent &&
+                 (millis() - devices[i].offlineTimer >= 5 * 60 * 1000)) { // 5 phút
+        String message = String(devices[i].name) + " OFFLINE";
+        Blynk.logEvent("STA", message);
+        devices[i].notificationSent = true;
+      }
+    } else {
+      // Reset các biến theo dõi khi thiết bị online trở lại
+      devices[i].offlineTimer = 0;
+      devices[i].notificationSent = false;
+    }
+  }
+  //---------------------------------------------------------------------------------
+  if (g_dothi != previous_g_dothi) {
+    sendBatchUpdate(main_dothi_TOKEN, pin_G_main_dothi, g_dothi);
+    previous_g_dothi = g_dothi;
+  }
+  if (g_denduong || previous_g_denduong) {
+    sendBatchUpdate(main_denduong_TOKEN, pin_G_main_denduong, g_denduong);
+    previous_g_denduong = g_denduong;
+  }
+  if (millis() - last_send_time >= SEND_INTERVAL) {
     // Gửi dữ liệu
     sendBatchUpdate(main_dothi_TOKEN, pin_G_main_dothi, g_dothi);
     sendBatchUpdate(main_denduong_TOKEN, pin_G_main_denduong, g_denduong);
-
-    // Cập nhật thời gian gửi cuối và trạng thái cũ
+    // Cập nhật thời gian gửi cuối
     last_send_time = millis();
-    previous_g_dothi = g_dothi;
-    previous_g_denduong = g_denduong;
-    Serial.println(g_dothi);
   }
-  // Serial.print("t = ");
-  // Serial.println(millis() - dem);
 }
 
 //-------------------------------------------------------------------

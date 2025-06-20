@@ -36,7 +36,7 @@
 #define BLYNK_TEMPLATE_ID "TMPL6usi7FSqp"
 #define BLYNK_TEMPLATE_NAME "TRẠM SỐ 3"
 #define BLYNK_AUTH_TOKEN "R_V1bJ9xeyl6Yokg1rhlaLhK-NYcDVpx"
-#define BLYNK_FIRMWARE_VERSION "250129"
+#define BLYNK_FIRMWARE_VERSION "25061050610"
 //------------------
 #include "EmonLib.h"
 #include "PCF8575.h"
@@ -306,7 +306,7 @@ void readPower() { // C2 - Cấp 1  - I0
               "error", String("Giếng lỗi\nKhông đo được DÒNG ĐIỆN"));
       }
     }
-    if ((noti_cap1) && (status_pre) && (conlai <= 80) && (!time_off_c1)) {
+    if ((noti_cap1) && (status_pre) && (conlai <= 75) && (!time_off_c1)) {
       if (data.key_noti) {
         noti_cap1 = false;
         Blynk.logEvent("info",

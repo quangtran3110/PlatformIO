@@ -75,7 +75,7 @@ V58 - Irms
 #define BLYNK_TEMPLATE_ID "TMPL67uSt4c-z"
 #define BLYNK_TEMPLATE_NAME "ĐÔ THỊ"
 #define BLYNK_AUTH_TOKEN "w3ZZc7F4pvOIwqozyrzYcBFVUE3XxSiW"
-#define BLYNK_FIRMWARE_VERSION "250607"
+#define BLYNK_FIRMWARE_VERSION "250606"
 //-----------------------------
 #include <BlynkSimpleEsp8266.h>
 #include <ESP8266HTTPClient.h>
@@ -205,7 +205,7 @@ WidgetTerminal terminal_boke1(V39);
 WidgetTerminal terminal_boke2(V44);
 WidgetTerminal terminal_boke3(V49);
 WidgetTerminal terminal_boke4(V54);
-BlynkTimer timer, timer_status;
+BlynkTimer timer;
 BLYNK_CONNECTED() {
   rtc_widget.begin();
   blynk_first_connect = true;
@@ -659,13 +659,8 @@ void hidden_ccd() {
   if (hidden_key_ccd != true) {
     Blynk.setProperty(V6, V8, V7, "isDisabled", "true");
     hidden_key_ccd = true;
-    if ((time_run) && (noti)) {
-      timer_status.setTimeout(3 * 60 * 1000, []() {
-        if (hidden_key_ccd) {
-          Blynk.logEvent("offline", "ccd OFFLINE!");
-        }
-      });
-    }
+    if ((time_run) && (noti))
+      Blynk.logEvent("offline", "ccd OFFLINE!");
   }
 }
 void visible_ccd() {
@@ -768,13 +763,8 @@ void hidden_ubndp2() {
   if (hidden_key_ubndp2 != true) {
     Blynk.setProperty(V10, V12, V13, "isDisabled", "true");
     hidden_key_ubndp2 = true;
-    if ((time_run) && (noti)) {
-      timer_status.setTimeout(3 * 60 * 1000, []() {
-        if (hidden_key_ubndp2) {
-          Blynk.logEvent("offline", "ubndp2 OFFLINE!");
-        }
-      });
-    }
+    if ((time_run) && (noti))
+      Blynk.logEvent("offline", "ubnd_p2 OFFLINE!");
   }
 }
 void visible_ubndp2() {
@@ -877,13 +867,8 @@ void hidden_alb() {
   if (hidden_key_alb != true) {
     Blynk.setProperty(V14, V16, V17, V18, "isDisabled", "true");
     hidden_key_alb = true;
-    if ((time_run) && (noti)) {
-      timer_status.setTimeout(3 * 60 * 1000, []() {
-        if (hidden_key_alb) {
-          Blynk.logEvent("offline", "alb OFFLINE!");
-        }
-      });
-    }
+    if ((time_run) && (noti))
+      Blynk.logEvent("offline", "alb OFFLINE!");
   }
 }
 void visible_alb() {
@@ -1006,13 +991,8 @@ void hidden_ntbinh() {
   if (hidden_key_ntbinh != true) {
     Blynk.setProperty(V23, V25, V26, "isDisabled", "true");
     hidden_key_ntbinh = true;
-    if ((time_run) && (noti)) {
-      timer_status.setTimeout(3 * 60 * 1000, []() {
-        if (hidden_key_ntbinh) {
-          Blynk.logEvent("offline", "ntbinh OFFLINE!");
-        }
-      });
-    }
+    if ((time_run) && (noti))
+      Blynk.logEvent("offline", "ntbinh OFFLINE!");
   }
 }
 void visible_ntbinh() {
@@ -1115,11 +1095,7 @@ void hidden_dhvuong() {
   if (hidden_key_dhvuong != true) {
     Blynk.setProperty(V27, V29, V30, "isDisabled", "true");
     hidden_key_dhvuong = true;
-    timer_status.setTimeout(3 * 60 * 1000, []() {
-      if (hidden_key_dhvuong) {
-        Blynk.logEvent("offline", "dhvuong OFFLINE!");
-      }
-    });
+    Blynk.logEvent("offline", "dhvuong OFFLINE!");
   }
 }
 void visible_dhvuong() {
@@ -1222,13 +1198,8 @@ void hidden_thpt1() {
   if (hidden_key_thpt1 != true) {
     Blynk.setProperty(V31, V33, V34, "isDisabled", "true");
     hidden_key_thpt1 = true;
-    if ((time_run) && (noti)) {
-      timer_status.setTimeout(3 * 60 * 1000, []() {
-        if (hidden_key_thpt1) {
-          Blynk.logEvent("offline", "thpt1 OFFLINE!");
-        }
-      });
-    }
+    if ((time_run) && (noti))
+      Blynk.logEvent("offline", "thpt1 OFFLINE!");
   }
 }
 void visible_thpt1() {
@@ -1331,13 +1302,8 @@ void hidden_thpt2() {
   if (hidden_key_thpt2 != true) {
     Blynk.setProperty(V35, V37, V38, "isDisabled", "true");
     hidden_key_thpt2 = true;
-    if ((time_run) && (noti)) {
-      timer_status.setTimeout(3 * 60 * 1000, []() {
-        if (hidden_key_thpt2) {
-          Blynk.logEvent("offline", "thpt2 OFFLINE!");
-        }
-      });
-    }
+    if ((time_run) && (noti))
+      Blynk.logEvent("offline", "thpt2 OFFLINE!");
   }
 }
 void visible_thpt2() {
@@ -1440,11 +1406,7 @@ void hidden_boke1() {
   if (hidden_key_boke1 != true) {
     Blynk.setProperty(V39, V41, V42, V43, "isDisabled", "true");
     hidden_key_boke1 = true;
-    timer_status.setTimeout(3 * 60 * 1000, []() {
-      if (hidden_key_boke1) {
-        Blynk.logEvent("offline", "boke1 OFFLINE!");
-      }
-    });
+    Blynk.logEvent("offline", "boke1 OFFLINE!");
   }
 }
 void visible_boke1() {
@@ -1559,11 +1521,7 @@ void hidden_boke2() {
   if (hidden_key_boke2 != true) {
     Blynk.setProperty(V44, V46, V47, V48, "isDisabled", "true");
     hidden_key_boke2 = true;
-    timer_status.setTimeout(3 * 60 * 1000, []() {
-      if (hidden_key_boke2) {
-        Blynk.logEvent("offline", "boke2 OFFLINE!");
-      }
-    });
+    Blynk.logEvent("offline", "boke2 OFFLINE!");
   }
 }
 void visible_boke2() {
@@ -1678,11 +1636,7 @@ void hidden_boke3() {
   if (hidden_key_boke3 != true) {
     Blynk.setProperty(V49, V51, V52, V53, "isDisabled", "true");
     hidden_key_boke3 = true;
-    timer_status.setTimeout(3 * 60 * 1000, []() {
-      if (hidden_key_boke3) {
-        Blynk.logEvent("offline", "boke3 OFFLINE!");
-      }
-    });
+    Blynk.logEvent("offline", "boke3 OFFLINE!");
   }
 }
 void visible_boke3() {
@@ -1797,11 +1751,7 @@ void hidden_boke4() {
   if (hidden_key_boke4 != true) {
     Blynk.setProperty(V54, V56, V57, V58, "isDisabled", "true");
     hidden_key_boke4 = true;
-    timer_status.setTimeout(3 * 60 * 1000, []() {
-      if (hidden_key_boke4) {
-        Blynk.logEvent("offline", "boke4 OFFLINE!");
-      }
-    });
+    Blynk.logEvent("offline", "boke4 OFFLINE!");
   }
 }
 void visible_boke4() {
@@ -2053,5 +2003,4 @@ void loop() {
   ESP.wdtFeed();
   Blynk.run();
   timer.run();
-  timer_status.run();
 }
