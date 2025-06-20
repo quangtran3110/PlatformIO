@@ -2,7 +2,7 @@
 #define BLYNK_TEMPLATE_NAME "VOLUME"
 #define BLYNK_AUTH_TOKEN "Hc5DgCBzl4Oi5hW_JOaNZ6oBKoGy5kFI"
 
-#define BLYNK_FIRMWARE_VERSION "241019"
+#define BLYNK_FIRMWARE_VERSION "250620"
 #define BLYNK_PRINT Serial
 #define APP_DEBUG
 
@@ -205,6 +205,8 @@ BLYNK_WRITE(V0) // String
 //-------------------------
 void scanI2C() {
   if (key_i2c) {
+    long rssi = WiFi.RSSI();
+    String wifi_rssi = "WiFi: " + String(rssi) + " dBm\n";
     String server_path = server_name + "batch/update?token=" + Main_TOKEN +
                          terminal_main + "clr";
     http.begin(client, server_path.c_str());
@@ -227,7 +229,7 @@ void scanI2C() {
         }
         String stringOne = String(address, HEX) + "\n";
         String server_path = server_name + "batch/update?token=" + Main_TOKEN +
-                             terminal_main + urlEncode("I2C device address 0x") + urlEncode(stringOne);
+                             terminal_main + urlEncode("I2C device address 0x") + urlEncode(stringOne) + urlEncode(wifi_rssi);
         http.begin(client, server_path.c_str());
         http.GET();
         http.end();
@@ -240,7 +242,7 @@ void scanI2C() {
         String stringOne = String(address, HEX) + "\n";
         // Blynk.virtualWrite(V0, stringOne);
         String server_path = server_name + "batch/update?token=" + Main_TOKEN +
-                             terminal_main + urlEncode("Unknown error at address 0x") + urlEncode(stringOne);
+                             terminal_main + urlEncode("Unknown error at address 0x") + urlEncode(stringOne) + urlEncode(wifi_rssi);
         http.begin(client, server_path.c_str());
         http.GET();
         http.end();
@@ -250,12 +252,13 @@ void scanI2C() {
     if (nDevices == 0) {
       // Blynk.virtualWrite(V0, "No I2C devices found\n");
       String server_path = server_name + "batch/update?token=" + Main_TOKEN +
-                           terminal_main + urlEncode("No I2C devices found\n");
+                           terminal_main + urlEncode("No I2C devices found\n") + urlEncode(wifi_rssi);
       http.begin(client, server_path.c_str());
       http.GET();
       http.end();
-    } else
+    } else {
       Blynk.virtualWrite(V0, "Done\n");
+    }
   }
 }
 //-------------------------
