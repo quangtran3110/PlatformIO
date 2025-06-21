@@ -69,9 +69,10 @@
 #define BLYNK_TEMPLATE_ID "TMPL67lOs7dLq"
 #define BLYNK_TEMPLATE_NAME "TRẠM SỐ 4"
 #define BLYNK_AUTH_TOKEN "ra1gZtR0irrwiTH1L-L_nhXI6TMRH7M9"
-#define VOLUME_TOKEN "fQeSuHadv_EFLjXPdqE-sV_lnZ6pXWfu"
+#define VOLUME_TOKEN "RyDZuYiRC4oaG5MsFI2kw4WsQpKiw2Ko"
 
-#define BLYNK_FIRMWARE_VERSION "250330"
+#define BLYNK_FIRMWARE_VERSION "250621"
+
 const char *ssid = "tram bom so 4";
 const char *password = "0943950555";
 #define APP_DEBUG

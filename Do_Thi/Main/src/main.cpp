@@ -89,13 +89,13 @@ V58 - Irms
 #pragma region // ALL TOKEN ID
 #define ccd_TOKEN "t9ZvFY3Syiz5C_efTM-PAS5mg0PGJgxv"
 #define ubndp2_TOKEN "gvfnRXv14oMohtqMWTPQXbduFKww1zfu"
-#define alb_TOKEN "1v4Fr0n4m4-GaYP26MMZ3bHbTi5k68nP"
+#define alb_TOKEN "5AVrDcfdNEFsPxEHeQoO-X_pHu4cI4Jc"
 #define ntbinh_TOKEN "5xw1AG7yoX1e7sphhfL2jgc-dPnW9_l2"
 #define boke1_TOKEN "egMiTa83bEFFC_YXyMaKNJ0a5dtSNpD0"
 #define boke2_TOKEN "T86HBKpJBPvMbJeGRF8mKPEUf83Oik9A"
 #define boke3_TOKEN "fjna3o_TwWwy0SMKGNTqevQGqpuCGDuQ"
 #define boke4_TOKEN "pTbMkuYkt_SOcW4JWPY2kqDEvxN_XXK0"
-#define dhvuong_TOKEN "eBeqi9ZJhRK3r66cUzgdD1gp2xGxG7kS"
+#define dhvuong_TOKEN "5xw1AG7yoX1e7sphhfL2jgc-dPnW9_l2"
 #define thpt1_TOKEN "H3VsCxfjXq67ALREdZcKOANCQ_kdFqfg"
 #define thpt2_TOKEN "H04PY3egc4KE3YnBQkOFEMNAGohM_oGo"
 //------------------

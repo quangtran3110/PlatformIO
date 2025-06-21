@@ -23,13 +23,13 @@ const char *password = "Password";
 #define main_dothi_TOKEN "w3ZZc7F4pvOIwqozyrzYcBFVUE3XxSiW"
 #define ccd_TOKEN "t9ZvFY3Syiz5C_efTM-PAS5mg0PGJgxv"
 #define ubndp2_TOKEN "gvfnRXv14oMohtqMWTPQXbduFKww1zfu"
-#define alb_TOKEN "1v4Fr0n4m4-GaYP26MMZ3bHbTi5k68nP"
+#define alb_TOKEN "5AVrDcfdNEFsPxEHeQoO-X_pHu4cI4Jc"
 #define ntbinh_TOKEN "5xw1AG7yoX1e7sphhfL2jgc-dPnW9_l2"
 #define boke1_TOKEN "egMiTa83bEFFC_YXyMaKNJ0a5dtSNpD0"
 #define boke2_TOKEN "T86HBKpJBPvMbJeGRF8mKPEUf83Oik9A"
 #define boke3_TOKEN "fjna3o_TwWwy0SMKGNTqevQGqpuCGDuQ"
 #define boke4_TOKEN "pTbMkuYkt_SOcW4JWPY2kqDEvxN_XXK0"
-#define dhvuong_TOKEN "eBeqi9ZJhRK3r66cUzgdD1gp2xGxG7kS"
+#define dhvuong_TOKEN "5xw1AG7yoX1e7sphhfL2jgc-dPnW9_l2"
 #define thpt1_TOKEN "H3VsCxfjXq67ALREdZcKOANCQ_kdFqfg"
 #define thpt2_TOKEN "H04PY3egc4KE3YnBQkOFEMNAGohM_oGo"
 //------------------
@@ -42,7 +42,7 @@ const char *password = "Password";
 #define T2_G3_TOKEN "JTnEpJjGVVJ8DM1aJx7zZT4cyNYJrhr_"
 #define T2BPT_TOKEN "AdXbklpLJKTZQ5hK9Qpy7Sg5DdwgmQ8z"
 #define T3BPT_TOKEN "Q2KAjaqI3sWhET-Ax94VPYfIk2Fmsr36"
-#define T4_TOKEN "fQeSuHadv_EFLjXPdqE-sV_lnZ6pXWfu"
+#define T4_TOKEN "RyDZuYiRC4oaG5MsFI2kw4WsQpKiw2Ko"
 #define BHD_TOKEN "PWYW_mopMTAAnpmZOeGH3h4D4QOzZi9X"
 #pragma endregion
 //-----------------------------

@@ -1,13 +1,13 @@
-#define BLYNK_TEMPLATE_ID "TMPL6wuETrZSy"
+#define BLYNK_TEMPLATE_ID "TMPL6ekKXp4iu"
 #define BLYNK_TEMPLATE_NAME "VOLUME"
-#define BLYNK_AUTH_TOKEN "fQeSuHadv_EFLjXPdqE-sV_lnZ6pXWfu"
+#define BLYNK_AUTH_TOKEN "RyDZuYiRC4oaG5MsFI2kw4WsQpKiw2Ko"
 
-#define BLYNK_FIRMWARE_VERSION "240911"
+#define BLYNK_FIRMWARE_VERSION "250621"
 #define BLYNK_PRINT Serial
 #define APP_DEBUG
 
-const char* ssid = "tram bom so 4";
-const char* password = "0943950555";
+const char *ssid = "tram bom so 4";
+const char *password = "0943950555";
 
 #include <BlynkSimpleEsp8266.h>
 #include <ESP8266WiFi.h>
@@ -205,6 +205,8 @@ BLYNK_WRITE(V0) // String
 //-------------------------
 void scanI2C() {
   if (key_i2c) {
+    long rssi = WiFi.RSSI();
+    String wifi_rssi = "WiFi: " + String(rssi) + " dBm\n";
     String server_path = server_name + "batch/update?token=" + Main_TOKEN +
                          terminal_main + "clr";
     http.begin(client, server_path.c_str());
@@ -227,7 +229,7 @@ void scanI2C() {
         }
         String stringOne = String(address, HEX) + "\n";
         String server_path = server_name + "batch/update?token=" + Main_TOKEN +
-                             terminal_main + urlEncode("I2C device address 0x") + urlEncode(stringOne);
+                             terminal_main + urlEncode("I2C device address 0x") + urlEncode(stringOne) + urlEncode(wifi_rssi);
         http.begin(client, server_path.c_str());
         http.GET();
         http.end();
@@ -240,7 +242,7 @@ void scanI2C() {
         String stringOne = String(address, HEX) + "\n";
         // Blynk.virtualWrite(V0, stringOne);
         String server_path = server_name + "batch/update?token=" + Main_TOKEN +
-                             terminal_main + urlEncode("Unknown error at address 0x") + urlEncode(stringOne);
+                             terminal_main + urlEncode("Unknown error at address 0x") + urlEncode(stringOne) + urlEncode(wifi_rssi);
         http.begin(client, server_path.c_str());
         http.GET();
         http.end();
@@ -250,7 +252,7 @@ void scanI2C() {
     if (nDevices == 0) {
       // Blynk.virtualWrite(V0, "No I2C devices found\n");
       String server_path = server_name + "batch/update?token=" + Main_TOKEN +
-                           terminal_main + urlEncode("No I2C devices found\n");
+                           terminal_main + urlEncode("No I2C devices found\n") + urlEncode(wifi_rssi);
       http.begin(client, server_path.c_str());
       http.GET();
       http.end();
