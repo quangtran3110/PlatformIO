@@ -1,13 +1,13 @@
 #define BLYNK_TEMPLATE_ID "TMPL6VP9MY4gS"
 #define BLYNK_TEMPLATE_NAME "VOLUME"
-#define BLYNK_AUTH_TOKEN "jaQFoaOgdcZcKbyI_ME_oi6tThEf4FR5"
+#define BLYNK_AUTH_TOKEN "HZCB36tVTkXZqdwbjV2i6TsewQJx5LWe"
 
 #define BLYNK_FIRMWARE_VERSION "250620"
 #define BLYNK_PRINT Serial
 #define APP_DEBUG
 
-const char* ssid = "NHA MAY NUOC CAI CAT";
-const char* password = "12345678";
+const char *ssid = "Wifi";
+const char *password = "Password";
 
 #include <BlynkSimpleEsp8266.h>
 #include <ESP8266WiFi.h>
@@ -29,10 +29,10 @@ WiFiClient client;
 HTTPClient http;
 String server_name = "http://sgp1.blynk.cloud/external/api/";
 String Main_TOKEN = "vcz0jVXPSGPK6XmFP5Dqi_etQA32VNPL";
-#define URL_fw_Bin "https://raw.githubusercontent.com/quangtran3110/PlatformIO/main/VOLUME/TRAM_CC_G1/.pio/build/nodemcuv2/firmware.bin"
+#define URL_fw_Bin "https://raw.githubusercontent.com/quangtran3110/PlatformIO/main/VOLUME/TRAM_CC_G2/.pio/build/nodemcuv2/firmware.bin"
 
-String LL24h = "&V52=";
-String LL1m3 = "&V51=";
+String LL24h = "&V55=";
+String LL1m3 = "&V54=";
 String terminal_main = "&V45=";
 String text;
 
@@ -185,23 +185,23 @@ void print_terminal_main() {
 BLYNK_WRITE(V0) // String
 {
   String dataS = param.asStr();
-  if (dataS == "rst_G1") {
+  if (dataS == "rst_G2") {
     text = "ESP khởi động lại sau 3s";
     print_terminal_main();
     delay(3000);
     ESP.restart();
-  } else if (dataS == "update_G1") {
+  } else if (dataS == "update_G2") {
     text = "UPDATE FIRMWARE...";
     print_terminal_main();
     update_fw();
-  } else if (dataS == "rst_vl_G1") {
+  } else if (dataS == "rst_vl_G2") {
     text = "Đã reset Volume";
     print_terminal_main();
     data.pulse = 0;
     savedata();
-  } else if (dataS == "i2c_G1") {
+  } else if (dataS == "i2c_G2") {
     key_i2c = !key_i2c;
-  } else if (dataS == "savedata_G1") {
+  } else if (dataS == "savedata_G2") {
     text = "DATA_SAVE... ok!";
     print_terminal_main();
     savedata();

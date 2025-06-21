@@ -36,7 +36,7 @@ const char *password = "Password";
 #define pin_G_main_denduong "&V99="
 #define main_denduong_TOKEN "Ol3VH8Hv_OX2JKUWl4ENBk6Rqgh3P3MQ"
 #define binhtan1_TOKEN "tCAptndMM6EXqRkWvj_6tK76_mi7gbKf"
-//------------------
+//------------------ VOLUME
 #define T2_G1_TOKEN "L_2oEOyv4bmrdsesIoasyKiEEOFZVgBO"
 #define T2_G2_TOKEN "Hc5DgCBzl4Oi5hW_JOaNZ6oBKoGy5kFI"
 #define T2_G3_TOKEN "JTnEpJjGVVJ8DM1aJx7zZT4cyNYJrhr_"
@@ -44,6 +44,9 @@ const char *password = "Password";
 #define T3BPT_TOKEN "Q2KAjaqI3sWhET-Ax94VPYfIk2Fmsr36"
 #define T4_TOKEN "RyDZuYiRC4oaG5MsFI2kw4WsQpKiw2Ko"
 #define BHD_TOKEN "PWYW_mopMTAAnpmZOeGH3h4D4QOzZi9X"
+#define CC_G1_TOKEN "jaQFoaOgdcZcKbyI_ME_oi6tThEf4FR5"
+#define CC_G2_TOKEN "HZCB36tVTkXZqdwbjV2i6TsewQJx5LWe"
+#define CC_G3_TOKEN "cneOHfDQM8j7_Syye2OSKZfKZkyZNLE-"
 #pragma endregion
 //-----------------------------
 #define URL_fw_Bin "https://raw.githubusercontent.com/quangtran3110/PlatformIO/main/StatusDevice/.pio/build/nodemcuv2/firmware.bin"
