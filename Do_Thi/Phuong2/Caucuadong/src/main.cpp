@@ -1,7 +1,7 @@
-#define BLYNK_TEMPLATE_ID "TMPL6VP9MY4gS"
-#define BLYNK_TEMPLATE_NAME "Cau Cua Dong"
-#define BLYNK_AUTH_TOKEN "jaQFoaOgdcZcKbyI_ME_oi6tThEf4FR5"
-#define BLYNK_FIRMWARE_VERSION "250328"
+#define BLYNK_TEMPLATE_ID "TMPL7Z9cnaGi"
+#define BLYNK_TEMPLATE_NAME "CAY XANH"
+#define BLYNK_AUTH_TOKEN "t9ZvFY3Syiz5C_efTM-PAS5mg0PGJgxv"
+#define BLYNK_FIRMWARE_VERSION "250621"
 
 #define Main_TOKEN "w3ZZc7F4pvOIwqozyrzYcBFVUE3XxSiW"
 const char *ssid = "net";

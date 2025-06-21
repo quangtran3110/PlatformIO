@@ -1,7 +1,7 @@
 #define BLYNK_TEMPLATE_ID "TMPL6I6ISEvF5"
 #define BLYNK_TEMPLATE_NAME "SUPPORT ACTIVE"
 #define BLYNK_AUTH_TOKEN "KqkJXdMncWRT3Vc8n85hzIIk2xr9N76X"
-#define BLYNK_FIRMWARE_VERSION "060619"
+#define BLYNK_FIRMWARE_VERSION "250621"
 //-----------------------------
 const char *ssid = "Wifi_Modem";
 const char *password = "Password";
@@ -21,7 +21,7 @@ const char *password = "Password";
 #pragma region // ALL TOKEN ID
 #define pin_G_main_dothi "&V99="
 #define main_dothi_TOKEN "w3ZZc7F4pvOIwqozyrzYcBFVUE3XxSiW"
-#define ccd_TOKEN "jaQFoaOgdcZcKbyI_ME_oi6tThEf4FR5"
+#define ccd_TOKEN "t9ZvFY3Syiz5C_efTM-PAS5mg0PGJgxv"
 #define ubndp2_TOKEN "gvfnRXv14oMohtqMWTPQXbduFKww1zfu"
 #define alb_TOKEN "1v4Fr0n4m4-GaYP26MMZ3bHbTi5k68nP"
 #define ntbinh_TOKEN "5xw1AG7yoX1e7sphhfL2jgc-dPnW9_l2"
