@@ -29,7 +29,7 @@ const char *password = "Password";
 #define boke2_TOKEN "T86HBKpJBPvMbJeGRF8mKPEUf83Oik9A"
 #define boke3_TOKEN "fjna3o_TwWwy0SMKGNTqevQGqpuCGDuQ"
 #define boke4_TOKEN "pTbMkuYkt_SOcW4JWPY2kqDEvxN_XXK0"
-#define dhvuong_TOKEN "5xw1AG7yoX1e7sphhfL2jgc-dPnW9_l2"
+#define dhvuong_TOKEN "_hOr-ezd7Ir4uSyeIl1s0Ufar6oSZUnA"
 #define thpt1_TOKEN "H3VsCxfjXq67ALREdZcKOANCQ_kdFqfg"
 #define thpt2_TOKEN "H04PY3egc4KE3YnBQkOFEMNAGohM_oGo"
 //------------------
