@@ -46,7 +46,7 @@ const char *password = "Password";
 #define BHD_TOKEN "PWYW_mopMTAAnpmZOeGH3h4D4QOzZi9X"
 #define CC_G1_TOKEN "jaQFoaOgdcZcKbyI_ME_oi6tThEf4FR5"
 #define CC_G2_TOKEN "HZCB36tVTkXZqdwbjV2i6TsewQJx5LWe"
-#define CC_G3_TOKEN "cneOHfDQM8j7_Syye2OSKZfKZkyZNLE-"
+#define CC_G3_TOKEN "DEdOyQWTbvQ5_ma_MEP1_Z8gefY_rnfE"
 #pragma endregion
 //-----------------------------
 #define URL_fw_Bin "https://raw.githubusercontent.com/quangtran3110/PlatformIO/main/StatusDevice/.pio/build/nodemcuv2/firmware.bin"

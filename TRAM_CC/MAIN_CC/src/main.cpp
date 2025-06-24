@@ -71,7 +71,7 @@
 
 #define VOLUME_TOKEN_G1 "jaQFoaOgdcZcKbyI_ME_oi6tThEf4FR5"
 #define VOLUME_TOKEN_G2 "HZCB36tVTkXZqdwbjV2i6TsewQJx5LWe"
-#define VOLUME_TOKEN_G3 "cneOHfDQM8j7_Syye2OSKZfKZkyZNLE-"
+#define VOLUME_TOKEN_G3 "DEdOyQWTbvQ5_ma_MEP1_Z8gefY_rnfE"
 
 #define BLYNK_PRINT Serial
 #define BLYNK_FIRMWARE_VERSION "250621"
@@ -282,13 +282,13 @@ void savedata() {
 void up() {
   String server_path = server_name + "batch/update?token=" + BLYNK_AUTH_TOKEN + "&V29=" + Result1 + "&V30=" + Irms0 + "&V31=" + Irms1 + "&V32=" + Irms2 + "&V33=" + Irms3 + "&V34=" + Irms4 + "&V35=" + Irms5 + "&V36=" + temp_1 + "&V37=" + temp_2 + "&V38=" + temp_3 + "&V60=" + float(data.timerun_G1) / 1000 / 60 / 60 + "&V62=" + float(data.timerun_G2) / 1000 / 60 / 60 + "&V64=" + float(data.timerun_G3) / 1000 / 60 / 60 + "&V66=" + float(data.timerun_B1) / 1000 / 60 / 60 + "&V68=" + float(data.timerun_B2) / 1000 / 60 / 60 + "&V70=" + float(data.timerun_B3) / 1000 / 60 / 60;
   http.begin(client, server_path.c_str());
-  int httpResponseCode = http.GET();
+  http.GET();
   http.end();
 }
 void up_timerun_motor() {
   String server_path = server_name + "batch/update?token=" + BLYNK_AUTH_TOKEN + "&V61=" + float(data.timerun_G1) / 1000 / 60 / 60 + "&V63=" + float(data.timerun_G2) / 1000 / 60 / 60 + "&V65=" + float(data.timerun_G3) / 1000 / 60 / 60 + "&V67=" + float(data.timerun_B1) / 1000 / 60 / 60 + "&V69=" + float(data.timerun_B2) / 1000 / 60 / 60 + "&V71=" + float(data.timerun_B3) / 1000 / 60 / 60;
   http.begin(client, server_path.c_str());
-  int httpResponseCode = http.GET();
+  http.GET();
   http.end();
 }
 void time_run_motor() {
@@ -344,7 +344,7 @@ void time_run_motor() {
 void send_rualoc(String token, int virtual_pin, float(value_to_send)) {
   String server_path = server_rualoc + token + "&V" + String(virtual_pin) + "=" + value_to_send;
   http.begin(client, server_path.c_str());
-  int httpResponseCode = http.GET();
+  http.GET();
   http.end();
 }
 void hidden() {
@@ -850,7 +850,7 @@ void rtctime() {
   if (blynk_first_connect == true) {
     if ((now.day() != day()) || (now.hour() != hour()) || ((now.minute() - minute() > 2) || (minute() - now.minute() > 2))) {
       rtc_module.adjust(DateTime(year(), month(), day(), hour(), minute(), second()));
-      DateTime now = rtc_module.now();
+      now = rtc_module.now();
     }
   }
   timestamp = now.unixtime();

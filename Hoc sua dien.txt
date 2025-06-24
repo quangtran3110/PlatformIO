@@ -1,0 +1,2 @@
+Nguồn ra đủ nhưng sụt áp khi có tải nên nghĩ ngay đến tụ lọc nguồn bị yếu (chưa hỏng nhé), kể cả nguồn máy tính.
+Tụ yếu/ lỗi (chưa hỏng) chủ yếu do chất lượng kém. Đo tụ dùng nên dùng máy đo LCR, đo được cả thông số rất quan trọng ngoài dung lượng đó là trị số ESR. Tụ càng tốt thì ESR càng nhỏ. Tụ kém thì ESR vài ôm trở lên. Tụ bị giảm trị số dung lượng (dù chưa hỏng) thì chắc chắn ESR bị tăng. Mạch lúc này tương đương với việc gắn tải // với 1 con R (vài ôm) nên điện áp ra sụt
