@@ -1,7 +1,7 @@
 #define BLYNK_TEMPLATE_ID "TMPL6mc-8Z360"
 #define BLYNK_TEMPLATE_NAME "TEST"
 #define BLYNK_AUTH_TOKEN "ytegflpR47cyAPi9JKBvRVfhVaFD8tfT"
-#define BLYNK_FIRMWARE_VERSION "250712"
+#define BLYNK_FIRMWARE_VERSION "250711"
 #define BLYNK_PRINT Serial
 #define APP_DEBUG
 
@@ -9,6 +9,7 @@
 #include <BlynkSimpleEsp8266.h>
 #include <ModbusRTU.h>
 #include <SoftwareSerial.h>
+#include <WidgetRTC.h>
 
 const char *ssid = "Tram Nuoc Dang Thi Manh";
 const char *password = "123456789";
@@ -22,10 +23,13 @@ HTTPClient http;
 String server_name = "http://sgp1.blynk.cloud/external/api/";
 //-----------------------------
 int reboot_num = 0;
-
+int sta_vfd_c1;
 WidgetTerminal terminal(V3);
+WidgetTerminal terminal_log(V4);
 BlynkTimer timer;
+WidgetRTC rtc_widget;
 BLYNK_CONNECTED() {
+  rtc_widget.begin();
 }
 
 //-------------------------
@@ -104,6 +108,26 @@ bool cbWrite(Modbus::ResultCode event, uint16_t transactionId, void *data) {
 }
 
 //-------------------------------------------------------------------
+uint16_t fault_code[1];
+const char *fault_code_list[] = {
+    "None", // 0 (không dùng)
+    "OUt1", "OUt2", "OUt3", "OV1", "OV2", "OV3", "OC1", "OC2", "OC3", "UV",
+    "OL1", "OL2", "SPI", "SPO", "OH1", "OH2", "EF", "CE", "ItE", "tE",
+    "EEP", "PIDE", "bCE", "END", "OL3", "PCE", "UPE", "DNE", "ETH1", "ETH2",
+    "dEu", "STo", "LL", "OT", "E-Err", "F1-Er", "F2-Er", "C1-Er", "C2-Er",
+    "E-DP", "E-NET", "E-CAN", "E-PN", "E-CAT", "E-BAC", "E-DEV", "ESCAN",
+    "S-Err", "FrOST", "BLOCK", "Dr"};
+bool cbWrite_fault_code(Modbus::ResultCode event, uint16_t transactionId, void *data) {
+  if (event == Modbus::EX_SUCCESS) {
+    int value = fault_code[0];
+    if (value >= 0 && value <= 51) {
+      Blynk.virtualWrite(V2, fault_code_list[value]);
+      Serial.println("fault code: " + String(fault_code_list[value]));
+    }
+  }
+  return true;
+}
+//-------------------------------------------------------------------
 const char *status_vdf_list[] = {
     "None",            // 0 (không dùng)
     "Forward running", // 1
@@ -114,33 +138,29 @@ const char *status_vdf_list[] = {
     "Pre-exciting"     // 6
 };
 uint16_t status_vdf[1];
+int sta_vfd_c1_prev = -1; // Thêm biến toàn cục lưu trạng thái trước
 bool cbWrite_status_vdf(Modbus::ResultCode event, uint16_t transactionId, void *data) {
   if (event == Modbus::EX_SUCCESS) {
-    int value = status_vdf[0];
-    if (value >= 1 && value <= 6) {
-      Blynk.virtualWrite(V0, status_vdf_list[value]);
-      Serial.println("Giá trị: " + String(status_vdf_list[value]));
-    }
-  }
-  return true;
-}
-//-------------------------------------------------------------------
-uint16_t fault_code[1];
-const char *fault_code_list[] = {
-    "None", // 0 (không dùng)
-    "OUt1", "OUt2", "OUt3", "OV1", "OV2", "OV3", "OC1", "OC2", "OC3", "UV",
-    "OL1", "OL2", "SPI", "SPO", "OH1", "OH2", "EF", "CE", "ItE", "tE",
-    "EEP", "PIDE", "bCE", "END", "OL3", "PCE", "UPE", "DNE", "ETH1", "ETH2",
-    "dEu", "STo", "LL", "OT", "E-Err", "F1-Er", "F2-Er", "C1-Er", "C2-Er",
-    "E-DP", "E-NET", "E-CAN", "E-PN", "E-CAT", "E-BAC", "E-DEV", "ESCAN",
-    "S-Err", "FrOST", "BLOCK", "Dr"};
-
-bool cbWrite_fault_code(Modbus::ResultCode event, uint16_t transactionId, void *data) {
-  if (event == Modbus::EX_SUCCESS) {
-    int value = fault_code[0];
-    if (value >= 0 && value <= 51) {
-      Blynk.virtualWrite(V2, fault_code_list[value]);
-      Serial.println("fault code: " + String(fault_code_list[value]));
+    sta_vfd_c1 = status_vdf[0];
+    if (sta_vfd_c1 >= 1 && sta_vfd_c1 <= 6) {
+      Blynk.virtualWrite(V0, status_vdf_list[sta_vfd_c1]);
+      Serial.println("Giá trị: " + String(status_vdf_list[sta_vfd_c1]));
+      // Gửi lên V4 nếu trạng thái vừa đổi
+      if (sta_vfd_c1 != sta_vfd_c1_prev) {
+        char buf[64];
+        if (sta_vfd_c1 == 4) { // Nếu là Fault
+          snprintf(buf, sizeof(buf), "%02d/%02d/%02d %02d:%02d %s %s",
+                   day(), month(), year() % 100, hour(), minute(),
+                   status_vdf_list[sta_vfd_c1],
+                   fault_code_list[fault_code[0]]);
+        } else {
+          snprintf(buf, sizeof(buf), "%02d/%02d/%02d %02d:%02d %s",
+                   day(), month(), year() % 100, hour(), minute(),
+                   status_vdf_list[sta_vfd_c1]);
+        }
+        Blynk.virtualWrite(V4, buf);
+        sta_vfd_c1_prev = sta_vfd_c1;
+      }
     }
   }
   return true;
@@ -203,7 +223,7 @@ void setup() {
   mb.begin(&S);
   mb.master();
 
-  timer.setInterval(3000, []() {
+  timer.setInterval(5000, []() {
     read_modbus();
   });
 }
