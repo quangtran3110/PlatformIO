@@ -31,15 +31,15 @@ void loop() {
 
   // Đánh giá chất lượng tín hiệu
   if (rssi >= -50) {
-    Serial.println("Chất lượng: Rất tốt");
+    //Serial.println("Chất lượng: Rất tốt");
   } else if (rssi >= -60) {
-    Serial.println("Chất lượng: Tốt");
+    //Serial.println("Chất lượng: Tốt");
   } else if (rssi >= -70) {
-    Serial.println("Chất lượng: Khá");
+    //Serial.println("Chất lượng: Khá");
   } else {
-    Serial.println("Chất lượng: Yếu");
+    //Serial.println("Chất lượng: Yếu");
   }
 
   Serial.println("------------------------");
-  delay(2000); // Đợi 2 giây trước khi đọc lại
+  delay(1000); // Đợi 2 giây trước khi đọc lại
 }
