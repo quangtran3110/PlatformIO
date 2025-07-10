@@ -1,7 +1,7 @@
 #define BLYNK_TEMPLATE_ID "TMPL6mc-8Z360"
 #define BLYNK_TEMPLATE_NAME "TEST"
 #define BLYNK_AUTH_TOKEN "ytegflpR47cyAPi9JKBvRVfhVaFD8tfT"
-#define BLYNK_FIRMWARE_VERSION "250710"
+#define BLYNK_FIRMWARE_VERSION "250711"
 #define BLYNK_PRINT Serial
 #define APP_DEBUG
 
@@ -18,7 +18,7 @@ ModbusRTU mb;
 //-----------------------------
 WiFiClient client;
 HTTPClient http;
-#define URL_fw_Bin "https://raw.githubusercontent.com/quangtran3110/PlatformIO/main/TEST_ESP/Modbus INVT/.pio/build/nodemcuv2/firmware.bin"
+#define URL_fw_Bin "https://raw.githubusercontent.com/quangtran3110/PlatformIO/main/TEST_ESP/ModbusINVT/.pio/build/nodemcuv2/firmware.bin"
 String server_name = "http://sgp1.blynk.cloud/external/api/";
 //-----------------------------
 int reboot_num = 0;
