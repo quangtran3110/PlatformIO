@@ -1,7 +1,7 @@
 #define BLYNK_TEMPLATE_ID "TMPL6mc-8Z360"
 #define BLYNK_TEMPLATE_NAME "TEST"
 #define BLYNK_AUTH_TOKEN "ytegflpR47cyAPi9JKBvRVfhVaFD8tfT"
-#define BLYNK_FIRMWARE_VERSION "250711"
+#define BLYNK_FIRMWARE_VERSION "250712"
 #define BLYNK_PRINT Serial
 #define APP_DEBUG
 
@@ -107,6 +107,7 @@ bool cbWrite(Modbus::ResultCode event, uint16_t transactionId, void *data) {
   return true;
 }
 
+
 //-------------------------------------------------------------------
 uint16_t fault_code[1];
 const char *fault_code_list[] = {
@@ -144,21 +145,23 @@ bool cbWrite_status_vdf(Modbus::ResultCode event, uint16_t transactionId, void *
     sta_vfd_c1 = status_vdf[0];
     if (sta_vfd_c1 >= 1 && sta_vfd_c1 <= 6) {
       Blynk.virtualWrite(V0, status_vdf_list[sta_vfd_c1]);
-      Serial.println("Giá trị: " + String(status_vdf_list[sta_vfd_c1]));
+      Serial.print("Giá trị: ");
+      Serial.println(status_vdf_list[sta_vfd_c1]);
       // Gửi lên V4 nếu trạng thái vừa đổi
       if (sta_vfd_c1 != sta_vfd_c1_prev) {
         char buf[64];
         if (sta_vfd_c1 == 4) { // Nếu là Fault
-          snprintf(buf, sizeof(buf), "%02d/%02d/%02d %02d:%02d %s %s",
+          snprintf(buf, sizeof(buf), "%02d/%02d/%02d %02d:%02d %s %s\n",
                    day(), month(), year() % 100, hour(), minute(),
                    status_vdf_list[sta_vfd_c1],
                    fault_code_list[fault_code[0]]);
         } else {
-          snprintf(buf, sizeof(buf), "%02d/%02d/%02d %02d:%02d %s",
+          snprintf(buf, sizeof(buf), "%02d/%02d/%02d %02d:%02d %s\n",
                    day(), month(), year() % 100, hour(), minute(),
                    status_vdf_list[sta_vfd_c1]);
         }
-        Blynk.virtualWrite(V4, buf);
+        terminal_log.println(buf);
+        terminal_log.flush();
         sta_vfd_c1_prev = sta_vfd_c1;
       }
     }
