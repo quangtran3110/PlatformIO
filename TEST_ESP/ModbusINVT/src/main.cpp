@@ -107,7 +107,6 @@ bool cbWrite(Modbus::ResultCode event, uint16_t transactionId, void *data) {
   return true;
 }
 
-
 //-------------------------------------------------------------------
 uint16_t fault_code[1];
 const char *fault_code_list[] = {
