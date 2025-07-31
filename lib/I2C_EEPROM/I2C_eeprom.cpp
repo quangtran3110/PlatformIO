@@ -1,7 +1,7 @@
 //
 //    FILE: I2C_eeprom.cpp
 //  AUTHOR: Rob Tillaart
-// VERSION: 1.8.5
+// VERSION: 1.9.2
 // PURPOSE: Arduino Library for external I2C EEPROM 24LC256 et al.
 //     URL: https://github.com/RobTillaart/I2C_EEPROM
 
@@ -36,7 +36,7 @@
 //  PUBLIC FUNCTIONS
 //
 I2C_eeprom::I2C_eeprom(const uint8_t deviceAddress, TwoWire * wire) :
-            I2C_eeprom(deviceAddress, I2C_PAGESIZE_24LC256, wire)
+            I2C_eeprom(deviceAddress, I2C_DEVICESIZE_24LC256, wire)
 {
 }
 
@@ -182,7 +182,7 @@ int I2C_eeprom::updateByte(const uint16_t memoryAddress, const uint8_t data)
 }
 
 
-//  returns bytes written.
+//  returns bytes actually written <= length
 uint16_t I2C_eeprom::updateBlock(const uint16_t memoryAddress, const uint8_t * buffer, const uint16_t length)
 {
   uint16_t address = memoryAddress;
@@ -194,10 +194,11 @@ uint16_t I2C_eeprom::updateBlock(const uint16_t memoryAddress, const uint8_t * b
     uint8_t count = I2C_BUFFERSIZE;
 
     if (count > len) count = len;
-    bytes += _ReadBlock(address, buf, count);
+    _ReadBlock(address, buf, count);
     if (memcmp(buffer, buf, count) != 0)
     {
       _pageBlock(address, buffer, count, true);
+      bytes += count;
     }
     address += count;
     buffer  += count;
@@ -235,7 +236,11 @@ bool I2C_eeprom::setBlockVerify(const uint16_t memoryAddress, const uint8_t valu
   if (setBlock(memoryAddress, value, length) != 0) return false;
   uint8_t * data = (uint8_t *) malloc(length);
   if (data == NULL) return false;
-  if (readBlock(memoryAddress, data, length) != length) return false;
+  if (readBlock(memoryAddress, data, length) != length)
+  {
+    free(data);
+    return false;
+  }
   for (uint16_t i = 0; i < length; i++)
   {
     if (data[i] != value)
@@ -261,7 +266,8 @@ bool I2C_eeprom::updateByteVerify(const uint16_t memoryAddress, const uint8_t va
 //  return false if write or verify failed.
 bool I2C_eeprom::updateBlockVerify(const uint16_t memoryAddress, const uint8_t * buffer, const uint16_t length)
 {
-  if (updateBlock(memoryAddress, buffer, length) != length) return false;
+  //  zero bytes written means nothing needs to be verified
+  if (0 == updateBlock(memoryAddress, buffer, length)) return true;
   return verifyBlock(memoryAddress, buffer, length);
 }
 

@@ -6,9 +6,20 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/)
 and this project adheres to [Semantic Versioning](http://semver.org/).
 
 
+## [1.9.2] - 2024-11-25
+- fix #79, wrong default in constructor - kudos to ekinohito
+
+## [1.9.1] - 2024-10-26
+- fix #77, updateBlock() returns bytes actually written.
+- minor edits
+
+## [1.9.0] - 2024-10-09
+- Fix #74, memory leak in setBlockVerify() - kudos to cmichailidis
+
+----
+
 ## [1.8.5] - 2024-04-22
 - Fix #72, force requestFrom parameters to use int type
-
 
 ## [1.8.4] - 2024-04-20
 - Fix #70, increase length internal buffer.

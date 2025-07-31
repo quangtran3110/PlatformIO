@@ -40,7 +40,7 @@ const char *ssid = "net";
 const char *password = "Abcd@1234";
 //-------------------------------------------------------------------
 #define BLYNK_PRINT Serial
-#define BLYNK_FIRMWARE_VERSION "250330"
+#define BLYNK_FIRMWARE_VERSION "250731"
 #define APP_DEBUG
 
 #pragma region // Library
@@ -327,6 +327,7 @@ void readPressure() // C2 - Ap Luc
 }
 //-------------------------
 void rtctime() {
+  /*
   DateTime now = rtc.now();
   if (Blynk.connected() == true) {
     Blynk.sendInternal("rtc", "sync");
@@ -337,7 +338,7 @@ void rtctime() {
     }
   }
   Blynk.virtualWrite(V20, daysOfTheWeek[now.dayOfTheWeek()], ", ", now.day(), "/", now.month(), "/", now.year(), " - ", now.hour(), ":", now.minute(), ":", now.second());
-
+*/
   if (Result1 < data.pre_min) {
     i = i + 1;
     if ((i >= 2) && (Irms1 == 0) && (data.noti)) {
@@ -546,7 +547,7 @@ void setup() {
       temperature();
       timer.restartTimer(timer_1);
     });
-    timer_2 = timer1.setInterval(1783L, []() {
+    timer_2 = timer1.setInterval(2583L, []() {
       readPower();
       readPower1();
       updata();

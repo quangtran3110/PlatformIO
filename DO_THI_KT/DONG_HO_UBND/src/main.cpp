@@ -309,8 +309,7 @@ BLYNK_WRITE(V3) {
     update_fw();
   } else if (dataS == "1") {
     terminal.clear();
-    String info = "--- THÔNG TIN HỆ THỐNG ---\n";
-    info += "Chế độ: " + String(mode == 0 ? "Tự động" : "Cài đặt thủ công") + "\n\n";
+    String info = "--- THÔNG TIN ĐỒNG HỒ ---\n\n";
 
     // Đồng hồ 1
     info += "Mặt 1: ";
@@ -318,11 +317,10 @@ BLYNK_WRITE(V3) {
       info += "Chưa cài đặt.";
     } else {
       DateTime dt(data.unixtime_1);
-      char buffer[9];
-      sprintf(buffer, "%02d:%02d:%02d", dt.hour(), dt.minute(), dt.second());
+      char buffer[6]; // Đủ cho "HH:MM" và ký tự null
+      sprintf(buffer, "%02d:%02d", dt.hour(), dt.minute());
       info += buffer;
     }
-    info += " | Trạng thái: " + String(dem1 > 0 ? "Đang chạy" : "Đã dừng");
     info += " | Cần quay: " + String(dem1) + " phút\n";
 
     // Đồng hồ 2
@@ -331,11 +329,10 @@ BLYNK_WRITE(V3) {
       info += "Chưa cài đặt.";
     } else {
       DateTime dt(data.unixtime_2);
-      char buffer[9];
-      sprintf(buffer, "%02d:%02d:%02d", dt.hour(), dt.minute(), dt.second());
+      char buffer[6];
+      sprintf(buffer, "%02d:%02d", dt.hour(), dt.minute());
       info += buffer;
     }
-    info += " | Trạng thái: " + String(dem2 > 0 ? "Đang chạy" : "Đã dừng");
     info += " | Cần quay: " + String(dem2) + " phút\n";
 
     // Đồng hồ 3
@@ -344,11 +341,10 @@ BLYNK_WRITE(V3) {
       info += "Chưa cài đặt.";
     } else {
       DateTime dt(data.unixtime_3);
-      char buffer[9];
-      sprintf(buffer, "%02d:%02d:%02d", dt.hour(), dt.minute(), dt.second());
+      char buffer[6];
+      sprintf(buffer, "%02d:%02d", dt.hour(), dt.minute());
       info += buffer;
     }
-    info += " | Trạng thái: " + String(dem3 > 0 ? "Đang chạy" : "Đã dừng");
     info += " | Cần quay: " + String(dem3) + " phút\n";
 
     // Đồng hồ 4
@@ -357,11 +353,10 @@ BLYNK_WRITE(V3) {
       info += "Chưa cài đặt.";
     } else {
       DateTime dt(data.unixtime_4);
-      char buffer[9];
-      sprintf(buffer, "%02d:%02d:%02d", dt.hour(), dt.minute(), dt.second());
+      char buffer[6];
+      sprintf(buffer, "%02d:%02d", dt.hour(), dt.minute());
       info += buffer;
     }
-    info += " | Trạng thái: " + String(dem4 > 0 ? "Đang chạy" : "Đã dừng");
     info += " | Cần quay: " + String(dem4) + " phút\n";
 
     Blynk.virtualWrite(V3, info);
@@ -410,11 +405,15 @@ void setup() {
     // Đọc dữ liệu từ EEPROM và đồng bộ vào cả data và dataCheck
     cs.read(data);
     memcpy(&dataCheck, &data, sizeof(data));
+
+    DateTime now = rtc_module.now(); // Lấy thời gian hiện tại từ module RTC
+
     Serial.println("--- Thời gian đã lưu trong EEPROM khi khởi động ---");
     print_clock_time("Đồng hồ 1: ", data.unixtime_1);
     print_clock_time("Đồng hồ 2: ", data.unixtime_2);
     print_clock_time("Đồng hồ 3: ", data.unixtime_3);
     print_clock_time("Đồng hồ 4: ", data.unixtime_4);
+    print_clock_time("Thời gian RTC hiện tại: ", now.unixtime());
     Serial.println("-------------------------------------------------");
     pcf8575_1.begin();
 
@@ -432,7 +431,7 @@ void setup() {
     attachInterrupt(D6, sensor_3, FALLING);
     attachInterrupt(D7, sensor_4, FALLING);
 
-    timer.setInterval(61005, connectionstatus);
+    //timer.setInterval(61005, connectionstatus);
     timer.setInterval(5003, rtc_time);
     // Timer này chỉ giương cờ báo hiệu, không thực hiện đồng bộ trực tiếp
     timer.setInterval(86400000L, []() { rtc_sync_due = true; }); // 24 giờ
