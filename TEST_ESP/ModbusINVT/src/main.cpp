@@ -101,6 +101,7 @@ int32_t int32_2int16(int int1, int int2) {
   f_number.i[1] = int2;
   return f_number.f;
 }
+
 bool cbWrite(Modbus::ResultCode event, uint16_t transactionId, void *data) {
   if (event == Modbus::EX_SUCCESS) {
   }
