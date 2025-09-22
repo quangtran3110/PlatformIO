@@ -568,7 +568,7 @@ void temperature() { // Nhiệt độ
     } else {
       // Lỗi đọc cảm biến, không cập nhật 'temp'.
       // 'temp' sẽ giữ giá trị hợp lệ cuối cùng.
-      Serial.println("Lỗi: Không thể đọc giá trị từ cảm biến nhiệt độ.");
+      // Serial.println("Lỗi: Không thể đọc giá trị từ cảm biến nhiệt độ.");
     }
 
     // Logic điều khiển quạt và in giá trị sẽ dùng biến 'temp' (giá trị mới hoặc giá trị hợp lệ cuối cùng).
@@ -576,7 +576,7 @@ void temperature() { // Nhiệt độ
       on_fan();
     else if (temp < 37)
       off_fan();
-    Serial.println("Temp C: " + String(temp, 2)); // In với 2 chữ số thập phân
+    // Serial.println("Temp C: " + String(temp, 2)); // In với 2 chữ số thập phân
   }
 }
 //-------------------------------------------------------------------

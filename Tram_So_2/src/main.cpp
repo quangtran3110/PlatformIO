@@ -102,7 +102,7 @@ static Eeprom24C32_64 eeprom(EEPROM_ADDRESS);
 const word address = 0;
 //-----------------------------
 #include "PCF8575.h"
-PCF8575 pcf8575_1(0x20);
+PCF8575 pcf8575_1(0x24);
 const int pin_on_G1 = P7;
 const int pin_off_G1 = P6;
 const int pin_on_G2 = P5;
@@ -127,7 +127,7 @@ WiFiClient client;
 HTTPClient http;
 String Tram2_Rualoc = "f_mIttU4MH80_pakaBYWjXq1cOWpqqYg";
 String server_name = "http://sgp1.blynk.cloud/external/api/";
-#define URL_fw_Bin "https://raw.githubusercontent.com/quangtran3110/PlatformIO/main/Tram_So_2/.pio/build/nodemcuv2/firmware.bin"
+#define URL_fw_Bin "https://raw.githubusercontent.com/quangtran3110/PlatformIO/refs/heads/main/Tram_So_2/.pio/build/nodemcuv2/firmware.bin"
 //-----------------------------
 const int S0 = 14;
 const int S1 = 12;
@@ -495,6 +495,36 @@ void hidden() {
 void visible() {
   Blynk.setProperty(V3, V11, V12, V13, V4, V8, V9, "isHidden", false);
 }
+void i2c_scaner() {
+  byte error, address;
+  int nDevices;
+  String stringOne;
+
+  nDevices = 0;
+  for (address = 1; address < 127; address++) {
+    // The i2c_scanner uses the return value of
+    // the Write.endTransmisstion to see if
+    // a device did acknowledge to the address.
+    Wire.beginTransmission(address);
+    error = Wire.endTransmission();
+
+    if (error == 0) {
+      stringOne = String(address, HEX);
+      if (address < 16)
+        Blynk.virtualWrite(V5, "I2C device found at address 0x0", stringOne, " !\n");
+      Blynk.virtualWrite(V5, "I2C device found at address 0x", stringOne, " !\n");
+      nDevices++;
+    } else if (error == 4) {
+      stringOne = String(address, HEX);
+
+      if (address < 16)
+        Blynk.virtualWrite(V5, "Unknown error at address 0x0", stringOne, " !\n");
+      Blynk.virtualWrite(V5, "I2C device found at address 0x", stringOne, " !\n");
+    }
+  }
+  if (nDevices == 0)
+    Blynk.virtualWrite(V5, "No I2C devices found\n");
+}
 //----------------------------------
 BLYNK_WRITE(V0) // Nguoi truc
 {
@@ -720,6 +750,8 @@ BLYNK_WRITE(V5) // data string
       keyterminal.clear();
       Blynk.virtualWrite(V5, "Đã lưu - CLO:", data.clo, "kg");
     }
+  } else if (dataS == "i2c") {
+    i2c_scaner();
   } else {
     Blynk.virtualWrite(V5, "Mã không hợp lệ!\nVui lòng nhập lại.\n");
   }
@@ -1910,6 +1942,7 @@ void time_run_motor() {
     savedata();
   }
 }
+
 //----------------------------------------------------
 void MeasureCmForSmoothing() // C14
 {
