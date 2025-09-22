@@ -1,7 +1,7 @@
 #define BLYNK_TEMPLATE_ID "TMPL6Px18Gsjk"
 #define BLYNK_TEMPLATE_NAME "TRẠM 3 VFD"
 #define BLYNK_AUTH_TOKEN "eXmsWQOmDdHaBMALIxHJqhbJXtzg8Gw1"
-#define BLYNK_FIRMWARE_VERSION "250921"
+#define BLYNK_FIRMWARE_VERSION "250922"
 //------------------
 #define APP_DEBUG
 #define BLYNK_PRINT Serial
@@ -41,14 +41,14 @@ ModbusRTU mb;
 #include <ESP8266httpUpdate.h>
 #include <UrlEncode.h>
 #include <WiFiClientSecure.h>
-#define URL_fw_Bin "https://raw.githubusercontent.com/quangtran3110/PlatformIO/main/Tram_So_3_VFD/.pio/build/nodemcuv2/firmware.bin"
+#define URL_fw_Bin "https://raw.githubusercontent.com/quangtran3110/PlatformIO/refs/heads/main/Tram_So_3%20_VFD/.pio/build/nodemcuv2/firmware.bin"
 String server_main = "http://sgp1.blynk.cloud/external/api/";
 WiFiClient client;
 HTTPClient http;
 //------------------
 #include <I2C_eeprom.h>
 #include <I2C_eeprom_cyclic_store.h>
-#define MEMORY_SIZE 0x4000 // Total capacity of the EEPROM
+#define MEMORY_SIZE 4096
 #define PAGE_SIZE 32
 I2C_eeprom ee(0x57, MEMORY_SIZE);
 //------------------
@@ -198,6 +198,7 @@ uint16_t current_vfd_b1_freq_channel_b = 0; // Biến RAM để lưu tần số 
 #define V_WIFI_SIGNAL 29      // Wifi signal
 #define V_TEMP 30             // Nhiệt độ
 #define V_TEMINAL_VOLUME 31   // Terminal volume
+
 //------------------
 WidgetTerminal terminal(V_TERMINAL);
 BlynkTimer timer;
@@ -245,9 +246,9 @@ const char *fault_code_list[] = {
     "S-Err", "FrOST", "BLOCK", "Dr"};
 const char *status_vdf_list[] = {
     "None",            // 0 (không dùng)
-    "Đang chạy", // 1
+    "Đang chạy",       // 1
     "Reverse running", // 2
-    "Dừng",         // 3
+    "Dừng",            // 3
     "Fault",           // 4
     "PoFF",            // 5
     "Pre-exciting"     // 6
@@ -556,14 +557,26 @@ void readPower2() { // Nen khi- I2 - C2
 }
 void temperature() { // Nhiệt độ
   sensors.requestTemperatures();
-  // Serial.println(sensors.getDeviceCount());
   if (sensors.getDeviceCount() > 0) {
-    // Serial.println("Temp C: " + String(sensors.getTempCByIndex(0)));
-    temp = sensors.getTempCByIndex(0);
-    if (temp > 35)
+    float newTemp = sensors.getTempCByIndex(0);
+
+    // Kiểm tra xem giá trị đọc được có phải là mã lỗi không.
+    // Thư viện DallasTemperature trả về -127 (DEVICE_DISCONNECTED_C) khi đọc lỗi.
+    if (newTemp != DEVICE_DISCONNECTED_C) {
+      // Đã đọc được giá trị hợp lệ, gán nó cho biến toàn cục 'temp'.
+      temp = newTemp;
+    } else {
+      // Lỗi đọc cảm biến, không cập nhật 'temp'.
+      // 'temp' sẽ giữ giá trị hợp lệ cuối cùng.
+      Serial.println("Lỗi: Không thể đọc giá trị từ cảm biến nhiệt độ.");
+    }
+
+    // Logic điều khiển quạt và in giá trị sẽ dùng biến 'temp' (giá trị mới hoặc giá trị hợp lệ cuối cùng).
+    if (temp > 39)
       on_fan();
-    else if (temp < 33)
+    else if (temp < 37)
       off_fan();
+    Serial.println("Temp C: " + String(temp, 2)); // In với 2 chữ số thập phân
   }
 }
 //-------------------------------------------------------------------
@@ -645,14 +658,14 @@ float readPressureWithMedianAndKalman() {
   result += 25.0f;
 
   // Giới hạn giá trị trong khoảng hợp lý
-  Serial.println("mực nước: " + String(result) + " cm");
-  return constrain(result, 0.0, dosau * 1.2); // Cho phép vượt 20%
+  // Serial.println("mực nước: " + String(result) + " cm");
+  return constrain(result, 0.0, dosau * 1.4); // Cho phép vượt 40%
 }
 void MeasureAndProcessWaterLevel() {
   // Đọc và lọc giá trị mực nước
   smoothDistance = readPressureWithMedianAndKalman();
-  Serial.println("mực nước1: " + String(smoothDistance) + " cm");
-  // Tính toán và gửi dữ liệu lên Blynk
+  // Serial.println("mực nước1: " + String(smoothDistance) + " cm");
+  //  Tính toán và gửi dữ liệu lên Blynk
   if (smoothDistance >= 0) {
     // Công thức tính thể tích cho bể tròn: V = pi * r^2 * h
     // pi: 3.14
@@ -941,6 +954,9 @@ BLYNK_WRITE_VP(V_TERMINAL) // String
                        "pre_<so>  : Hieu chuan tai ap suat <so> bar\n"
                        "level_0   : Hieu chuan muc nuoc 0 cm\n"
                        "level_<so>: Hieu chuan tai muc nuoc <so> cm\n");
+    char ram_buffer[50];
+    sprintf(ram_buffer, "Free RAM: %u bytes\n", ESP.getFreeHeap());
+    Blynk.virtualWrite(V_TERMINAL, ram_buffer);
   } else if (dataS == "ts3") {
     terminal.clear();
     key = true;
