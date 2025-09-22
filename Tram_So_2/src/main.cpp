@@ -102,7 +102,7 @@ static Eeprom24C32_64 eeprom(EEPROM_ADDRESS);
 const word address = 0;
 //-----------------------------
 #include "PCF8575.h"
-PCF8575 pcf8575_1(0x24);
+PCF8575 pcf8575_1(0x20);
 const int pin_on_G1 = P7;
 const int pin_off_G1 = P6;
 const int pin_on_G2 = P5;
