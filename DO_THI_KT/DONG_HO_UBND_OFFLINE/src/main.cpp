@@ -24,7 +24,7 @@ DateTime lastSampledTime;
 //-------------------
 #include <I2C_eeprom.h>
 #include <I2C_eeprom_cyclic_store.h>
-#define MEMORY_SIZE 0x4000 // Total capacity of the EEPROM
+#define MEMORY_SIZE 4096 // Total capacity of the EEPROM
 #define PAGE_SIZE 32
 I2C_eeprom ee(0x57, MEMORY_SIZE);
 
@@ -46,7 +46,7 @@ WiFiClient client;
 HTTPClient http;
 String server_name = "http://sgp1.blynk.cloud/external/api/";
 
-#define URL_fw_Bin "https://raw.githubusercontent.com/quangtran3110/PlatformIO/main/DO_THI_KT/DONG_HO_UBND/.pio/build/nodemcuv2/firmware.bin"
+#define URL_fw_Bin "https://raw.githubusercontent.com/quangtran3110/PlatformIO/refs/heads/main/DO_THI_KT/DONG_HO_UBND/.pio/build/nodemcuv2/firmware.bin"
 //-------------------
 #include "PCF8575.h"
 #include <WidgetRTC.h>
@@ -69,8 +69,9 @@ State currentState = STATE_OFFLINE_RUNNING;
 bool rtcSyncRequested = false;
 
 unsigned long lastAdjust = 0;
-const unsigned long SENSOR_TIMEOUT = 5000;         // 5 giây timeout cho cảm biến
-const unsigned long CLOCK_ADJUST_INTERVAL = 30000; // 30 giây
+const unsigned long SENSOR_TIMEOUT = 5000;           // 5 giây timeout cho cảm biến
+const unsigned long CLOCK_ADJUST_INTERVAL = 30000;   // 30 giây
+const unsigned long MIN_VALID_TRIGGER_TIME_MS = 750; // (ms) Bỏ qua các trigger nhanh hơn khoảng thời gian này để lọc nhiễu
 
 // Biến để theo dõi mặt đồng hồ đang được đồng bộ (0-3). -1 nghĩa là không có mặt nào.
 int sync_face_index = -1;
@@ -276,7 +277,10 @@ void advanceToNextFace() {
   stop_all_motors();
   if (sync_face_index >= NUM_CLOCKS) {
     Serial.println("All clocks adjusted. Stopping motors.");
-    sync_face_index = -1;      // Reset index, -1 nghĩa là không đồng bộ
+    sync_face_index = -1; // Reset index, -1 nghĩa là không đồng bộ
+    // Reset lại thời gian của trigger cuối cùng. Điều này rất quan trọng để đảm bảo
+    // lần điều chỉnh tiếp theo (có thể là 1 phút sau) sẽ không bị ảnh hưởng bởi giá trị cũ.
+    lastSensorTriggerTime = 0;
     enableSensorInterrupt(-1); // Tắt hết ngắt
     return;
   }
@@ -315,17 +319,27 @@ void handleManualOnlineMode() {
 }
 void processSingleSensor(int clock_index) {
   if (sensor_triggered[clock_index]) {
-    sensor_triggered[clock_index] = false;
+    // Lọc nhiễu: Bỏ qua các xung kích hoạt quá nhanh.
+    // Một xung chỉ được coi là hợp lệ nếu nó xảy ra sau một khoảng thời gian tối thiểu
+    // kể từ khi motor bắt đầu quay hoặc kể từ xung hợp lệ cuối cùng.
+    if (millis() - lastSensorTriggerTime < MIN_VALID_TRIGGER_TIME_MS) {
+      sensor_triggered[clock_index] = false; // Hạ cờ, bỏ qua xung nhiễu
+      Serial.printf("Clock %d: Ignored noisy trigger (too fast).\n", clock_index + 1);
+      return; // Thoát, không xử lý gì thêm
+    }
+
+    sensor_triggered[clock_index] = false; // Xung hợp lệ, hạ cờ để xử lý
     if (dem[clock_index] > 0) {
       dem[clock_index]--;
       // Cập nhật thời gian dựa trên hướng quay
       if (motor_direction[clock_index] == FORWARD) {
         data.unixtime[clock_index] += 60;
       } else if (motor_direction[clock_index] == BACKWARD) {
+        // Khi quay lùi, thời gian của đồng hồ phải giảm đi để khớp với chuyển động cơ khí
         data.unixtime[clock_index] -= 60;
       }
       eeprom_save_request = true;
-      lastSensorTriggerTime = millis();
+      lastSensorTriggerTime = millis(); // Cập nhật lại thời điểm của xung hợp lệ cuối cùng
     }
     if (dem[clock_index] <= 0) {
       pcf8575_1.digitalWrite(FWD_PINS[clock_index], HIGH);

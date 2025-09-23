@@ -1785,10 +1785,10 @@ void readcurrent7() // C7 - NK1
   }
   // Blynk.virtualWrite(V32, Irms7);  // Irms7 - NK1
 }
-void readcurrent8() // C8 - NK2
+void readcurrent8() // C9 - NK2
 {
   // Blynk.run();
-  digitalWrite(S0, LOW);
+  digitalWrite(S0, HIGH);
   digitalWrite(S1, LOW);
   digitalWrite(S2, LOW);
   digitalWrite(S3, HIGH);

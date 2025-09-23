@@ -41,7 +41,7 @@ ModbusRTU mb;
 #include <ESP8266httpUpdate.h>
 #include <UrlEncode.h>
 #include <WiFiClientSecure.h>
-#define URL_fw_Bin "https://raw.githubusercontent.com/quangtran3110/PlatformIO/refs/heads/main/Tram_So_3%20_VFD/.pio/build/nodemcuv2/firmware.bin"
+#define URL_fw_Bin "https://raw.githubusercontent.com/quangtran3110/PlatformIO/refs/heads/main/Tram_So_3_VFD/.pio/build/nodemcuv2/firmware.bin"
 String server_main = "http://sgp1.blynk.cloud/external/api/";
 WiFiClient client;
 HTTPClient http;
