@@ -69,7 +69,7 @@
 #define VOLUME_TOKEN_G2 "Hc5DgCBzl4Oi5hW_JOaNZ6oBKoGy5kFI"
 #define VOLUME_TOKEN_G3 "JTnEpJjGVVJ8DM1aJx7zZT4cyNYJrhr_"
 
-#define BLYNK_FIRMWARE_VERSION "250922"
+#define BLYNK_FIRMWARE_VERSION "250923"
 #define BLYNK_PRINT Serial
 #define APP_DEBUG
 
@@ -1793,10 +1793,10 @@ void readcurrent8() // C9 - NK2
   digitalWrite(S2, LOW);
   digitalWrite(S3, HIGH);
   float rms8 = emon8.calcIrms(740);
-  if (rms8 < 1) {
+  if (rms8 < 2) {
     Irms8 = 0;
     yIrms8 = 0;
-  } else if (rms8 >= 1) {
+  } else if (rms8 >= 2) {
     Irms8 = rms8;
     yIrms8 = yIrms8 + 1;
     if ((yIrms8 > 2) && ((Irms8 >= data.SetAmpe8max) || (Irms8 < data.SetAmpe8min))) {
