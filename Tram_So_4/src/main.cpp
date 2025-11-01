@@ -155,6 +155,8 @@ byte status_b1 = LOW, status_b2 = LOW, status_g1 = LOW;
 int G1_start, B1_start, B2_start;
 bool G1_save = false, B1_save = false, B2_save = false;
 //-------------------
+int startup_cycles = 5; // Bỏ qua 5 chu kỳ đọc đầu tiên để cảm biến ổn định
+//-------------------
 int dai = 800;
 int rong = 800;
 int dosau = 330;
@@ -432,7 +434,6 @@ void offcap1() {
 void onbom1() {
   if (status_b1 != HIGH) {
     status_b1 = HIGH;
-    Serial.println("BOM 1 ON");
     Blynk.virtualWrite(V0, status_b1);
     pcf8575_1.digitalWrite(pin_B1, !status_b1);
   }
@@ -488,6 +489,11 @@ void readPower() // C2 - Giếng    - I0
   } else {
     // Nếu động cơ đang tắt, đo nhanh để kiểm tra
     rms0 = emon0.calcIrms(200);
+  }
+
+  // Nếu đang trong chu kỳ khởi động, chỉ đọc để ổn định và thoát.
+  if (startup_cycles > 0) {
+    return;
   }
 
   if (rms0 < 2) {
@@ -560,6 +566,11 @@ void readPower1() // C3 - Bơm 1    - I1
     rms1 = emon1.calcIrms(200);
   }
 
+  // Nếu đang trong chu kỳ khởi động, chỉ đọc để ổn định và thoát.
+  if (startup_cycles > 0) {
+    return;
+  }
+
   if (rms1 < 2) {
     Irms1 = 0;
     yIrms1 = 0;
@@ -628,6 +639,11 @@ void readPower2() // C4 - Bơm 2    - I2
   } else {
     // Nếu động cơ đang tắt, đo nhanh để kiểm tra
     rms2 = emon2.calcIrms(200);
+  }
+
+  // Nếu đang trong chu kỳ khởi động, chỉ đọc để ổn định và thoát.
+  if (startup_cycles > 0) {
+    return;
   }
 
   if (rms2 < 2) {
@@ -700,6 +716,11 @@ void readPower3() // C5 - Nén khí  - I3
     rms3 = emon3.calcIrms(200);
   }
 
+  // Nếu đang trong chu kỳ khởi động, chỉ đọc để ổn định và thoát.
+  if (startup_cycles > 0) {
+    return;
+  }
+
   if (rms3 < 1) {
     Irms3 = 0;
     yIrms3 = 0;
@@ -736,6 +757,11 @@ void readPower4() // C6 - Van điện - I4
   } else {
     // Nếu không có lệnh, đo nhanh
     rms4 = emon4.calcIrms(200);
+  }
+
+  // Nếu đang trong chu kỳ khởi động, chỉ đọc để ổn định và thoát.
+  if (startup_cycles > 0) {
+    return;
   }
 
   if (rms4 < 1) {
@@ -1588,13 +1614,19 @@ void setup() {
 
   timer.setTimeout(5000L, []() {
     timer_1 = timer.setInterval(1103L, []() {
+      if (startup_cycles > 0) {
+        Serial.printf("Startup stabilization... %d cycles left.\n", startup_cycles);
+        startup_cycles--; // Giảm biến đếm
+      }
+      // Luôn gọi các hàm đọc. Logic bên trong hàm sẽ quyết định có xử lý kết quả hay không.
       readPower();
       readPower1();
       readPower2();
       readPower3();
       readPower4();
-      //temperature();
-      up();
+      up(); // Luôn gọi hàm up(), các giá trị sẽ là 0 trong giai đoạn khởi động
+
+
     });
     timer_5 = timer.setInterval(15006L, []() {
       rtctime();
