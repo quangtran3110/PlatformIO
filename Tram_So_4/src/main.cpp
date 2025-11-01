@@ -71,7 +71,7 @@
 #define BLYNK_AUTH_TOKEN "ra1gZtR0irrwiTH1L-L_nhXI6TMRH7M9"
 #define VOLUME_TOKEN "RyDZuYiRC4oaG5MsFI2kw4WsQpKiw2Ko"
 
-#define BLYNK_FIRMWARE_VERSION "251101"
+#define BLYNK_FIRMWARE_VERSION "251102"
 
 const char *ssid = "tram bom so 4";
 const char *password = "0943950555";
@@ -151,7 +151,7 @@ int time_cycle, timer_cycle;
 int LLG1_1m3, reboot_num;
 int time_run_nenkhi = 5 * 60;
 int time_stop_nenkhi = 10 * 60;
-byte status_b1 = 0, status_b2 = 0, status_g1 = 0, stastus_read_current = false;
+byte status_b1 = LOW, status_b2 = LOW, status_g1 = LOW;
 int G1_start, B1_start, B2_start;
 bool G1_save = false, B1_save = false, B2_save = false;
 //-------------------
@@ -743,7 +743,7 @@ void readPower4() // C6 - Van điện - I4
     yIrms4 = yIrms4 + 1;
     if ((yIrms4 > 3) && ((Irms4 >= data.SetAmpe4max && data.SetAmpe4max > 0) || (Irms4 <= data.SetAmpe4min && data.SetAmpe4min > 0))) {
       xSetAmpe4 = xSetAmpe4 + 1;
-      if ((xSetAmpe4 >= 2) && (keyp)) {
+      if ((xSetAmpe4 >= 3) && (keyp)) {
         data.flags.statusRualoc = LOW;
         savedata();
         pcf8575_1.digitalWrite(pin_Vandien, !data.flags.statusRualoc);
@@ -1580,10 +1580,6 @@ void setup() {
   pcf8575_1.digitalWrite(pin_P3, HIGH);
 
   timer.setTimeout(5000L, []() {
-    timer_2 = timer.setInterval(250L, []() { // Tăng tần suất đọc cảm biến
-      readPressure();
-      readWaterLevel();
-    });
     timer_1 = timer.setInterval(1103L, []() {
       readPower();
       readPower1();
@@ -1602,6 +1598,10 @@ void setup() {
     });
     timer.setInterval(long(((time_run_nenkhi + time_stop_nenkhi) * 1000) + 500), rualoc);
     terminal.clear(); });
+  timer.setTimeout(10000L, []() { timer.setInterval(250L, []() { // Tăng tần suất đọc cảm biến
+                                    readPressure();
+                                    readWaterLevel();
+                                  }); });
 }
 void loop() {
   ESP.wdtFeed();
