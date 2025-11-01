@@ -71,7 +71,7 @@
 #define BLYNK_AUTH_TOKEN "ra1gZtR0irrwiTH1L-L_nhXI6TMRH7M9"
 #define VOLUME_TOKEN "RyDZuYiRC4oaG5MsFI2kw4WsQpKiw2Ko"
 
-#define BLYNK_FIRMWARE_VERSION "251101"
+#define BLYNK_FIRMWARE_VERSION "251102"
 
 const char *ssid = "tram bom so 4";
 const char *password = "0943950555";
@@ -479,14 +479,25 @@ void readPower() // C2 - Giếng    - I0
   pcf8575_1.digitalWrite(S1pin, HIGH);
   pcf8575_1.digitalWrite(S2pin, LOW);
   pcf8575_1.digitalWrite(S3pin, LOW);
-  float rms0 = emon0.calcIrms(1480);
+
+  float rms0;
+  if (status_g1 == HIGH) {
+    // Nếu có lệnh bật động cơ, đo chi tiết luôn
+    rms0 = emon0.calcIrms(1480);
+  } else {
+    // Nếu động cơ đang tắt, đo nhanh để kiểm tra
+    rms0 = emon0.calcIrms(200);
+  }
+
   if (rms0 < 2) {
     Irms0 = 0;
     yIrms0 = 0;
-    xIrms0++;
-    if (xIrms0 > 3) {
-      if ((status_g1 == HIGH) && (keyp) && (volume1 < 170)) {
-        offcap1();
+    if (status_g1 == HIGH) {
+      // Nếu có lệnh BẬT nhưng không có dòng, bắt đầu đếm lỗi
+      xIrms0++;
+      if (xIrms0 > 3) {
+        // Lệnh đang là BẬT nhưng không đo được dòng điện -> Động cơ lỗi không chạy
+        offcap1(); // Hàm này đã bao gồm việc đặt status_g1 = LOW
         trip0 = true;
         if (data.flags.key_noti)
           Blynk.logEvent("error", String("Bơm GIẾNG lỗi không đo được DÒNG ĐIỆN!"));
@@ -501,6 +512,11 @@ void readPower() // C2 - Giếng    - I0
     Irms0 = rms0;
     yIrms0 = yIrms0 + 1;
     xIrms0 = 0;
+    if (status_g1 == LOW) {
+      // Lệnh đang là TẮT nhưng vẫn đo được dòng điện -> Contactor kẹt?
+      status_g1 = HIGH; // Cập nhật trạng thái để logic bảo vệ hoạt động
+      Blynk.virtualWrite(V2, status_g1);
+    }
     if (yIrms0 > 3) {
       if (G1_start >= 0) {
         if (G1_start == 0)
@@ -510,7 +526,7 @@ void readPower() // C2 - Giếng    - I0
         } else
           G1_save = false;
       }
-      if ((Irms0 >= data.SetAmpemax) || (Irms0 <= data.SetAmpemin)) {
+      if ((Irms0 >= data.SetAmpemax) || (Irms0 <= data.SetAmpemin && data.SetAmpemin > 0)) {
         xSetAmpe = xSetAmpe + 1;
         if ((xSetAmpe >= 4) && (keyp)) {
           offcap1();
@@ -531,14 +547,25 @@ void readPower1() // C3 - Bơm 1    - I1
   pcf8575_1.digitalWrite(S1pin, HIGH);
   pcf8575_1.digitalWrite(S2pin, LOW);
   pcf8575_1.digitalWrite(S3pin, LOW);
-  float rms1 = emon1.calcIrms(1480);
+
+  float rms1;
+  if (status_b1 == HIGH) {
+    // Nếu có lệnh bật động cơ, đo chi tiết luôn
+    rms1 = emon1.calcIrms(1480);
+  } else {
+    // Nếu động cơ đang tắt, đo nhanh để kiểm tra
+    rms1 = emon1.calcIrms(200);
+  }
+
   if (rms1 < 2) {
     Irms1 = 0;
     yIrms1 = 0;
-    xIrms1++;
-    if (xIrms1 > 3) {
-      if ((status_b1 == HIGH) && (keyp)) {
-        offbom1();
+    if (status_b1 == HIGH) {
+      // Nếu có lệnh BẬT nhưng không có dòng, bắt đầu đếm lỗi
+      xIrms1++;
+      if (xIrms1 > 3) {
+        // Lệnh đang là BẬT nhưng không đo được dòng điện -> Động cơ lỗi không chạy
+        offbom1(); // Hàm này đã bao gồm việc đặt status_b1 = LOW
         trip1 = true;
         if (data.flags.key_noti)
           Blynk.logEvent("error", String("Bơm 1 lỗi không đo được DÒNG ĐIỆN!"));
@@ -553,6 +580,11 @@ void readPower1() // C3 - Bơm 1    - I1
     Irms1 = rms1;
     yIrms1 = yIrms1 + 1;
     xIrms1 = 0;
+    if (status_b1 == LOW) {
+      // Lệnh đang là TẮT nhưng vẫn đo được dòng điện -> Contactor kẹt?
+      status_b1 = HIGH; // Cập nhật trạng thái để logic bảo vệ hoạt động
+      Blynk.virtualWrite(V0, status_b1);
+    }
     if (yIrms1 > 3) {
       if (B1_start >= 0) {
         if (B1_start == 0)
@@ -562,7 +594,7 @@ void readPower1() // C3 - Bơm 1    - I1
         } else
           B1_save = false;
       }
-      if ((Irms1 >= data.SetAmpe1max) || (Irms1 <= data.SetAmpe1min)) {
+      if ((Irms1 >= data.SetAmpe1max) || (Irms1 <= data.SetAmpe1min && data.SetAmpe1min > 0)) {
         xSetAmpe1 = xSetAmpe1 + 1;
         if ((xSetAmpe1 >= 2) && (keyp)) {
           offbom1();
@@ -583,14 +615,25 @@ void readPower2() // C4 - Bơm 2    - I2
   pcf8575_1.digitalWrite(S1pin, LOW);
   pcf8575_1.digitalWrite(S2pin, HIGH);
   pcf8575_1.digitalWrite(S3pin, LOW);
-  float rms2 = emon2.calcIrms(1480);
+
+  float rms2;
+  if (status_b2 == HIGH) {
+    // Nếu có lệnh bật động cơ, đo chi tiết luôn
+    rms2 = emon2.calcIrms(1480);
+  } else {
+    // Nếu động cơ đang tắt, đo nhanh để kiểm tra
+    rms2 = emon2.calcIrms(200);
+  }
+
   if (rms2 < 2) {
     Irms2 = 0;
     yIrms2 = 0;
-    xIrms2++;
-    if ((xIrms2 > 3) && (keyp)) {
-      if (status_b2 == HIGH) {
-        offbom2();
+    if (status_b2 == HIGH) {
+      // Nếu có lệnh BẬT nhưng không có dòng, bắt đầu đếm lỗi
+      xIrms2++;
+      if (xIrms2 > 3) {
+        // Lệnh đang là BẬT nhưng không đo được dòng điện -> Động cơ lỗi không chạy
+        offbom2(); // Hàm này đã bao gồm việc đặt status_b2 = LOW
         trip2 = true;
         if (data.flags.key_noti)
           Blynk.logEvent("error", String("Bơm 2 lỗi không đo được DÒNG ĐIỆN!"));
@@ -605,6 +648,11 @@ void readPower2() // C4 - Bơm 2    - I2
     Irms2 = rms2;
     yIrms2 = yIrms2 + 1;
     xIrms2 = 0;
+    if (status_b2 == LOW) {
+      // Lệnh đang là TẮT nhưng vẫn đo được dòng điện -> Contactor kẹt?
+      status_b2 = HIGH; // Cập nhật trạng thái để logic bảo vệ hoạt động
+      Blynk.virtualWrite(V1, status_b2);
+    }
     if (yIrms2 > 3) {
       if (B2_start >= 0) {
         if (B2_start == 0)
@@ -614,7 +662,7 @@ void readPower2() // C4 - Bơm 2    - I2
         } else
           B2_save = false;
       }
-      if ((Irms2 >= data.SetAmpe2max) || (Irms2 <= data.SetAmpe2min)) {
+      if ((Irms2 >= data.SetAmpe2max) || (Irms2 <= data.SetAmpe2min && data.SetAmpe2min > 0)) {
         xSetAmpe2 = xSetAmpe2 + 1;
         if ((xSetAmpe2 >= 2) && (keyp)) {
           offbom2();
@@ -634,16 +682,27 @@ void readPower3() // C5 - Nén khí  - I3
   pcf8575_1.digitalWrite(S1pin, LOW);
   pcf8575_1.digitalWrite(S2pin, HIGH);
   pcf8575_1.digitalWrite(S3pin, LOW);
-  float rms3 = emon3.calcIrms(740);
+
+  float rms3;
+  // Nén khí chạy chung nguồn với Bơm Giếng, nên dựa vào status_g1
+  if (status_g1 == HIGH) {
+    // Nếu bơm giếng đang chạy, đo chi tiết cho nén khí
+    rms3 = emon3.calcIrms(740);
+  } else {
+    // Nếu bơm giếng tắt, đo nhanh
+    rms3 = emon3.calcIrms(200);
+  }
+
   if (rms3 < 1) {
     Irms3 = 0;
     yIrms3 = 0;
   } else if (rms3 >= 1) {
     Irms3 = rms3;
     yIrms3 = yIrms3 + 1;
-    if ((yIrms3 > 3) && ((Irms3 >= data.SetAmpe3max) || (Irms3 <= data.SetAmpe3min))) {
+    if ((yIrms3 > 3) && ((Irms3 >= data.SetAmpe3max && data.SetAmpe3max > 0) || (Irms3 <= data.SetAmpe3min && data.SetAmpe3min > 0))) {
       xSetAmpe3 = xSetAmpe3 + 1;
       if ((xSetAmpe3 >= 3) && (keyp)) {
+        // Lỗi nén khí -> Tắt nguồn chung (Bơm Giếng)
         offcap1();
         trip3 = true;
         xSetAmpe3 = 0;
@@ -654,7 +713,6 @@ void readPower3() // C5 - Nén khí  - I3
       xSetAmpe3 = 0;
     }
   }
-  // Blynk.virtualWrite(V30, Irms3);
 }
 void readPower4() // C6 - Van điện - I4
 {
@@ -662,14 +720,28 @@ void readPower4() // C6 - Van điện - I4
   pcf8575_1.digitalWrite(S1pin, HIGH);
   pcf8575_1.digitalWrite(S2pin, HIGH);
   pcf8575_1.digitalWrite(S3pin, LOW);
-  float rms4 = emon4.calcIrms(740);
+
+  float rms4;
+  // Van điện được điều khiển bởi `data.flags.statusRualoc`
+  if (data.flags.statusRualoc == HIGH) {
+    // Nếu có lệnh bật van, đo chi tiết
+    rms4 = emon4.calcIrms(740);
+  } else {
+    // Nếu không có lệnh, đo nhanh
+    rms4 = emon4.calcIrms(200);
+  }
+
   if (rms4 < 1) {
     Irms4 = 0;
     yIrms4 = 0;
+    if (data.flags.statusRualoc == HIGH) {
+      // Có lệnh bật nhưng không có dòng -> Lỗi?
+      // Có thể thêm logic đếm lỗi và cảnh báo ở đây nếu cần
+    }
   } else if (rms4 >= 1) {
     Irms4 = rms4;
     yIrms4 = yIrms4 + 1;
-    if ((yIrms4 > 3) && ((Irms4 >= data.SetAmpe4max) || (Irms4 <= data.SetAmpe4min))) {
+    if ((yIrms4 > 3) && ((Irms4 >= data.SetAmpe4max && data.SetAmpe4max > 0) || (Irms4 <= data.SetAmpe4min && data.SetAmpe4min > 0))) {
       xSetAmpe4 = xSetAmpe4 + 1;
       if ((xSetAmpe4 >= 2) && (keyp)) {
         data.flags.statusRualoc = LOW;
@@ -684,7 +756,6 @@ void readPower4() // C6 - Van điện - I4
       xSetAmpe4 = 0;
     }
   }
-  // Blynk.virtualWrite(V25, Irms4);
 }
 void temperature() { // Nhiệt độ
   sensors.requestTemperatures();
@@ -1016,13 +1087,13 @@ BLYNK_WRITE(V5) // Chon máy cài đặt bảo vệ
     Blynk.virtualWrite(V7, data.SetAmpe2max);
     break;
   }
-  case 3: { // Clo
+  case 3: { // NK
     c = 3;
     Blynk.virtualWrite(V6, data.SetAmpe3min);
     Blynk.virtualWrite(V7, data.SetAmpe3max);
     break;
   }
-  case 4: { // NK
+  case 4: { // Van điện
     c = 4;
     Blynk.virtualWrite(V6, data.SetAmpe4min);
     Blynk.virtualWrite(V7, data.SetAmpe4max);
