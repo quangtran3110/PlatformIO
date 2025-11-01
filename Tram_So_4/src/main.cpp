@@ -574,6 +574,8 @@ void readPower1() // C3 - Bơm 1    - I1
 
   // Nếu đang trong chu kỳ khởi động, chỉ đọc để ổn định và thoát.
   if (startup_cycles > 0) {
+    xIrms1 = 0;
+    yIrms1 = 0;
     return;
   }
 
@@ -583,7 +585,7 @@ void readPower1() // C3 - Bơm 1    - I1
     if (status_b1 == HIGH) {
       // Nếu có lệnh BẬT nhưng không có dòng, bắt đầu đếm lỗi
       xIrms1++;
-      if (xIrms1 > 6) {
+      if (xIrms1 > 3) {
         // Lệnh đang là BẬT nhưng không đo được dòng điện -> Động cơ lỗi không chạy
         offbom1(); // Hàm này đã bao gồm việc đặt status_b1 = LOW
         trip1 = true;
@@ -656,7 +658,7 @@ void readPower2() // C4 - Bơm 2    - I2
     if (status_b2 == HIGH) {
       // Nếu có lệnh BẬT nhưng không có dòng, bắt đầu đếm lỗi
       xIrms2++;
-      if (xIrms2 > 6) {
+      if (xIrms2 > 3) {
         // Lệnh đang là BẬT nhưng không đo được dòng điện -> Động cơ lỗi không chạy
         offbom2(); // Hàm này đã bao gồm việc đặt status_b2 = LOW
         trip2 = true;
