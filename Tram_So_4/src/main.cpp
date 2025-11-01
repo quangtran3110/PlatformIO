@@ -71,7 +71,7 @@
 #define BLYNK_AUTH_TOKEN "ra1gZtR0irrwiTH1L-L_nhXI6TMRH7M9"
 #define VOLUME_TOKEN "RyDZuYiRC4oaG5MsFI2kw4WsQpKiw2Ko"
 
-#define BLYNK_FIRMWARE_VERSION "251101"
+#define BLYNK_FIRMWARE_VERSION "251103"
 
 const char *ssid = "tram bom so 4";
 const char *password = "0943950555";
@@ -436,7 +436,6 @@ void onbom1() {
     status_b1 = HIGH;
     Blynk.virtualWrite(V0, status_b1);
     pcf8575_1.digitalWrite(pin_B1, !status_b1);
-    status_b1 = LOW;
   }
 }
 void offbom1() {
@@ -584,7 +583,7 @@ void readPower1() // C3 - Bơm 1    - I1
     if (status_b1 == HIGH) {
       // Nếu có lệnh BẬT nhưng không có dòng, bắt đầu đếm lỗi
       xIrms1++;
-      if (xIrms1 > 3) {
+      if (xIrms1 > 100) {
         // Lệnh đang là BẬT nhưng không đo được dòng điện -> Động cơ lỗi không chạy
         offbom1(); // Hàm này đã bao gồm việc đặt status_b1 = LOW
         trip1 = true;
