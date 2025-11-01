@@ -71,7 +71,7 @@
 #define BLYNK_AUTH_TOKEN "ra1gZtR0irrwiTH1L-L_nhXI6TMRH7M9"
 #define VOLUME_TOKEN "RyDZuYiRC4oaG5MsFI2kw4WsQpKiw2Ko"
 
-#define BLYNK_FIRMWARE_VERSION "251101"
+#define BLYNK_FIRMWARE_VERSION "251102"
 
 const char *ssid = "tram bom so 4";
 const char *password = "0943950555";
@@ -1080,6 +1080,7 @@ BLYNK_WRITE(V10) // String
                        "update    : Cap nhat firmware (OTA)\n"
                        "pre_0     : Hieu chuan diem 0 bar (ap suat)\n"
                        "pre_X.X   : Hieu chuan tai ap suat X.X bar\n"
+                       "i2c       : Quet cac thiet bi I2C\n"
                        "level_0   : Hieu chuan muc nuoc 0 cm\n"
                        "level_YYY : Hieu chuan tai muc nuoc YYY cm\n");
   } else if (dataS == "M") {
@@ -1126,6 +1127,30 @@ BLYNK_WRITE(V10) // String
     Blynk.virtualWrite(V10, "UPDATE FIRMWARE...");
     update_fw();
   } else if (dataS == "clr") {
+    terminal.clear();
+  } else if (dataS == "i2c") {
+    terminal.clear();
+    byte error, address;
+    int nDevices;
+    terminal.println("Scanning for I2C devices...");
+    nDevices = 0;
+    for (address = 1; address < 127; address++) {
+      Wire.beginTransmission(address);
+      error = Wire.endTransmission();
+      if (error == 0) {
+        terminal.print("I2C device found at address 0x");
+        if (address < 16) {
+          terminal.print("0");
+        }
+        terminal.println(address, HEX);
+        nDevices++;
+      } else if (error == 4) {
+        terminal.print("Unknown error at address 0x");
+        terminal.println(address, HEX);
+      }
+    }
+    if (nDevices == 0)
+      terminal.println("No I2C devices found.");
     terminal.clear();
   } else {
     bool handled = false;
