@@ -503,11 +503,19 @@ void readPower() // C2 - Giếng    - I0
       // Nếu có lệnh BẬT nhưng không có dòng, bắt đầu đếm lỗi
       xIrms0++;
       if (xIrms0 > 3) {
-        // Lệnh đang là BẬT nhưng không đo được dòng điện -> Động cơ lỗi không chạy
-        offcap1(); // Hàm này đã bao gồm việc đặt status_g1 = LOW
-        trip0 = true;
-        if (data.flags.key_noti)
-          Blynk.logEvent("error", String("Bơm GIẾNG lỗi không đo được DÒNG ĐIỆN!"));
+        // Kiểm tra xem có phải do bể đầy nên phao ngắt bơm không
+        if (smoothDistance >= (dosau - 30)) {
+          // Bể đầy, phao đã ngắt bơm. Đây là hoạt động bình thường.
+          // Chỉ cần cập nhật lại trạng thái, không báo lỗi.
+          offcap1();  // Cập nhật status_g1 = LOW và trạng thái trên app
+          xIrms0 = 0; // Reset bộ đếm lỗi
+        } else {
+          // Bể chưa đầy nhưng bơm không chạy -> Đây mới là lỗi thực sự.
+          offcap1(); // Tắt bơm (cập nhật status_g1 = LOW)
+          trip0 = true;
+          if (data.flags.key_noti)
+            Blynk.logEvent("error", String("Bơm GIẾNG lỗi không đo được DÒNG ĐIỆN!"));
+        }
       }
     }
     if (G1_start != 0) {
@@ -524,8 +532,6 @@ void readPower() // C2 - Giếng    - I0
         // Lệnh đang là TẮT nhưng vẫn đo được dòng điện ổn định -> Contactor kẹt?
         status_g1 = HIGH; // Cập nhật trạng thái để logic bảo vệ hoạt động
         Blynk.virtualWrite(V2, status_g1);
-        if (data.flags.key_noti)
-          Blynk.logEvent("warning", String("Bơm GIẾNG chạy ngoài ý muốn!"));
       }
       if (G1_start >= 0) {
         if (G1_start == 0)
@@ -599,8 +605,6 @@ void readPower1() // C3 - Bơm 1    - I1
         // Lệnh đang là TẮT nhưng vẫn đo được dòng điện ổn định -> Contactor kẹt?
         status_b1 = HIGH; // Cập nhật trạng thái để logic bảo vệ hoạt động
         Blynk.virtualWrite(V0, status_b1);
-        if (data.flags.key_noti)
-          Blynk.logEvent("warning", String("Bơm 1 chạy ngoài ý muốn!"));
       }
       if (B1_start >= 0) {
         if (B1_start == 0)
@@ -674,8 +678,6 @@ void readPower2() // C4 - Bơm 2    - I2
         // Lệnh đang là TẮT nhưng vẫn đo được dòng điện ổn định -> Contactor kẹt?
         status_b2 = HIGH; // Cập nhật trạng thái để logic bảo vệ hoạt động
         Blynk.virtualWrite(V1, status_b2);
-        if (data.flags.key_noti)
-          Blynk.logEvent("warning", String("Bơm 2 chạy ngoài ý muốn!"));
       }
       if (B2_start >= 0) {
         if (B2_start == 0)
