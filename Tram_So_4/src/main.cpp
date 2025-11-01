@@ -436,6 +436,7 @@ void onbom1() {
     status_b1 = HIGH;
     Blynk.virtualWrite(V0, status_b1);
     pcf8575_1.digitalWrite(pin_B1, !status_b1);
+    status_b1 = LOW;
   }
 }
 void offbom1() {
@@ -574,8 +575,6 @@ void readPower1() // C3 - Bơm 1    - I1
 
   // Nếu đang trong chu kỳ khởi động, chỉ đọc để ổn định và thoát.
   if (startup_cycles > 0) {
-    xIrms1 = 0;
-    yIrms1 = 0;
     return;
   }
 
