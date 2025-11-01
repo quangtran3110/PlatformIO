@@ -105,7 +105,7 @@ static Eeprom24C32_64 eeprom(EEPROM_ADDRESS);
 #include <WiFiClientSecure.h>
 WiFiClient client;
 HTTPClient http;
-#define URL_fw_Bin "https://raw.githubusercontent.com/quangtran3110/PlatformIO/main/CN_MocHoa/Tram3BPT/.pio/build/nodemcuv2/firmware.bin"
+#define URL_fw_Bin "https://raw.githubusercontent.com/quangtran3110/PlatformIO/refs/heads/main/CN_MocHoa/Tram3BPT/.pio/build/nodemcuv2/firmware.bin"
 String server_name = "http://sgp1.blynk.cloud/external/api/";
 //--------------
 #define filterSamples 121
@@ -428,6 +428,36 @@ void syncstatus() {
   Blynk.virtualWrite(V4, data.mode_cap2);
   Blynk.virtualWrite(V2, status_g1);
   Blynk.virtualWrite(V3, status_g2);
+}
+void i2c_scaner() {
+  byte error, address;
+  int nDevices;
+  String stringOne;
+
+  nDevices = 0;
+  for (address = 1; address < 127; address++) {
+    // The i2c_scanner uses the return value of
+    // the Write.endTransmisstion to see if
+    // a device did acknowledge to the address.
+    Wire.beginTransmission(address);
+    error = Wire.endTransmission();
+
+    if (error == 0) {
+      stringOne = String(address, HEX);
+      if (address < 16)
+        Blynk.virtualWrite(V10, "I2C device found at address 0x0", stringOne, " !\n");
+      Blynk.virtualWrite(V10, "I2C device found at address 0x", stringOne, " !\n");
+      nDevices++;
+    } else if (error == 4) {
+      stringOne = String(address, HEX);
+
+      if (address < 16)
+        Blynk.virtualWrite(V10, "Unknown error at address 0x0", stringOne, " !\n");
+      Blynk.virtualWrite(V10, "I2C device found at address 0x", stringOne, " !\n");
+    }
+  }
+  if (nDevices == 0)
+    Blynk.virtualWrite(V10, "No I2C devices found\n");
 }
 //-------------------------------------------------------------------
 //-------------------------------------------------------------------
@@ -960,6 +990,8 @@ BLYNK_WRITE(V10) // String
     terminal.clear();
     Blynk.virtualWrite(V10, "UPDATE FIRMWARE...");
     update_fw();
+  } else if (dataS == "i2c") {
+    i2c_scaner();
   } else {
     Blynk.virtualWrite(V10, "Mật mã sai.\nVui lòng nhập lại!\n");
   }

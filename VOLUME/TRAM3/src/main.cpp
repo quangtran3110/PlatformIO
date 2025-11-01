@@ -2,7 +2,7 @@
 #define BLYNK_TEMPLATE_NAME "VOLUME"
 #define BLYNK_AUTH_TOKEN "eBeqi9ZJhRK3r66cUzgdD1gp2xGxG7kS"
 
-#define BLYNK_FIRMWARE_VERSION "250920"
+#define BLYNK_FIRMWARE_VERSION "251006"
 #define BLYNK_PRINT Serial
 #define APP_DEBUG
 
@@ -28,8 +28,8 @@ const char *password = "0723841249";
 WiFiClient client;
 HTTPClient http;
 String server_name = "http://sgp1.blynk.cloud/external/api/";
-String Main_TOKEN = "BDm1LNQi_LhtaKAQU8RWUaGbiOyKIcd3";
-#define URL_fw_Bin "https://raw.githubusercontent.com/quangtran3110/PlatformIO/main/VOLUME/TRAM3/.pio/build/nodemcuv2/firmware.bin"
+String Main_TOKEN = "eXmsWQOmDdHaBMALIxHJqhbJXtzg8Gw1";
+#define URL_fw_Bin "https://raw.githubusercontent.com/quangtran3110/PlatformIO/refs/heads/main/VOLUME/TRAM3/.pio/build/nodemcuv2/firmware.bin"
 
 String LL24h = "&V24=";
 String LL1m3 = "&V23=";

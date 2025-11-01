@@ -124,6 +124,9 @@ const int pin_off_Bom4 = P15;
 #include <ESP8266httpUpdate.h>
 #include <WiFiClientSecure.h>
 WiFiClient client;
+#include <SimpleKalmanFilter.h>
+// Bạn cần "tune" 3 giá trị này để có kết quả tốt nhất. Hãy bắt đầu với các giá trị này.
+SimpleKalmanFilter levelKalmanFilter(2, 2, 0.01);
 HTTPClient http;
 String Tram2_Rualoc = "f_mIttU4MH80_pakaBYWjXq1cOWpqqYg";
 String server_name = "http://sgp1.blynk.cloud/external/api/";
@@ -136,49 +139,28 @@ const int S3 = 15;
 //----------------------------------
 const int dai = 2000;
 const int rong = 1000;
-const int dosau = 515;
-#define filterSamples 121
-int zeropointTank = 199, fullpointTank = 936;
-int volume, volume1, dungtich, smoothDistance;
-long distance, distance1;
-int sensSmoothArray1[filterSamples];
-int digitalSmooth(int rawIn, int *sensSmoothArray) {
-  int j, k, temp, top, bottom;
-  long total;
-  static int i;
-  static int sorted[filterSamples];
-  boolean done;
+const int dosau = 515; // Chiều cao tối đa của bể (cm)
+int volume, volume1, dungtich;
+float smoothDistance; // Thay int bằng float để có độ chính xác cao hơn
 
-  i = (i + 1) % filterSamples; // increment counter and roll over if necc. -  % (modulo operator) rolls over variable
-  sensSmoothArray[i] = rawIn;  // input new data into the oldest slot
+// --- BỘ LỌC KẾT HỢP: MEDIAN + KALMAN ---
+const int MEDIAN_WINDOW_SIZE = 5;
+int median_buffer[MEDIAN_WINDOW_SIZE];
+int median_buffer_index = 0;
+float kalman_filtered_adc_value = 0; // Biến lưu giá trị ADC đã lọc, dùng cho hiệu chuẩn
 
-  // Serial.print("raw = ");
-
-  for (j = 0; j < filterSamples; j++) { // transfer data array into anther array for sorting and averaging
-    sorted[j] = sensSmoothArray[j];
-  }
-
-  done = 0;           // flag to know when we're done sorting
-  while (done != 1) { // simple swap sort, sorts numbers from lowest to highest
-    done = 1;
-    for (j = 0; j < (filterSamples - 1); j++) {
-      if (sorted[j] > sorted[j + 1]) { // numbers are out of order - swap
-        temp = sorted[j + 1];
-        sorted[j + 1] = sorted[j];
-        sorted[j] = temp;
-        done = 0;
-      }
+// Hàm sắp xếp và lấy trung vị
+int getMedian(int arr[], int size) {
+  for (int i = 1; i < size; i++) {
+    int key = arr[i];
+    int j = i - 1;
+    while (j >= 0 && arr[j] > key) {
+      arr[j + 1] = arr[j];
+      j = j - 1;
     }
+    arr[j + 1] = key;
   }
-  bottom = max(((filterSamples * 20) / 100), 1);
-  top = min((((filterSamples * 80) / 100) + 1), (filterSamples - 1)); // the + 1 is to make up for asymmetry caused by integer rounding
-  k = 0;
-  total = 0;
-  for (j = bottom; j < top; j++) {
-    total += sorted[j]; // total remaining indices
-    k++;
-  }
-  return total / k; // divide by number of samples
+  return arr[size / 2];
 }
 //----------------------------------
 bool keySwitchQ = false, keySwitchD = false, keySwitchP = false, keySet = false, data12 = true, data13 = true, keyPRE2 = true, keyPRE4 = true, noti = true;
@@ -220,8 +202,41 @@ struct Data {
   byte reset_day;
   int timerun_G1, timerun_G2, timerun_G3, timerun_B1, timerun_B2, timerun_B3, timerun_B4;
   byte key_noti;
+  // Thêm các trường hiệu chuẩn cho cảm biến mực nước
+  uint16_t level_cal_offset_x100; // Giá trị đọc được ở điểm 0 (ADC * 100).
+  uint16_t level_cal_gain_x1000;  // Hệ số khuếch đại (gain * 1000).
 } data, dataCheck;
-const struct Data dataDefault = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+const struct Data dataDefault = {};
+
+// Cấu trúc để lưu trạng thái trước đó của các biến, tối ưu việc gửi dữ liệu
+struct PrevState {
+  float Irms0 = -1.0, Irms1 = -1.0, Irms2 = -1.0, Irms3 = -1.0, Irms4 = -1.0, Irms5 = -1.0, Irms6 = -1.0, Irms7 = -1.0, Irms8 = -1.0;
+  float smoothDistance = -1.0;
+  int volume1 = -1;
+  float timerun_G1 = -1.0, timerun_G2 = -1.0, timerun_G3 = -1.0;
+  float timerun_B1 = -1.0, timerun_B2 = -1.0, timerun_B3 = -1.0, timerun_B4 = -1.0;
+
+  // Timestamps cho việc cập nhật bắt buộc
+  unsigned long Irms0_ts = 0, Irms1_ts = 0, Irms2_ts = 0, Irms3_ts = 0, Irms4_ts = 0, Irms5_ts = 0, Irms6_ts = 0, Irms7_ts = 0, Irms8_ts = 0;
+  unsigned long smoothDistance_ts = 0;
+  unsigned long volume1_ts = 0;
+  unsigned long timerun_G1_ts = 0, timerun_G2_ts = 0, timerun_G3_ts = 0;
+  unsigned long timerun_B1_ts = 0, timerun_B2_ts = 0, timerun_B3_ts = 0, timerun_B4_ts = 0;
+} prevState;
+
+// Macro để đơn giản hóa việc kiểm tra và thêm tham số
+#define CHECK_AND_APPEND(param, v_pin, current_val, prev_val, ts_val, precision)        \
+  do {                                                                                  \
+    if (current_val != prev_val || (current_millis - ts_val > FORCE_UPDATE_INTERVAL)) { \
+      if (precision >= 0) {                                                             \
+        param += "&V" + String(v_pin) + "=" + String(current_val, precision);           \
+      } else {                                                                          \
+        param += "&V" + String(v_pin) + "=" + String(current_val);                      \
+      }                                                                                 \
+      prev_val = current_val;                                                           \
+      ts_val = current_millis;                                                          \
+    }                                                                                   \
+  } while (0)
 
 #pragma endregion
 
@@ -292,12 +307,49 @@ void update_fw() {
     break;
   }
 } //-------------------------
+
 void updata() {
-  String server_path = server_name + "batch/update?token=" + BLYNK_AUTH_TOKEN + "&V32=" + Irms7 + "&V34=" + smoothDistance + "&V35=" + volume1 + "&V36=" + Irms8 + "&V40=" + Irms0 // 18.5kw
-                       + "&V41=" + Irms1 + "&V42=" + Irms2 + "&V43=" + Irms3 + "&V44=" + Irms4 + "&V45=" + Irms5 + "&V46=" + Irms6 + "&V70=" + float(data.timerun_G1) / 1000 / 60 / 60 + "&V72=" + float(data.timerun_G2) / 1000 / 60 / 60 + "&V74=" + float(data.timerun_G3) / 1000 / 60 / 60 + "&V76=" + float(data.timerun_B1) / 1000 / 60 / 60 + "&V78=" + float(data.timerun_B2) / 1000 / 60 / 60 + "&V80=" + float(data.timerun_B3) / 1000 / 60 / 60 + "&V82=" + float(data.timerun_B4) / 1000 / 60 / 60;
-  http.begin(client, server_path.c_str());
-  http.GET();
-  http.end();
+  const unsigned long FORCE_UPDATE_INTERVAL = 45000; // 45 giây
+  unsigned long current_millis = millis();
+  String params_to_update = "";
+
+  // Chuyển đổi thời gian chạy sang giờ (float)
+  float tr_g1_h = (float)data.timerun_G1 / 3600000.0f;
+  float tr_g2_h = (float)data.timerun_G2 / 3600000.0f;
+  float tr_g3_h = (float)data.timerun_G3 / 3600000.0f;
+  float tr_b1_h = (float)data.timerun_B1 / 3600000.0f;
+  float tr_b2_h = (float)data.timerun_B2 / 3600000.0f;
+  float tr_b3_h = (float)data.timerun_B3 / 3600000.0f;
+  float tr_b4_h = (float)data.timerun_B4 / 3600000.0f;
+
+  // Sử dụng macro để kiểm tra và xây dựng chuỗi cập nhật
+  // precision: số chữ số thập phân, -1 cho số nguyên
+  CHECK_AND_APPEND(params_to_update, 40, Irms0, prevState.Irms0, prevState.Irms0_ts, 1);
+  CHECK_AND_APPEND(params_to_update, 41, Irms1, prevState.Irms1, prevState.Irms1_ts, 1);
+  CHECK_AND_APPEND(params_to_update, 42, Irms2, prevState.Irms2, prevState.Irms2_ts, 1);
+  CHECK_AND_APPEND(params_to_update, 43, Irms3, prevState.Irms3, prevState.Irms3_ts, 1);
+  CHECK_AND_APPEND(params_to_update, 44, Irms4, prevState.Irms4, prevState.Irms4_ts, 1);
+  CHECK_AND_APPEND(params_to_update, 45, Irms5, prevState.Irms5, prevState.Irms5_ts, 1);
+  CHECK_AND_APPEND(params_to_update, 46, Irms6, prevState.Irms6, prevState.Irms6_ts, 1);
+  CHECK_AND_APPEND(params_to_update, 32, Irms7, prevState.Irms7, prevState.Irms7_ts, 1);
+  CHECK_AND_APPEND(params_to_update, 36, Irms8, prevState.Irms8, prevState.Irms8_ts, 1);
+  CHECK_AND_APPEND(params_to_update, 34, smoothDistance, prevState.smoothDistance, prevState.smoothDistance_ts, 1);
+  CHECK_AND_APPEND(params_to_update, 35, volume1, prevState.volume1, prevState.volume1_ts, -1);
+  CHECK_AND_APPEND(params_to_update, 70, tr_g1_h, prevState.timerun_G1, prevState.timerun_G1_ts, 2);
+  CHECK_AND_APPEND(params_to_update, 72, tr_g2_h, prevState.timerun_G2, prevState.timerun_G2_ts, 2);
+  CHECK_AND_APPEND(params_to_update, 74, tr_g3_h, prevState.timerun_G3, prevState.timerun_G3_ts, 2);
+  CHECK_AND_APPEND(params_to_update, 76, tr_b1_h, prevState.timerun_B1, prevState.timerun_B1_ts, 2);
+  CHECK_AND_APPEND(params_to_update, 78, tr_b2_h, prevState.timerun_B2, prevState.timerun_B2_ts, 2);
+  CHECK_AND_APPEND(params_to_update, 80, tr_b3_h, prevState.timerun_B3, prevState.timerun_B3_ts, 2);
+  CHECK_AND_APPEND(params_to_update, 82, tr_b4_h, prevState.timerun_B4, prevState.timerun_B4_ts, 2);
+
+  // Chỉ gửi yêu cầu HTTP nếu có ít nhất một giá trị đã thay đổi
+  if (params_to_update.length() > 0) {
+    String server_path = server_name + "batch/update?token=" + BLYNK_AUTH_TOKEN + params_to_update;
+    http.begin(client, server_path.c_str());
+    http.GET();
+    http.end();
+  }
 }
 //----------------------------------
 void bridge_Tram2C(String token, int virtual_pin, float(value_to_send)) {
@@ -667,6 +719,23 @@ BLYNK_WRITE(V4) // PROTECT
 BLYNK_WRITE(V5) // data string
 {
   String dataS = param.asStr();
+  if (dataS == "help") {
+    keyterminal.clear();
+    Blynk.virtualWrite(V5,
+                       "--- DANH SACH LENH ---\n"
+                       "t2, M, d  : Kich hoat che do van hanh (10-15s)\n"
+                       "active    : Kich hoat che do cai dat (vo han)\n"
+                       "deactive  : Thoat che do cai dat\n"
+                       "save      : Luu tat ca cai dat vao EEPROM\n"
+                       "reset     : Xoa trang thai loi cua may bom\n"
+                       "rst       : Khoi dong lai thiet bi\n"
+                       "update    : Cap nhat firmware (OTA)\n"
+                       "i2c       : Quet cac thiet bi I2C\n"
+                       "save_num  : Xem so lan ghi vao EEPROM\n"
+                       "level_0   : Hieu chuan muc nuoc 0 cm\n"
+                       "level_<so>: Hieu chuan tai muc nuoc <so> cm\n"
+                       "ok        : Xac nhan luu khoi luong CLO\n");
+  }
   if ((dataS == "t2")) {
     keyterminal.clear();
     Blynk.virtualWrite(V5, "Người vận hành: 'T.Phong'\nKích hoạt trong 15s\n");
@@ -749,6 +818,32 @@ BLYNK_WRITE(V5) // data string
       savedata();
       keyterminal.clear();
       Blynk.virtualWrite(V5, "Đã lưu - CLO:", data.clo, "kg");
+    }
+  } else if (dataS == "level_0") { // Lệnh hiệu chuẩn điểm 0 cm cho mực nước
+    if (keySet) {
+      data.level_cal_offset_x100 = kalman_filtered_adc_value * 100;
+      savedata();
+      char buffer[60];
+      sprintf(buffer, "Đã lưu offset mực nước: %.0f\n", kalman_filtered_adc_value);
+      Blynk.virtualWrite(V5, buffer);
+    }
+  } else if (dataS.startsWith("level_")) { // Lệnh hiệu chuẩn điểm mực nước đã biết, ví dụ: level_150
+    if (keySet) {
+      String numStr = dataS.substring(6);
+      float level_known = numStr.toFloat();
+      float adc_at_known = kalman_filtered_adc_value;
+      float adc_zero = data.level_cal_offset_x100 / 100.0f;
+
+      if (adc_at_known > adc_zero) {
+        float gain = level_known / (adc_at_known - adc_zero);
+        data.level_cal_gain_x1000 = gain * 1000;
+        savedata();
+        char buffer[80];
+        sprintf(buffer, "Đã hiệu chuẩn tại %.1f cm. Gain mới: %.3f\n", level_known, gain);
+        Blynk.virtualWrite(V5, buffer);
+      } else {
+        Blynk.virtualWrite(V5, "Lỗi: ADC đọc được phải > ADC tại điểm 0\n");
+      }
     }
   } else if (dataS == "i2c") {
     i2c_scaner();
@@ -1944,34 +2039,57 @@ void time_run_motor() {
 }
 
 //----------------------------------------------------
-void MeasureCmForSmoothing() // C14
+/**
+ * @brief Đọc và xử lý giá trị từ cảm biến mực nước bằng bộ lọc Median + Kalman.
+ */
+void MeasureAndProcessWaterLevel() // C14
 {
+  // 1. Chọn kênh analog cho cảm biến mực nước
   digitalWrite(S0, LOW);
   digitalWrite(S1, HIGH);
   digitalWrite(S2, HIGH);
   digitalWrite(S3, HIGH);
-  float sensorValue = analogRead(A0);
-  distance1 = (((sensorValue - zeropointTank) * 800) / (fullpointTank - zeropointTank)); // 915,74 (R=147.7)
-  // Serial.print("sensorValue ");
-  // Serial.println(distance1);
-  if (distance1 > 0) {
-    smoothDistance = digitalSmooth(distance1, sensSmoothArray1);
-    volume1 = (dai * smoothDistance * rong) / 1000000;
-    // Serial.print("\nsmoothDistance ");
-    // Serial.println(smoothDistance);
+
+  // 2. Đọc giá trị thô từ ADC
+  int raw_value = analogRead(A0);
+
+  // 3. Áp dụng Median Filter để loại bỏ nhiễu đột biến
+  median_buffer[median_buffer_index] = raw_value;
+  median_buffer_index = (median_buffer_index + 1) % MEDIAN_WINDOW_SIZE;
+
+  int sorted_buffer[MEDIAN_WINDOW_SIZE];
+  memcpy(sorted_buffer, median_buffer, sizeof(median_buffer));
+  int median_value = getMedian(sorted_buffer, MEDIAN_WINDOW_SIZE);
+
+  // 4. Đưa giá trị đã qua bộ lọc trung vị vào bộ lọc Kalman
+  kalman_filtered_adc_value = levelKalmanFilter.updateEstimate(median_value);
+
+  // 5. Chuyển đổi giá trị ADC đã làm mịn sang đơn vị đo thực tế (cm)
+  float gain = data.level_cal_gain_x1000 / 1000.0f;
+  float offset = data.level_cal_offset_x100 / 100.0f;
+
+  if (gain > 0) {
+    smoothDistance = gain * (kalman_filtered_adc_value - offset);
+  } else {
+    smoothDistance = 0.0f;
   }
-  if (smoothDistance >= 500) //  Nếu mực nước = 500cm thì tắt Cấp 1
+
+  // Giới hạn giá trị trong khoảng hợp lý
+  smoothDistance = constrain(smoothDistance, 0.0, dosau * 1.4); // Cho phép vượt 40%
+
+  // 6. Tính toán thể tích
+  volume1 = (dai * smoothDistance * rong) / 1000000; // m3
+
+  // 7. Logic điều khiển khi bể đầy
+  if (smoothDistance >= 500) // Nếu mực nước >= 500cm thì tắt Cấp 1
   {
     if (data.protect) {
-      if (Irms1 != 0) {
+      if (Irms1 != 0)
         offG2();
-      }
-      if (Irms3 != 0) {
+      if (Irms3 != 0)
         offG1();
-      }
-      if (Irms5 != 0) {
+      if (Irms5 != 0)
         offG3();
-      }
     }
   }
 }
@@ -2052,6 +2170,16 @@ void setup() {
 
   eeprom.initialize();
   eeprom.readBytes(address, sizeof(dataDefault), (byte *)&data);
+  memcpy(&dataCheck, &data, sizeof(dataDefault));
+
+  // Khởi tạo giá trị hiệu chuẩn mặc định nếu chưa có (lần chạy đầu tiên)
+  if (data.level_cal_gain_x1000 == 0) {
+    Serial.println("Initializing default calibration values for water level sensor.");
+    // Giả định: 0cm -> ADC 199, 515cm -> ADC 936
+    data.level_cal_offset_x100 = 199.0f * 100;
+    data.level_cal_gain_x1000 = (515.0f / (936.0f - 199.0f)) * 1000; // gain ~ 0.698
+    savedata();
+  }
 
   timer.setTimeout(5000L, []() {
     timer_I = timer.setInterval(1589, []() {
@@ -2068,7 +2196,7 @@ void setup() {
       timer.restartTimer(timer_I);
       timer.restartTimer(timer_tank);
     });
-    timer_tank = timer.setInterval(230L, MeasureCmForSmoothing);
+    timer_tank = timer.setInterval(230L, MeasureAndProcessWaterLevel);
     timer.setInterval(15005L, []() {
       rtctime();
       time_run_motor();
