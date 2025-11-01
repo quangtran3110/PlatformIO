@@ -432,6 +432,7 @@ void offcap1() {
 void onbom1() {
   if (status_b1 != HIGH) {
     status_b1 = HIGH;
+    Serial.println("BOM 1 ON");
     Blynk.virtualWrite(V0, status_b1);
     pcf8575_1.digitalWrite(pin_B1, !status_b1);
   }
