@@ -71,7 +71,7 @@
 #define BLYNK_AUTH_TOKEN "ra1gZtR0irrwiTH1L-L_nhXI6TMRH7M9"
 #define VOLUME_TOKEN "RyDZuYiRC4oaG5MsFI2kw4WsQpKiw2Ko"
 
-#define BLYNK_FIRMWARE_VERSION "251102"
+#define BLYNK_FIRMWARE_VERSION "251101"
 
 const char *ssid = "tram bom so 4";
 const char *password = "0943950555";
@@ -512,12 +512,14 @@ void readPower() // C2 - Giếng    - I0
     Irms0 = rms0;
     yIrms0 = yIrms0 + 1;
     xIrms0 = 0;
-    if (status_g1 == LOW) {
-      // Lệnh đang là TẮT nhưng vẫn đo được dòng điện -> Contactor kẹt?
-      status_g1 = HIGH; // Cập nhật trạng thái để logic bảo vệ hoạt động
-      Blynk.virtualWrite(V2, status_g1);
-    }
     if (yIrms0 > 3) {
+      if (status_g1 == LOW) {
+        // Lệnh đang là TẮT nhưng vẫn đo được dòng điện ổn định -> Contactor kẹt?
+        status_g1 = HIGH; // Cập nhật trạng thái để logic bảo vệ hoạt động
+        Blynk.virtualWrite(V2, status_g1);
+        if (data.flags.key_noti)
+          Blynk.logEvent("warning", String("Bơm GIẾNG chạy ngoài ý muốn!"));
+      }
       if (G1_start >= 0) {
         if (G1_start == 0)
           G1_start = millis();
@@ -580,12 +582,14 @@ void readPower1() // C3 - Bơm 1    - I1
     Irms1 = rms1;
     yIrms1 = yIrms1 + 1;
     xIrms1 = 0;
-    if (status_b1 == LOW) {
-      // Lệnh đang là TẮT nhưng vẫn đo được dòng điện -> Contactor kẹt?
-      status_b1 = HIGH; // Cập nhật trạng thái để logic bảo vệ hoạt động
-      Blynk.virtualWrite(V0, status_b1);
-    }
     if (yIrms1 > 3) {
+      if (status_b1 == LOW) {
+        // Lệnh đang là TẮT nhưng vẫn đo được dòng điện ổn định -> Contactor kẹt?
+        status_b1 = HIGH; // Cập nhật trạng thái để logic bảo vệ hoạt động
+        Blynk.virtualWrite(V0, status_b1);
+        if (data.flags.key_noti)
+          Blynk.logEvent("warning", String("Bơm 1 chạy ngoài ý muốn!"));
+      }
       if (B1_start >= 0) {
         if (B1_start == 0)
           B1_start = millis();
@@ -648,12 +652,14 @@ void readPower2() // C4 - Bơm 2    - I2
     Irms2 = rms2;
     yIrms2 = yIrms2 + 1;
     xIrms2 = 0;
-    if (status_b2 == LOW) {
-      // Lệnh đang là TẮT nhưng vẫn đo được dòng điện -> Contactor kẹt?
-      status_b2 = HIGH; // Cập nhật trạng thái để logic bảo vệ hoạt động
-      Blynk.virtualWrite(V1, status_b2);
-    }
     if (yIrms2 > 3) {
+      if (status_b2 == LOW) {
+        // Lệnh đang là TẮT nhưng vẫn đo được dòng điện ổn định -> Contactor kẹt?
+        status_b2 = HIGH; // Cập nhật trạng thái để logic bảo vệ hoạt động
+        Blynk.virtualWrite(V1, status_b2);
+        if (data.flags.key_noti)
+          Blynk.logEvent("warning", String("Bơm 2 chạy ngoài ý muốn!"));
+      }
       if (B2_start >= 0) {
         if (B2_start == 0)
           B2_start = millis();
@@ -852,7 +858,7 @@ void rtctime() {
   uint16_t nowtime = now.hour() * 360 + now.minute() * 6; // Chuyển sang đơn vị mới
   if (data.flags.mode_cap2 == 1) {
     if ((nowtime > data.b1_1_start && nowtime < data.b1_1_stop) || (nowtime > data.b1_2_start && nowtime < data.b1_2_stop) || (nowtime > data.b1_3_start && nowtime < data.b1_3_stop) || (nowtime > data.b1_4_start && nowtime < data.b1_4_stop)) { // Chạy bơm 1
-      if (Irms1 == 0 && !trip1) {                                                                                                                                                                                                                   // Nếu bơm 1 đang tắt và không lỗi
+      if (Irms1 == 0 && !trip1) {
         if ((Irms2 == 0 && !time_run2) || (time_run2))
           onbom1(); // Chạy bơm 1
         if (time_run1 && noti_3) {
