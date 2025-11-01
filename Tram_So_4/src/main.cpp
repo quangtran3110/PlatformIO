@@ -71,7 +71,7 @@
 #define BLYNK_AUTH_TOKEN "ra1gZtR0irrwiTH1L-L_nhXI6TMRH7M9"
 #define VOLUME_TOKEN "RyDZuYiRC4oaG5MsFI2kw4WsQpKiw2Ko"
 
-#define BLYNK_FIRMWARE_VERSION "251102"
+#define BLYNK_FIRMWARE_VERSION "251101"
 
 const char *ssid = "tram bom so 4";
 const char *password = "0943950555";
@@ -151,7 +151,7 @@ int time_cycle, timer_cycle;
 int LLG1_1m3, reboot_num;
 int time_run_nenkhi = 5 * 60;
 int time_stop_nenkhi = 10 * 60;
-byte status_b1, status_b2, status_g1, stastus_read_current = false;
+byte status_b1 = 0, status_b2 = 0, status_g1 = 0, stastus_read_current = false;
 int G1_start, B1_start, B2_start;
 bool G1_save = false, B1_save = false, B2_save = false;
 //-------------------
