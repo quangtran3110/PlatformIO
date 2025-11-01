@@ -71,7 +71,7 @@
 #define BLYNK_AUTH_TOKEN "ra1gZtR0irrwiTH1L-L_nhXI6TMRH7M9"
 #define VOLUME_TOKEN "RyDZuYiRC4oaG5MsFI2kw4WsQpKiw2Ko"
 
-#define BLYNK_FIRMWARE_VERSION "251102"
+#define BLYNK_FIRMWARE_VERSION "251101"
 
 const char *ssid = "tram bom so 4";
 const char *password = "0943950555";
@@ -82,10 +82,10 @@ const char *password = "0943950555";
 #include <BlynkSimpleEsp8266.h>
 #include <ESP8266WiFi.h>
 #include <SPI.h>
+#include <SimpleKalmanFilter.h>
 #include <UrlEncode.h>
 //-------------------
 #include "PCF8575.h"
-#include <SimpleKalmanFilter.h>
 PCF8575 pcf8575_1(0x20);
 const int pin_G1 = P7;
 const int pin_B2 = P6;
@@ -1151,7 +1151,7 @@ BLYNK_WRITE(V10) // String
     }
     if (nDevices == 0)
       terminal.println("No I2C devices found.");
-    terminal.clear();
+    // terminal.clear();
   } else {
     bool handled = false;
     if (key) {
@@ -1212,49 +1212,58 @@ BLYNK_WRITE(V11) // Chọn thời gian chạy 2 Bơm
     case 0: { // Bơm 1 - Lần 1
       if (key)
         b = 0;
-      Blynk.virtualWrite(V18, data.b1_1_start * 60, data.b1_1_stop * 60, tz);
+      // Chuyển đổi ngược từ đơn vị tùy chỉnh sang giây để hiển thị đúng trên app
+      Blynk.virtualWrite(V18, (data.b1_1_start / 360) * 3600 + ((data.b1_1_start % 360) / 6) * 60,
+                         (data.b1_1_stop / 360) * 3600 + ((data.b1_1_stop % 360) / 6) * 60, tz);
       break;
     }
     case 1: { // Bơm 2 - Lần 1
       if (key)
         b = 1;
-      Blynk.virtualWrite(V18, data.b2_1_start * 60, data.b2_1_stop * 60, tz);
+      Blynk.virtualWrite(V18, (data.b2_1_start / 360) * 3600 + ((data.b2_1_start % 360) / 6) * 60,
+                         (data.b2_1_stop / 360) * 3600 + ((data.b2_1_stop % 360) / 6) * 60, tz);
       break;
     }
     case 2: { // Bơm 1 - Lần 2
       if (key)
         b = 2;
-      Blynk.virtualWrite(V18, data.b1_2_start * 60, data.b1_2_stop * 60, tz);
+      Blynk.virtualWrite(V18, (data.b1_2_start / 360) * 3600 + ((data.b1_2_start % 360) / 6) * 60,
+                         (data.b1_2_stop / 360) * 3600 + ((data.b1_2_stop % 360) / 6) * 60, tz);
       break;
     }
     case 3: { // Bơm 2 - Lần 2
       if (key)
         b = 3;
-      Blynk.virtualWrite(V18, data.b2_2_start * 60, data.b2_2_stop * 60, tz);
+      Blynk.virtualWrite(V18, (data.b2_2_start / 360) * 3600 + ((data.b2_2_start % 360) / 6) * 60,
+                         (data.b2_2_stop / 360) * 3600 + ((data.b2_2_stop % 360) / 6) * 60, tz);
       break;
     }
     case 4: { // Bơm 1 - Lần 3
       if (key)
         b = 4;
-      Blynk.virtualWrite(V18, data.b1_3_start * 60, data.b1_3_stop * 60, tz);
+      Blynk.virtualWrite(V18, (data.b1_3_start / 360) * 3600 + ((data.b1_3_start % 360) / 6) * 60,
+                         (data.b1_3_stop / 360) * 3600 + ((data.b1_3_stop % 360) / 6) * 60, tz);
       break;
     }
     case 5: { // Bơm 2 - Lần 3
       if (key)
         b = 5;
-      Blynk.virtualWrite(V18, data.b2_3_start * 60, data.b2_3_stop * 60, tz);
+      Blynk.virtualWrite(V18, (data.b2_3_start / 360) * 3600 + ((data.b2_3_start % 360) / 6) * 60,
+                         (data.b2_3_stop / 360) * 3600 + ((data.b2_3_stop % 360) / 6) * 60, tz);
       break;
     }
     case 6: { // Bơm 1 - Lần 4
       if (key)
         b = 6;
-      Blynk.virtualWrite(V18, data.b1_4_start * 60, data.b1_4_stop * 60, tz);
+      Blynk.virtualWrite(V18, (data.b1_4_start / 360) * 3600 + ((data.b1_4_start % 360) / 6) * 60,
+                         (data.b1_4_stop / 360) * 3600 + ((data.b1_4_stop % 360) / 6) * 60, tz);
       break;
     }
     case 7: { // Bơm 2 - Lần 4
       if (key)
         b = 7;
-      Blynk.virtualWrite(V18, data.b2_4_start * 60, data.b2_4_stop * 60, tz);
+      Blynk.virtualWrite(V18, (data.b2_4_start / 360) * 3600 + ((data.b2_4_start % 360) / 6) * 60,
+                         (data.b2_4_stop / 360) * 3600 + ((data.b2_4_stop % 360) / 6) * 60, tz);
       break;
     }
     }
@@ -1445,7 +1454,7 @@ BLYNK_WRITE(V37) { // LLG1_1m3
 void setup() {
   ESP.wdtDisable();
   ESP.wdtEnable(300000);
-  Serial.begin(9600);
+  Serial.begin(115200);
   WiFi.mode(WIFI_STA);
   WiFi.begin(ssid, password);
   Blynk.config(BLYNK_AUTH_TOKEN);
