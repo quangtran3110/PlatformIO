@@ -71,7 +71,7 @@
 #define BLYNK_AUTH_TOKEN "ra1gZtR0irrwiTH1L-L_nhXI6TMRH7M9"
 #define VOLUME_TOKEN "RyDZuYiRC4oaG5MsFI2kw4WsQpKiw2Ko"
 
-#define BLYNK_FIRMWARE_VERSION "251103"
+#define BLYNK_FIRMWARE_VERSION "251102"
 
 const char *ssid = "tram bom so 4";
 const char *password = "0943950555";
@@ -155,7 +155,7 @@ byte status_b1 = LOW, status_b2 = LOW, status_g1 = LOW;
 int G1_start, B1_start, B2_start;
 bool G1_save = false, B1_save = false, B2_save = false;
 //-------------------
-int startup_cycles = 5; // Bỏ qua 5 chu kỳ đọc đầu tiên để cảm biến ổn định
+int startup_cycles = 8; // Bỏ qua 5 chu kỳ đọc đầu tiên để cảm biến ổn định
 //-------------------
 int dai = 800;
 int rong = 800;
@@ -583,7 +583,8 @@ void readPower1() // C3 - Bơm 1    - I1
     if (status_b1 == HIGH) {
       // Nếu có lệnh BẬT nhưng không có dòng, bắt đầu đếm lỗi
       xIrms1++;
-      if (xIrms1 > 100) {
+      Serial.println("xIrms1: " + String(xIrms1));
+      if (xIrms1 > 3) {
         // Lệnh đang là BẬT nhưng không đo được dòng điện -> Động cơ lỗi không chạy
         offbom1(); // Hàm này đã bao gồm việc đặt status_b1 = LOW
         trip1 = true;
@@ -604,6 +605,7 @@ void readPower1() // C3 - Bơm 1    - I1
       if (status_b1 == LOW) {
         // Lệnh đang là TẮT nhưng vẫn đo được dòng điện ổn định -> Contactor kẹt?
         status_b1 = HIGH; // Cập nhật trạng thái để logic bảo vệ hoạt động
+        Serial.println("Status B1: " + String(status_b1));
         Blynk.virtualWrite(V0, status_b1);
       }
       if (B1_start >= 0) {
@@ -888,8 +890,9 @@ void rtctime() {
   if (data.flags.mode_cap2 == 1) {
     if ((nowtime > data.b1_1_start && nowtime < data.b1_1_stop) || (nowtime > data.b1_2_start && nowtime < data.b1_2_stop) || (nowtime > data.b1_3_start && nowtime < data.b1_3_stop) || (nowtime > data.b1_4_start && nowtime < data.b1_4_stop)) { // Chạy bơm 1
       if (Irms1 == 0 && !trip1) {
-        if ((Irms2 == 0 && !time_run2) || (time_run2))
+        if ((Irms2 == 0 && !time_run2) || (time_run2)) {
           onbom1(); // Chạy bơm 1
+        }
         if (time_run1 && noti_3) {
           noti_3 = false;
           if (data.flags.key_noti)
@@ -1626,12 +1629,11 @@ void setup() {
       readPower2();
       readPower3();
       readPower4();
-      up(); // Luôn gọi hàm up(), các giá trị sẽ là 0 trong giai đoạn khởi động
-
+      up();
 
     });
     timer_5 = timer.setInterval(15006L, []() {
-      rtctime();
+      //rtctime();
       time_run_motor();
     });
     timer.setInterval(900005L, []() {
