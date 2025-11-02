@@ -605,7 +605,6 @@ void readPower1() // C3 - Bơm 1    - I1
       if (status_b1 == LOW) {
         // Lệnh đang là TẮT nhưng vẫn đo được dòng điện ổn định -> Contactor kẹt?
         status_b1 = HIGH; // Cập nhật trạng thái để logic bảo vệ hoạt động
-        Serial.println("Status B1: " + String(status_b1));
         Blynk.virtualWrite(V0, status_b1);
       }
       if (B1_start >= 0) {
@@ -1633,7 +1632,7 @@ void setup() {
 
     });
     timer_5 = timer.setInterval(15006L, []() {
-      //rtctime();
+      rtctime();
       time_run_motor();
     });
     timer.setInterval(900005L, []() {
