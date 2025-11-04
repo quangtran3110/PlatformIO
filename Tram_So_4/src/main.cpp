@@ -71,7 +71,7 @@
 #define BLYNK_AUTH_TOKEN "ra1gZtR0irrwiTH1L-L_nhXI6TMRH7M9"
 #define VOLUME_TOKEN "RyDZuYiRC4oaG5MsFI2kw4WsQpKiw2Ko"
 
-#define BLYNK_FIRMWARE_VERSION "251102"
+#define BLYNK_FIRMWARE_VERSION "251104"
 
 const char *ssid = "tram bom so 4";
 const char *password = "0943950555";
@@ -507,7 +507,6 @@ void readPower() // C2 - Giếng    - I0
         if (smoothDistance >= (dosau - 30)) {
           // Bể đầy, phao đã ngắt bơm. Đây là hoạt động bình thường.
           // Chỉ cần cập nhật lại trạng thái, không báo lỗi.
-          offcap1();  // Cập nhật status_g1 = LOW và trạng thái trên app
           xIrms0 = 0; // Reset bộ đếm lỗi
         } else {
           // Bể chưa đầy nhưng bơm không chạy -> Đây mới là lỗi thực sự.
