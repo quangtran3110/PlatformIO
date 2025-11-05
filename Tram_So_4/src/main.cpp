@@ -507,7 +507,8 @@ void readPower() // C2 - Giếng    - I0
         if (smoothDistance >= (dosau - 40)) {
           // Bể đầy, phao đã ngắt bơm. Đây là hoạt động bình thường.
           // Chỉ cần cập nhật lại trạng thái, không báo lỗi.
-          xIrms0 = 0; // Reset bộ đếm lỗi
+          status_g1 = LOW; // Cập nhật trạng thái để logic bảo vệ hoạt động
+          xIrms0 = 0;      // Reset bộ đếm lỗi
         } else {
           // Bể chưa đầy nhưng bơm không chạy -> Đây mới là lỗi thực sự.
           offcap1(); // Tắt bơm (cập nhật status_g1 = LOW)
