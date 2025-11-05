@@ -85,6 +85,10 @@ const char *password = "0943950555";
 #include <SimpleKalmanFilter.h>
 #include <UrlEncode.h>
 //-------------------
+const char *host = "script.google.com";
+const int httpsPort = 443;
+String LOG_ID = "AKfycby_KPSb6ZSU_koFXzexJBHGEl3ajALoW8ANagHukK-ZZinLy2vuOYXqKVUMhln3IVI-";
+//-------------------
 #include "PCF8575.h"
 PCF8575 pcf8575_1(0x20);
 const int pin_G1 = P7;
@@ -366,6 +370,43 @@ void up_timerun_motor() {
   http.GET();
   http.end();
 }
+void upData() {
+  // Sử dụng WiFiClientSecure cho kết nối HTTPS đến Google
+  WiFiClientSecure client_secure;
+
+  Serial.print("connecting to ");
+  Serial.println(host);
+
+  // Bỏ qua xác thực chứng chỉ SSL/TLS. Cần thiết cho ESP8266.
+  client_secure.setInsecure();
+
+  if (!client_secure.connect(host, httpsPort)) {
+    Serial.println("connection failed");
+    return;
+  }
+  // Create a URL for sending or writing data to Google Sheets.
+  String Send_Data_URL = "sts=write";
+  Send_Data_URL += "&AL=" + String(Result1, 2); // Ap luc (làm tròn 2 chữ số thập phân)
+  Send_Data_URL += "&AG1=" + String(Irms0, 2);  // Dòng điện Bơm Giếng (làm tròn 2 chữ số thập phân)
+
+  String url = "/macros/s/" + LOG_ID + "/exec?" + Send_Data_URL;
+  Serial.println(url);
+
+  // Gửi yêu cầu GET bằng đối tượng client_secure
+  client_secure.print(String("GET ") + url + " HTTP/1.1\r\n" + "Host: " + host + "\r\n" + "User-Agent: BuildFailureDetectorESP8266\r\n" + "Connection: close\r\n\r\n");
+  Serial.println("OK");
+}
+String dataForm(float value, int leng, int decimal) {
+  String str = String(value, decimal);
+  if (str.length() < leng) {
+    int space = leng - str.length();
+    for (int i = 0; i < space; ++i) {
+      str = " " + str;
+    }
+  }
+  return str;
+}
+//-------------------------------------------------------------------
 void savedata() {
   if (memcmp(&data, &dataCheck, sizeof(data)) != 0) {
     Serial.println("\nData changed, writing to EEPROM...");
@@ -1633,6 +1674,7 @@ void setup() {
     });
     timer_5 = timer.setInterval(15006L, []() {
       rtctime();
+      upData();
       time_run_motor();
     });
     timer.setInterval(900005L, []() {
