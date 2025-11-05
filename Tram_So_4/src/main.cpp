@@ -88,6 +88,7 @@ const char *password = "0943950555";
 const char *host = "script.google.com";
 const int httpsPort = 443;
 String LOG_ID = "AKfycby_KPSb6ZSU_koFXzexJBHGEl3ajALoW8ANagHukK-ZZinLy2vuOYXqKVUMhln3IVI-";
+WiFiClientSecure client_secure;
 //-------------------
 #include "PCF8575.h"
 PCF8575 pcf8575_1(0x20);
@@ -371,14 +372,8 @@ void up_timerun_motor() {
   http.end();
 }
 void upData() {
-  // Sử dụng WiFiClientSecure cho kết nối HTTPS đến Google
-  WiFiClientSecure client_secure;
-
   Serial.print("connecting to ");
   Serial.println(host);
-
-  // Bỏ qua xác thực chứng chỉ SSL/TLS. Cần thiết cho ESP8266.
-  client_secure.setInsecure();
 
   if (!client_secure.connect(host, httpsPort)) {
     Serial.println("connection failed");
@@ -1615,6 +1610,7 @@ void setup() {
   emon3.current(A0, 105); // Nén khí
   emon4.current(A0, 105); // Van điện
 
+  client_secure.setInsecure();
   Wire.begin();
   sensors.begin(); // DS18B20 start
   rtc_module.begin();
