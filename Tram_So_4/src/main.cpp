@@ -524,7 +524,7 @@ void readPower() // C2 - Giếng    - I0
     rms0 = emon0.calcIrms(1480);
   } else {
     // Nếu động cơ đang tắt, đo nhanh để kiểm tra
-    rms0 = emon0.calcIrms(400);
+    rms0 = emon0.calcIrms(370);
   }
 
   // Nếu đang trong chu kỳ khởi động, chỉ đọc để ổn định và thoát.
@@ -605,7 +605,7 @@ void readPower1() // C3 - Bơm 1    - I1
     rms1 = emon1.calcIrms(1480);
   } else {
     // Nếu động cơ đang tắt, đo nhanh để kiểm tra
-    rms1 = emon1.calcIrms(400);
+    rms1 = emon1.calcIrms(370);
   }
 
   // Nếu đang trong chu kỳ khởi động, chỉ đọc để ổn định và thoát.
@@ -679,7 +679,7 @@ void readPower2() // C4 - Bơm 2    - I2
     rms2 = emon2.calcIrms(1480);
   } else {
     // Nếu động cơ đang tắt, đo nhanh để kiểm tra
-    rms2 = emon2.calcIrms(400);
+    rms2 = emon2.calcIrms(370);
   }
 
   // Nếu đang trong chu kỳ khởi động, chỉ đọc để ổn định và thoát.
@@ -752,7 +752,7 @@ void readPower3() // C5 - Nén khí  - I3
     rms3 = emon3.calcIrms(740);
   } else {
     // Nếu bơm giếng tắt, đo nhanh
-    rms3 = emon3.calcIrms(400);
+    rms3 = emon3.calcIrms(370);
   }
 
   // Nếu đang trong chu kỳ khởi động, chỉ đọc để ổn định và thoát.
@@ -795,7 +795,7 @@ void readPower4() // C6 - Van điện - I4
     rms4 = emon4.calcIrms(740);
   } else {
     // Nếu không có lệnh, đo nhanh
-    rms4 = emon4.calcIrms(400);
+    rms4 = emon4.calcIrms(370);
   }
 
   // Nếu đang trong chu kỳ khởi động, chỉ đọc để ổn định và thoát.
