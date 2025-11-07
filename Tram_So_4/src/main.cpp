@@ -71,7 +71,7 @@
 #define BLYNK_AUTH_TOKEN "ra1gZtR0irrwiTH1L-L_nhXI6TMRH7M9"
 #define VOLUME_TOKEN "RyDZuYiRC4oaG5MsFI2kw4WsQpKiw2Ko"
 
-#define BLYNK_FIRMWARE_VERSION "251106"
+#define BLYNK_FIRMWARE_VERSION "251107"
 
 const char *ssid = "tram bom so 4";
 const char *password = "0943950555";
@@ -383,6 +383,9 @@ void upData() {
   String Send_Data_URL = "sts=write";
   Send_Data_URL += "&AL=" + String(Result1, 2); // Ap luc (làm tròn 2 chữ số thập phân)
   Send_Data_URL += "&AG1=" + String(Irms0, 2);  // Dòng điện Bơm Giếng (làm tròn 2 chữ số thập phân)
+  Send_Data_URL += "&AB1=" + String(Irms1, 2);  // Dòng điện Bơm 1 (làm tròn 2 chữ số thập phân)
+  Send_Data_URL += "&AB2=" + String(Irms2, 2);  // Dòng điện Bơm 2 (làm tròn 2 chữ số thập phân)
+  Send_Data_URL += "&ANK=" + String(Irms3, 2);  // Dòng điện Nén Khí (làm tròn 2 chữ số thập phân)
 
   String url = "/macros/s/" + LOG_ID + "/exec?" + Send_Data_URL;
   Serial.println(url);
