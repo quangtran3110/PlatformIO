@@ -71,7 +71,7 @@
 #define BLYNK_AUTH_TOKEN "ra1gZtR0irrwiTH1L-L_nhXI6TMRH7M9"
 #define VOLUME_TOKEN "RyDZuYiRC4oaG5MsFI2kw4WsQpKiw2Ko"
 
-#define BLYNK_FIRMWARE_VERSION "251107"
+#define BLYNK_FIRMWARE_VERSION "251108"
 
 const char *ssid = "tram bom so 4";
 const char *password = "0943950555";
@@ -273,6 +273,10 @@ void update_error(int err) {
   Serial.printf("CALLBACK:  HTTP update fatal error code %d\n", err);
 }
 void update_fw() {
+  // Dừng các timer để giải phóng bộ nhớ và tránh xung đột
+  timer.disable(timer_1);
+  timer.disable(timer_5);
+
   WiFiClientSecure client_;
   client_.setInsecure();
   Serial.print("Wait...");
@@ -290,6 +294,8 @@ void update_fw() {
     break;
   case HTTP_UPDATE_OK:
     Serial.println("HTTP_UPDATE_OK");
+    // Cập nhật thành công, board sẽ tự khởi động lại.
+    // Nếu không, cần khởi động lại thủ công.
     break;
   }
 }
@@ -1272,6 +1278,9 @@ BLYNK_WRITE(V10) // String
   } else if (dataS == "update") {
     terminal.clear();
     Blynk.virtualWrite(V10, "UPDATE FIRMWARE...");
+    // Đợi một chút để Blynk gửi xong tin nhắn
+    delay(100);
+    // Gọi hàm cập nhật
     update_fw();
   } else if (dataS == "clr") {
     terminal.clear();
