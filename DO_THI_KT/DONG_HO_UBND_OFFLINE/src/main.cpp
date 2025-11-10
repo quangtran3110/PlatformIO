@@ -71,7 +71,7 @@ bool rtcSyncRequested = false;
 unsigned long lastAdjust = 0;
 const unsigned long SENSOR_TIMEOUT = 5000;           // 5 giây timeout cho cảm biến
 const unsigned long CLOCK_ADJUST_INTERVAL = 30000;   // 30 giây
-const unsigned long MIN_VALID_TRIGGER_TIME_MS = 750; // (ms) Bỏ qua các trigger nhanh hơn khoảng thời gian này để lọc nhiễu
+const unsigned long MIN_VALID_TRIGGER_TIME_MS = 950; // (ms) Bỏ qua các trigger nhanh hơn khoảng thời gian này để lọc nhiễu
 
 // Biến để theo dõi mặt đồng hồ đang được đồng bộ (0-3). -1 nghĩa là không có mặt nào.
 int sync_face_index = -1;

@@ -294,8 +294,6 @@ void update_fw() {
     break;
   case HTTP_UPDATE_OK:
     Serial.println("HTTP_UPDATE_OK");
-    // Cập nhật thành công, board sẽ tự khởi động lại.
-    // Nếu không, cần khởi động lại thủ công.
     break;
   }
 }
