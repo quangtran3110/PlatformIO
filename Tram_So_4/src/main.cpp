@@ -71,7 +71,7 @@
 #define BLYNK_AUTH_TOKEN "ra1gZtR0irrwiTH1L-L_nhXI6TMRH7M9"
 #define VOLUME_TOKEN "RyDZuYiRC4oaG5MsFI2kw4WsQpKiw2Ko"
 
-#define BLYNK_FIRMWARE_VERSION "251108"
+#define BLYNK_FIRMWARE_VERSION "251124"
 
 const char *ssid = "tram bom so 4";
 const char *password = "0943950555";
@@ -1306,6 +1306,18 @@ BLYNK_WRITE(V10) // String
     if (nDevices == 0)
       terminal.println("No I2C devices found.");
     // terminal.clear();
+  } else if (dataS == "calib") {
+    terminal.clear();
+    terminal.println("--- THÔNG TIN HIỆU CHUẨN ---");
+
+    // Cảm biến áp suất
+    terminal.println("\n[CẢM BIẾN ÁP SUẤT]");
+    terminal.printf(" - Offset (ADC @ 0 bar): %d\n", data.pressure_cal_offset);
+    float pressure_gain = data.pressure_cal_gain_x1000 / 1000.0f;
+    terminal.printf(" - Gain: %.5f\n", pressure_gain);
+    terminal.printf(" - ADC đã lọc hiện tại: %.2f\n", filtered_adc_pressure);
+    terminal.printf(" => Áp suất tính toán: %.2f bar\n", Result1);
+    terminal.flush();
   } else {
     bool handled = false;
     if (key) {

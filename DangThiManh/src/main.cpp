@@ -40,7 +40,11 @@ int timer_nguon_220;
 int timer_loc12, timer_loc1, timer_loc2;
 byte status_rualoc1 = HIGH;
 byte status_rualoc2 = HIGH;
+byte pulse = LOW;
 bool key_loc12 = true, key_loc1 = true, key_loc2 = true;
+
+String previousState = ""; // Biến để lưu trạng thái trước đó
+
 struct Data {
   byte status_rualoc1123;
 
@@ -71,12 +75,33 @@ void rualoc() {
   byte in_mode_RL = pcf8575_2.digitalRead(IN_MODE_RUALOC);
   byte in_timer_loc_1 = pcf8575_2.digitalRead(IN_TIMER_LOC_1);
   byte in_timer_loc_2 = pcf8575_2.digitalRead(IN_TIMER_LOC_2);
-  // Serial.print(in_loc_1);
-  // Serial.print(in_loc_2);
-  // Serial.println(in_mode_RL);
-  if ((in_loc_1 == HIGH) && (in_loc_2 == HIGH)) {                              // Nếu công tắc cơ lọc 1 và lọc 2 đều mở
+  String currentState = ""; // Biến để lưu trạng thái hiện tại
+
+  // Hàm trợ giúp để in trạng thái khi có thay đổi
+  auto printStateWhenChanged = [&](const String &newState) {
+    if (newState != previousState) {
+      Serial.println("--------------------");
+      Serial.print("Trang thai cac cong tac: LOC1=");
+      Serial.print(in_loc_1);
+      Serial.print(" | LOC2=");
+      Serial.print(in_loc_2);
+      Serial.print(" | RUA LOC=");
+      Serial.print(in_mode_RL);
+      Serial.print(" | TIMER1=");
+      Serial.print(in_timer_loc_1);
+      Serial.print(" | TIMER2=");
+      Serial.println(in_timer_loc_2);
+      Serial.println(newState);
+      previousState = newState;
+    }
+  };
+
+  if ((in_loc_1 == HIGH) && (in_loc_2 == HIGH)) { // Nếu công tắc cơ lọc 1 và lọc 2 đều mở
+    currentState = "Che do: Ca hai loc deu bat.\n";
     if ((in_timer_loc_1 == HIGH) || (in_timer_loc_2 == HIGH)) {                // Nếu timer rửa lọc 1 hoặc lọc 2 mở
       if ((in_timer_loc_1 == HIGH) && (in_timer_loc_2 == HIGH) && key_loc12) { // Nếu timer rửa lọc 1 và lọc 2 mở
+        currentState += "Hanh dong: Rua ca hai loc (theo timer).";
+        printStateWhenChanged(currentState);
         pcf8575_1.digitalWrite(van_xa_be, LOW);
         pcf8575_1.digitalWrite(van_nguon_loc_1, HIGH);
         pcf8575_1.digitalWrite(van_nguon_loc_2, HIGH);
@@ -93,6 +118,8 @@ void rualoc() {
           key_loc12 = true;
         });
       } else if (in_timer_loc_1 == HIGH && key_loc1) { // Nếu timer rửa lọc 1 mở
+        currentState += "Hanh dong: Chi rua loc 1 (theo timer).";
+        printStateWhenChanged(currentState);
         pcf8575_1.digitalWrite(van_xa_be, LOW);
         pcf8575_1.digitalWrite(van_nguon_loc_1, HIGH);
         pcf8575_1.digitalWrite(van_nguon_loc_2, LOW);
@@ -109,6 +136,8 @@ void rualoc() {
           key_loc1 = true;
         });
       } else if (in_timer_loc_2 == HIGH && key_loc2) { // Nếu timer rửa lọc 2 mở
+        currentState += "Hanh dong: Chi rua loc 2 (theo timer).";
+        printStateWhenChanged(currentState);
         pcf8575_1.digitalWrite(van_xa_be, LOW);
         pcf8575_1.digitalWrite(van_nguon_loc_1, LOW);
         pcf8575_1.digitalWrite(van_nguon_loc_2, HIGH);
@@ -126,6 +155,8 @@ void rualoc() {
         });
       }
     } else if (in_mode_RL == HIGH && key_loc12) { // Nếu công tắc cơ ở chế độ rửa lọc
+      currentState += "Hanh dong: Rua ca hai loc (che do bang tay).";
+      printStateWhenChanged(currentState);
       pcf8575_1.digitalWrite(van_xa_be, LOW);
       pcf8575_1.digitalWrite(van_nguon_loc_1, HIGH);
       pcf8575_1.digitalWrite(van_nguon_loc_2, HIGH);
@@ -142,6 +173,8 @@ void rualoc() {
         key_loc12 = true;
       });
     } else if ((in_timer_loc_1 == LOW) && (in_timer_loc_2 == LOW) && (in_mode_RL == LOW)) {
+      currentState += "Hanh dong: Loc binh thuong (ca hai loc).";
+      printStateWhenChanged(currentState);
       status_rualoc1 = false;
       status_rualoc2 = false;
       key_loc1 = true;
@@ -159,9 +192,12 @@ void rualoc() {
     }
 
   } else if (in_loc_1 == HIGH) {
+    currentState = "Che do: Chi loc 1 bat.\n";
     pcf8575_1.digitalWrite(van_nguon_loc_1, HIGH);
     pcf8575_1.digitalWrite(van_nguon_loc_2, LOW);
     if (((in_mode_RL == HIGH) || (in_timer_loc_1 == HIGH)) && key_loc1) {
+      currentState += "Hanh dong: Rua loc 1 (bang tay hoac timer).";
+      printStateWhenChanged(currentState);
       pcf8575_1.digitalWrite(van_xa_be, LOW);
       key_loc1 = false;
       status_rualoc1 = true;
@@ -174,6 +210,8 @@ void rualoc() {
         key_loc1 = true;
       });
     } else if ((in_timer_loc_1 == LOW) && (in_mode_RL == LOW)) {
+      currentState += "Hanh dong: Loc binh thuong (chi loc 1).";
+      printStateWhenChanged(currentState);
       status_rualoc1 = false;
       key_loc1 = true;
       loc1();
@@ -184,9 +222,12 @@ void rualoc() {
       timer.deleteTimer(timer_loc1);
     }
   } else if (in_loc_2 == HIGH) {
+    currentState = "Che do: Chi loc 2 bat.\n";
     pcf8575_1.digitalWrite(van_nguon_loc_1, LOW);
     pcf8575_1.digitalWrite(van_nguon_loc_2, HIGH);
     if (((in_mode_RL == HIGH) || (in_timer_loc_2 == HIGH)) && key_loc2) {
+      currentState += "Hanh dong: Rua loc 2 (bang tay hoac timer).";
+      printStateWhenChanged(currentState);
       pcf8575_1.digitalWrite(van_xa_be, LOW);
       key_loc2 = false;
       status_rualoc2 = true;
@@ -199,6 +240,8 @@ void rualoc() {
         key_loc2 = true;
       });
     } else if ((in_timer_loc_2 == LOW) && (in_mode_RL == LOW)) {
+      currentState += "Hanh dong: Loc binh thuong (chi loc 2).";
+      printStateWhenChanged(currentState);
       status_rualoc2 = false;
       key_loc2 = true;
       loc2();
@@ -209,6 +252,8 @@ void rualoc() {
       timer.deleteTimer(timer_loc2);
     }
   } else if ((in_loc_1 == LOW) && (in_loc_2 == LOW)) {
+    currentState = "Che do: TAT HE THONG.";
+    printStateWhenChanged(currentState);
     pcf8575_1.digitalWrite(van_nguon_loc_1, LOW);
     pcf8575_1.digitalWrite(van_nguon_loc_2, LOW);
     pcf8575_1.digitalWrite(thoi_khi, HIGH);
@@ -228,10 +273,13 @@ void rualoc() {
 }
 void setup() {
   Serial.begin(115200);
+  Serial.println("Starting...");
   Wire.begin();
   eeprom.initialize();
   eeprom.readBytes(address, sizeof(dataDefault), (byte *)&data);
 
+  pinMode(D3, OUTPUT);
+  digitalWrite(D3, HIGH);
   pcf8575_1.begin();
   pcf8575_1.pinMode(van_loc_1, OUTPUT);
   pcf8575_1.digitalWrite(van_loc_1, HIGH);
@@ -275,6 +323,8 @@ void setup() {
 
   timer.setTimeout(1000, []() {
     timer.setInterval(1000, []() {
+      pulse = !pulse;
+      digitalWrite(D3, pulse); // Chớp LED D3 để biết hàm rualoc() đang chạy
       rualoc();
     });
   });
