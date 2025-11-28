@@ -71,7 +71,7 @@
 #define BLYNK_AUTH_TOKEN "ra1gZtR0irrwiTH1L-L_nhXI6TMRH7M9"
 #define VOLUME_TOKEN "RyDZuYiRC4oaG5MsFI2kw4WsQpKiw2Ko"
 
-#define BLYNK_FIRMWARE_VERSION "251124"
+#define BLYNK_FIRMWARE_VERSION "251128"
 
 const char *ssid = "tram bom so 4";
 const char *password = "0943950555";
@@ -127,11 +127,10 @@ DallasTemperature sensors(&oneWire);
 float temp[3];
 //-------------------
 #include <Eeprom24C32_64.h>
-#include <I2C_eeprom.h>
 #include <I2C_eeprom_cyclic_store.h>
 #define MEMORY_SIZE 4096
-#define PAGE_SIZE 32
-I2C_eeprom ee(0x57, MEMORY_SIZE);
+#define PAGE_SIZE 32              // Đúng theo datasheet của EEPROM AT24C32
+I2C_eeprom ee(0x57, MEMORY_SIZE); // Địa chỉ 0x57 là của EEPROM AT24C32 tích hợp trên module DS3231
 //-------------------
 #include <ESP8266HTTPClient.h>
 #include <ESP8266httpUpdate.h>
@@ -188,15 +187,15 @@ struct Data {
   uint32_t save_num;
   uint8_t clo;
   uint32_t time_clo;
-  int LLG1_RL;
+  int16_t LLG1_RL; // Sử dụng kiểu dữ liệu có kích thước cố định
   uint8_t reset_day;
   uint32_t timerun_G1, timerun_B1, timerun_B2;
 
   // Calibration data
-  uint16_t pressure_cal_offset;     // ADC value at 0 bar
-  uint16_t pressure_cal_gain_x1000; // Gain * 1000
-  uint16_t level_cal_offset;        // ADC value at 0 cm
-  uint16_t level_cal_gain_x1000;    // Gain * 1000
+  uint16_t pressure_cal_offset;   // ADC value at 0 bar
+  uint32_t pressure_cal_gain_x1M; // Gain * 1,000,000 for high precision
+  uint16_t level_cal_offset;      // ADC value at 0 cm
+  uint32_t level_cal_gain_x1M;    // Gain * 1,000,000 for high precision
 } data, dataCheck;
 I2C_eeprom_cyclic_store<Data> cs;
 
@@ -301,70 +300,57 @@ void update_fw() {
 void up() {
   const unsigned long FORCE_UPDATE_INTERVAL = 45000; // 45 giây
   unsigned long current_millis = millis();
-  String params_to_update = "";
 
-  if (Result1 != prevState.Result1 || (current_millis - prevState.Result1_ts > FORCE_UPDATE_INTERVAL)) {
-    params_to_update += "&V14=" + String(Result1);
-    prevState.Result1 = Result1;
-    prevState.Result1_ts = current_millis;
-  }
-  if (volume1 != prevState.volume1 || (current_millis - prevState.volume1_ts > FORCE_UPDATE_INTERVAL)) {
-    params_to_update += "&V19=" + String(volume1);
-    prevState.volume1 = volume1;
-    prevState.volume1_ts = current_millis;
-  }
-  if (smoothDistance != prevState.smoothDistance || (current_millis - prevState.smoothDistance_ts > FORCE_UPDATE_INTERVAL)) {
-    params_to_update += "&V20=" + String(smoothDistance);
-    prevState.smoothDistance = smoothDistance;
-    prevState.smoothDistance_ts = current_millis;
-  }
-  if (Irms0 != prevState.Irms0 || (current_millis - prevState.Irms0_ts > FORCE_UPDATE_INTERVAL)) {
-    params_to_update += "&V27=" + String(Irms0);
-    prevState.Irms0 = Irms0;
-    prevState.Irms0_ts = current_millis;
-  }
-  if (Irms1 != prevState.Irms1 || (current_millis - prevState.Irms1_ts > FORCE_UPDATE_INTERVAL)) {
-    params_to_update += "&V26=" + String(Irms1);
-    prevState.Irms1 = Irms1;
-    prevState.Irms1_ts = current_millis;
-  }
-  if (Irms2 != prevState.Irms2 || (current_millis - prevState.Irms2_ts > FORCE_UPDATE_INTERVAL)) {
-    params_to_update += "&V24=" + String(Irms2);
-    prevState.Irms2 = Irms2;
-    prevState.Irms2_ts = current_millis;
-  }
-  if (Irms3 != prevState.Irms3 || (current_millis - prevState.Irms3_ts > FORCE_UPDATE_INTERVAL)) {
-    params_to_update += "&V30=" + String(Irms3);
-    prevState.Irms3 = Irms3;
-    prevState.Irms3_ts = current_millis;
-  }
-  if (Irms4 != prevState.Irms4 || (current_millis - prevState.Irms4_ts > FORCE_UPDATE_INTERVAL)) {
-    params_to_update += "&V25=" + String(Irms4);
-    prevState.Irms4 = Irms4;
-    prevState.Irms4_ts = current_millis;
-  }
-  float timerun_G1_h = float(data.timerun_G1) / 1000 / 60 / 60;
-  if (timerun_G1_h != prevState.timerun_G1 || (current_millis - prevState.timerun_G1_ts > FORCE_UPDATE_INTERVAL)) {
-    params_to_update += "&V39=" + String(timerun_G1_h);
-    prevState.timerun_G1 = timerun_G1_h;
-    prevState.timerun_G1_ts = current_millis;
-  }
-  float timerun_B1_h = float(data.timerun_B1) / 1000 / 60 / 60;
-  if (timerun_B1_h != prevState.timerun_B1 || (current_millis - prevState.timerun_B1_ts > FORCE_UPDATE_INTERVAL)) {
-    params_to_update += "&V41=" + String(timerun_B1_h);
-    prevState.timerun_B1 = timerun_B1_h;
-    prevState.timerun_B1_ts = current_millis;
-  }
-  float timerun_B2_h = float(data.timerun_B2) / 1000 / 60 / 60;
-  if (timerun_B2_h != prevState.timerun_B2 || (current_millis - prevState.timerun_B2_ts > FORCE_UPDATE_INTERVAL)) {
-    params_to_update += "&V43=" + String(timerun_B2_h);
-    prevState.timerun_B2 = timerun_B2_h;
-    prevState.timerun_B2_ts = current_millis;
-  }
+  // Tạo một buffer đủ lớn để chứa URL. 512 bytes là rất an toàn.
+  char url_buffer[512];
+  // Con trỏ để theo dõi vị trí cuối cùng trong buffer
+  char *p = url_buffer;
+  // Biến đếm số byte còn lại trong buffer
+  int remaining_space = sizeof(url_buffer);
+  int written_bytes = 0;
+  bool has_params = false;
 
-  if (params_to_update.length() > 0) {
-    String server_path = server_name + "batch/update?token=" + BLYNK_AUTH_TOKEN + params_to_update;
-    http.begin(client, server_path.c_str());
+  // Hàm lambda để nối tham số một cách an toàn và hiệu quả
+  auto append_param = [&](const char* format, float value, float &prevValue, unsigned long &last_ts) {
+    if (value != prevValue || (current_millis - last_ts > FORCE_UPDATE_INTERVAL)) {
+      written_bytes = snprintf(p, remaining_space, format, value);
+      if (written_bytes > 0 && written_bytes < remaining_space) {
+        p += written_bytes;
+        remaining_space -= written_bytes;
+        has_params = true;
+      }
+      prevValue = value;
+      last_ts = current_millis;
+    }
+  };
+
+  // Nối các tham số vào buffer
+  append_param("&V14=%.2f", Result1, prevState.Result1, prevState.Result1_ts);
+  append_param("&V19=%.1f", volume1, prevState.volume1, prevState.volume1_ts);
+  append_param("&V20=%.1f", smoothDistance, prevState.smoothDistance, prevState.smoothDistance_ts);
+  append_param("&V27=%.2f", Irms0, prevState.Irms0, prevState.Irms0_ts);
+  append_param("&V26=%.2f", Irms1, prevState.Irms1, prevState.Irms1_ts);
+  append_param("&V24=%.2f", Irms2, prevState.Irms2, prevState.Irms2_ts);
+  append_param("&V30=%.2f", Irms3, prevState.Irms3, prevState.Irms3_ts);
+  append_param("&V25=%.2f", Irms4, prevState.Irms4, prevState.Irms4_ts);
+
+  float timerun_G1_h = (float)data.timerun_G1 / 3600000.0f;
+  append_param("&V39=%.2f", timerun_G1_h, prevState.timerun_G1, prevState.timerun_G1_ts);
+
+  float timerun_B1_h = (float)data.timerun_B1 / 3600000.0f;
+  append_param("&V41=%.2f", timerun_B1_h, prevState.timerun_B1, prevState.timerun_B1_ts);
+
+  float timerun_B2_h = (float)data.timerun_B2 / 3600000.0f;
+  append_param("&V43=%.2f", timerun_B2_h, prevState.timerun_B2, prevState.timerun_B2_ts);
+
+  // Nếu có ít nhất một tham số được thêm vào
+  if (has_params) {
+    // Tạo URL cuối cùng
+    char final_url[512];
+    snprintf(final_url, sizeof(final_url), "%sbatch/update?token=%s%s", server_name.c_str(), BLYNK_AUTH_TOKEN, url_buffer);
+
+    // Gửi yêu cầu HTTP
+    http.begin(client, final_url);
     http.GET();
     http.end();
   }
@@ -390,6 +376,7 @@ void upData() {
   Send_Data_URL += "&AB1=" + String(Irms1, 2);  // Dòng điện Bơm 1 (làm tròn 2 chữ số thập phân)
   Send_Data_URL += "&AB2=" + String(Irms2, 2);  // Dòng điện Bơm 2 (làm tròn 2 chữ số thập phân)
   Send_Data_URL += "&ANK=" + String(Irms3, 2);  // Dòng điện Nén Khí (làm tròn 2 chữ số thập phân)
+  Send_Data_URL += "&MN=" + String(smoothDistance, 1); // Mực nước (làm tròn 1 chữ số thập phân)
 
   String url = "/macros/s/" + LOG_ID + "/exec?" + Send_Data_URL;
   Serial.println(url);
@@ -517,7 +504,7 @@ void visible_man() {
 void rst_board() {
   pcf8575_1.digitalWrite(pin_rst, LOW);
 }
-//-------------------------------------------------------------------
+
 void readPower() // C2 - Giếng    - I0
 {
   pcf8575_1.digitalWrite(S0pin, LOW);
@@ -869,7 +856,7 @@ void readPressure() { // C0 - Ap Luc
 
   // Áp dụng công thức hiệu chuẩn
   // Pressure = gain * (ADC_current - ADC_zero)
-  float gain = data.pressure_cal_gain_x1000 / 1000.0f;
+  float gain = data.pressure_cal_gain_x1M / 1000000.0f;
   if (gain > 0) {
     Result1 = gain * (filtered_adc_pressure - data.pressure_cal_offset);
   } else {
@@ -898,7 +885,7 @@ void readWaterLevel() { // C1 - Muc Nuoc
 
   // 3. Áp dụng công thức hiệu chuẩn
   // Level = gain * (ADC_current - ADC_zero)
-  float gain = data.level_cal_gain_x1000 / 1000.0f;
+  float gain = data.level_cal_gain_x1M / 1000000.0f;
   if (gain > 0) {
     smoothDistance = gain * (filtered_adc_level - data.level_cal_offset);
   } else {
@@ -1313,7 +1300,7 @@ BLYNK_WRITE(V10) // String
     // Cảm biến áp suất
     terminal.println("\n[CẢM BIẾN ÁP SUẤT]");
     terminal.printf(" - Offset (ADC @ 0 bar): %d\n", data.pressure_cal_offset);
-    float pressure_gain = data.pressure_cal_gain_x1000 / 1000.0f;
+    float pressure_gain = data.pressure_cal_gain_x1M / 1000000.0f;
     terminal.printf(" - Gain: %.5f\n", pressure_gain);
     terminal.printf(" - ADC đã lọc hiện tại: %.2f\n", filtered_adc_pressure);
     terminal.printf(" => Áp suất tính toán: %.2f bar\n", Result1);
@@ -1330,7 +1317,7 @@ BLYNK_WRITE(V10) // String
         float p_known = dataS.substring(4).toFloat();
         if (p_known > 0 && filtered_adc_pressure > data.pressure_cal_offset) {
           float gain = p_known / (filtered_adc_pressure - data.pressure_cal_offset);
-          data.pressure_cal_gain_x1000 = gain * 1000;
+          data.pressure_cal_gain_x1M = round(gain * 1000000); // Lưu với 6 chữ số thập phân
           savedata();
           terminal.printf("Đã tính gain áp suất: %.4f\n", gain);
         } else {
@@ -1346,7 +1333,7 @@ BLYNK_WRITE(V10) // String
         float l_known = dataS.substring(6).toFloat();
         if (l_known > 0 && filtered_adc_level > data.level_cal_offset) {
           float gain = l_known / (filtered_adc_level - data.level_cal_offset);
-          data.level_cal_gain_x1000 = gain * 1000;
+          data.level_cal_gain_x1M = round(gain * 1000000); // Áp dụng tương tự cho mực nước
           savedata();
           terminal.printf("Đã tính gain mực nước: %.4f\n", gain);
         } else {
@@ -1637,22 +1624,22 @@ void setup() {
   sensors.begin(); // DS18B20 start
   rtc_module.begin();
   ee.begin();
-  cs.begin(ee, PAGE_SIZE, MEMORY_SIZE / PAGE_SIZE);
+  cs.begin(ee, PAGE_SIZE, MEMORY_SIZE / PAGE_SIZE); // Cập nhật số trang: 4096 / 32 = 128 trang
   cs.read(data);
   memcpy(&dataCheck, &data, sizeof(data));
 
   // Khởi tạo giá trị hiệu chuẩn mặc định nếu chưa có
-  if (data.pressure_cal_gain_x1000 == 0) {
+  if (data.pressure_cal_gain_x1M == 0) {
     Serial.println("Initializing default calibration for pressure sensor.");
     // Giả định: 0 bar -> ADC 186, 6 bar -> ADC 805
     data.pressure_cal_offset = 186;
-    data.pressure_cal_gain_x1000 = (6.0f / (805.0f - 186.0f)) * 1000; // gain ~ 0.00969
+    data.pressure_cal_gain_x1M = round((6.0f / (805.0f - 186.0f)) * 1000000); // gain ~ 0.009693
   }
-  if (data.level_cal_gain_x1000 == 0) {
+  if (data.level_cal_gain_x1M == 0) {
     Serial.println("Initializing default calibration for water level sensor.");
     // Giả định: 0cm -> ADC 196, 500cm -> ADC 750
     data.level_cal_offset = 196;
-    data.level_cal_gain_x1000 = (500.0f / (750.0f - 196.0f)) * 1000; // gain ~ 0.9025
+    data.level_cal_gain_x1M = round((500.0f / (750.0f - 196.0f)) * 1000000); // gain ~ 0.902527
   }
   savedata(); // Lưu lại nếu có thay đổi
 

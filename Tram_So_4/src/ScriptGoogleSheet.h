@@ -56,6 +56,11 @@ function doGet(e) {
         result += ', Ampe Nen Khi Written';
         break;
 
+      case 'MN':
+        rowDataLog[7] = value;
+        result += ', Muc Nuoc Written';
+        break;
+
       default:
         result += ", unsupported parameter";
       }
@@ -70,7 +75,7 @@ function doGet(e) {
       var newRangeDataLog = sheet_target.getRange(2, 1, 1, rowDataLog.length);
       newRangeDataLog.setValues([rowDataLog]);
       // Định dạng các cột C đến G là dạng SỐ với 2 chữ số thập phân (ví dụ: 22.08)
-      sheet_target.getRange("C:G").setNumberFormat('0.00');
+      sheet_target.getRange("C:H").setNumberFormat('0.00');
       maxRowData(10000);
       return ContentService.createTextOutput(result);
     }
