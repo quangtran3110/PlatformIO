@@ -14,7 +14,7 @@ function doGet(e) {
 
     var rowDataLog = [];
 
-    var Curr_Date = Utilities.formatDate(new Date(), "Asia/Jakarta", 'dd/MM/yyyy');
+    var Curr_Date = Utilities.formatDate(new Date(), "Asia/Jakarta", 'yyyy-MM-dd');
     rowDataLog[0] = Curr_Date; // Date will be written in column A (in the "DHT11 Sensor Data Logger" section).
 
     var Curr_Time = Utilities.formatDate(new Date(), "Asia/Jakarta", 'HH:mm:ss');

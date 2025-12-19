@@ -32,7 +32,7 @@
  *V30 - I3 - Nén khí
  *V31 -
  *V32 -
- *V33 - check luu luong
+ *V33 -
  *V34 -
  *V35 - Luu Luong G1 - 24h
  *V36 - Khoi luong Clo
@@ -71,7 +71,7 @@
 #define BLYNK_AUTH_TOKEN "ra1gZtR0irrwiTH1L-L_nhXI6TMRH7M9"
 #define VOLUME_TOKEN "RyDZuYiRC4oaG5MsFI2kw4WsQpKiw2Ko"
 
-#define BLYNK_FIRMWARE_VERSION "251128"
+#define BLYNK_FIRMWARE_VERSION "251219"
 
 const char *ssid = "tram bom so 4";
 const char *password = "0943950555";
@@ -168,6 +168,14 @@ int volume1;
 long t;
 //-------------------
 
+// --- CẤU TRÚC CHO HIỆU CHUẨN ĐA ĐIỂM ---
+#define MAX_CALIB_POINTS 5
+
+struct CalibPoint {
+  uint16_t adc;   // Giá trị ADC (0-1023)
+  uint16_t value; // Giá trị quy đổi (Áp suất * 100, Mực nước cm)
+};
+
 struct Data {
   struct Flags {
     uint8_t man : 1;
@@ -191,11 +199,11 @@ struct Data {
   uint8_t reset_day;
   uint32_t timerun_G1, timerun_B1, timerun_B2;
 
-  // Calibration data
-  uint16_t pressure_cal_offset;   // ADC value at 0 bar
-  uint32_t pressure_cal_gain_x1M; // Gain * 1,000,000 for high precision
-  uint16_t level_cal_offset;      // ADC value at 0 cm
-  uint32_t level_cal_gain_x1M;    // Gain * 1,000,000 for high precision
+  // --- DỮ LIỆU HIỆU CHUẨN MỚI ---
+  CalibPoint pressure_points[MAX_CALIB_POINTS];
+  uint8_t    num_pressure_points;
+  CalibPoint level_points[MAX_CALIB_POINTS];
+  uint8_t    num_level_points;
 } data, dataCheck;
 I2C_eeprom_cyclic_store<Data> cs;
 
@@ -311,7 +319,7 @@ void up() {
   bool has_params = false;
 
   // Hàm lambda để nối tham số một cách an toàn và hiệu quả
-  auto append_param = [&](const char* format, float value, float &prevValue, unsigned long &last_ts) {
+  auto append_param = [&](const char *format, float value, float &prevValue, unsigned long &last_ts) {
     if (value != prevValue || (current_millis - last_ts > FORCE_UPDATE_INTERVAL)) {
       written_bytes = snprintf(p, remaining_space, format, value);
       if (written_bytes > 0 && written_bytes < remaining_space) {
@@ -371,11 +379,11 @@ void upData() {
   }
   // Create a URL for sending or writing data to Google Sheets.
   String Send_Data_URL = "sts=write";
-  Send_Data_URL += "&AL=" + String(Result1, 2); // Ap luc (làm tròn 2 chữ số thập phân)
-  Send_Data_URL += "&AG1=" + String(Irms0, 2);  // Dòng điện Bơm Giếng (làm tròn 2 chữ số thập phân)
-  Send_Data_URL += "&AB1=" + String(Irms1, 2);  // Dòng điện Bơm 1 (làm tròn 2 chữ số thập phân)
-  Send_Data_URL += "&AB2=" + String(Irms2, 2);  // Dòng điện Bơm 2 (làm tròn 2 chữ số thập phân)
-  Send_Data_URL += "&ANK=" + String(Irms3, 2);  // Dòng điện Nén Khí (làm tròn 2 chữ số thập phân)
+  Send_Data_URL += "&AL=" + String(Result1, 2);        // Ap luc (làm tròn 2 chữ số thập phân)
+  Send_Data_URL += "&AG1=" + String(Irms0, 2);         // Dòng điện Bơm Giếng (làm tròn 2 chữ số thập phân)
+  Send_Data_URL += "&AB1=" + String(Irms1, 2);         // Dòng điện Bơm 1 (làm tròn 2 chữ số thập phân)
+  Send_Data_URL += "&AB2=" + String(Irms2, 2);         // Dòng điện Bơm 2 (làm tròn 2 chữ số thập phân)
+  Send_Data_URL += "&ANK=" + String(Irms3, 2);         // Dòng điện Nén Khí (làm tròn 2 chữ số thập phân)
   Send_Data_URL += "&MN=" + String(smoothDistance, 1); // Mực nước (làm tròn 1 chữ số thập phân)
 
   String url = "/macros/s/" + LOG_ID + "/exec?" + Send_Data_URL;
@@ -844,6 +852,77 @@ int getMedian(int arr[], int size) {
   }
   return arr[size / 2];
 }
+// --- CÁC HÀM HỖ TRỢ HIỆU CHUẨN ĐA ĐIỂM ---
+
+void sortCalibPoints(CalibPoint points[], uint8_t num_points) {
+  for (uint8_t i = 1; i < num_points; i++) {
+    CalibPoint key = points[i];
+    int8_t j = i - 1;
+    while (j >= 0 && points[j].adc > key.adc) {
+      points[j + 1] = points[j];
+      j--;
+    }
+    points[j + 1] = key;
+  }
+}
+
+void addOrUpdateCalibPoint(CalibPoint new_point, CalibPoint points[], uint8_t &num_points) {
+  if (num_points < MAX_CALIB_POINTS) {
+    points[num_points] = new_point;
+    num_points++;
+  } else {
+    // Tìm điểm có giá trị thực (value) gần nhất để thay thế
+    int8_t closest_idx = -1;
+    uint16_t min_diff = 65535;
+
+    for (uint8_t i = 0; i < num_points; i++) {
+      uint16_t diff = abs((int)points[i].value - (int)new_point.value);
+      if (closest_idx == -1 || diff < min_diff) {
+        min_diff = diff;
+        closest_idx = i;
+      }
+    }
+    if (closest_idx != -1) {
+      points[closest_idx] = new_point;
+    }
+  }
+  sortCalibPoints(points, num_points);
+}
+
+float interpolate(float current_adc, const CalibPoint points[], uint8_t num_points) {
+  if (num_points < 2) {
+    return (num_points == 1) ? (float)points[0].value : 0.0f;
+  }
+
+  const CalibPoint *p1, *p2;
+
+  if (current_adc <= points[0].adc) {
+    // Ngoại suy thấp: dùng 2 điểm đầu
+    p1 = &points[0];
+    p2 = &points[1];
+  } else if (current_adc >= points[num_points - 1].adc) {
+    // Ngoại suy cao: dùng 2 điểm cuối
+    p1 = &points[num_points - 2];
+    p2 = &points[num_points - 1];
+  } else {
+    // Nội suy
+    uint8_t i = 0;
+    while (i < num_points - 1 && current_adc > points[i + 1].adc) {
+      i++;
+    }
+    p1 = &points[i];
+    p2 = &points[i + 1];
+  }
+
+  float x = current_adc;
+  float x1 = p1->adc, y1 = p1->value;
+  float x2 = p2->adc, y2 = p2->value;
+
+  if (x2 == x1) return y1;
+
+  return y1 + (x - x1) * (y2 - y1) / (x2 - x1);
+}
+
 void readPressure() { // C0 - Ap Luc
   pcf8575_1.digitalWrite(S0pin, LOW);
   pcf8575_1.digitalWrite(S1pin, LOW);
@@ -854,15 +933,10 @@ void readPressure() { // C0 - Ap Luc
   // Đưa giá trị ADC thô qua bộ lọc Kalman
   filtered_adc_pressure = pressureKalmanFilter.updateEstimate(raw_adc);
 
-  // Áp dụng công thức hiệu chuẩn
-  // Pressure = gain * (ADC_current - ADC_zero)
-  float gain = data.pressure_cal_gain_x1M / 1000000.0f;
-  if (gain > 0) {
-    Result1 = gain * (filtered_adc_pressure - data.pressure_cal_offset);
-  } else {
-    Result1 = 0.0f; // Tránh chia cho 0 nếu chưa hiệu chuẩn
-  }
-  Result1 = constrain(Result1, 0.0, 10.0); // Giới hạn trong thang đo 0-10 bar
+  // Tính toán: interpolate trả về (Bar * 100), cần chia 100 để ra Bar
+  float val = interpolate(filtered_adc_pressure, data.pressure_points, data.num_pressure_points);
+  Result1 = val / 100.0f;
+  Result1 = constrain(Result1, 0.0f, 10.0f);
 }
 
 void readWaterLevel() { // C1 - Muc Nuoc
@@ -883,15 +957,9 @@ void readWaterLevel() { // C1 - Muc Nuoc
   // 2. Đưa giá trị đã qua bộ lọc trung vị vào bộ lọc Kalman
   filtered_adc_level = levelKalmanFilter.updateEstimate(median_value);
 
-  // 3. Áp dụng công thức hiệu chuẩn
-  // Level = gain * (ADC_current - ADC_zero)
-  float gain = data.level_cal_gain_x1M / 1000000.0f;
-  if (gain > 0) {
-    smoothDistance = gain * (filtered_adc_level - data.level_cal_offset);
-  } else {
-    smoothDistance = 0.0f; // Tránh chia cho 0 nếu chưa hiệu chuẩn
-  }
-  smoothDistance = constrain(smoothDistance, 0.0, dosau * 1.2); // Giới hạn giá trị
+  // 3. Tính toán: interpolate trả về cm
+  smoothDistance = interpolate(filtered_adc_level, data.level_points, data.num_level_points);
+  smoothDistance = constrain(smoothDistance, 0.0f, (float)dosau * 1.2f);
 
   // 4. Tính toán thể tích và kiểm tra logic
   volume1 = (dai * smoothDistance * rong) / 1000000;
@@ -1215,12 +1283,12 @@ BLYNK_WRITE(V10) // String
                        "save      : Luu tat ca cai dat\n"
                        "reset     : Xoa trang thai loi cua may bom\n"
                        "rst       : Khoi dong lai thiet bi\n"
-                       "update    : Cap nhat firmware (OTA)\n"
-                       "pre_0     : Hieu chuan diem 0 bar (ap suat)\n"
-                       "pre_X.X   : Hieu chuan tai ap suat X.X bar\n"
-                       "i2c       : Quet cac thiet bi I2C\n"
-                       "level_0   : Hieu chuan muc nuoc 0 cm\n"
-                       "level_YYY : Hieu chuan tai muc nuoc YYY cm\n");
+                       "update    : Cap nhat firmware (OTA)\n\n"
+                       "--- HIỆU CHUẨN ---\n"
+                       "pre_X.X   : Calib áp suất tại X.X bar\n"
+                       "level_YYY : Calib mực nước tại YYY cm\n"
+                       "pre_clear : Xóa calib áp suất\n"
+                       "level_clear : Xóa calib mực nước\n");
   } else if (dataS == "M") {
     terminal.clear();
     key = true;
@@ -1297,48 +1365,62 @@ BLYNK_WRITE(V10) // String
     terminal.clear();
     terminal.println("--- THÔNG TIN HIỆU CHUẨN ---");
 
-    // Cảm biến áp suất
+    // In thông tin áp suất
     terminal.println("\n[CẢM BIẾN ÁP SUẤT]");
-    terminal.printf(" - Offset (ADC @ 0 bar): %d\n", data.pressure_cal_offset);
-    float pressure_gain = data.pressure_cal_gain_x1M / 1000000.0f;
-    terminal.printf(" - Gain: %.5f\n", pressure_gain);
+    terminal.printf(" - Số điểm: %d/%d\n", data.num_pressure_points, MAX_CALIB_POINTS);
+    for (uint8_t i = 0; i < data.num_pressure_points; i++) {
+      terminal.printf(" #%d: ADC=%d -> %.2f bar\n", i + 1, data.pressure_points[i].adc, data.pressure_points[i].value / 100.0f);
+    }
     terminal.printf(" - ADC đã lọc hiện tại: %.2f\n", filtered_adc_pressure);
     terminal.printf(" => Áp suất tính toán: %.2f bar\n", Result1);
+
+    // In thông tin mực nước
+    terminal.println("\n[CẢM BIẾN MỰC NƯỚC]");
+    terminal.printf(" - Số điểm: %d/%d\n", data.num_level_points, MAX_CALIB_POINTS);
+    for (uint8_t i = 0; i < data.num_level_points; i++) {
+      terminal.printf(" #%d: ADC=%d -> %d cm\n", i + 1, data.level_points[i].adc, data.level_points[i].value);
+    }
+    terminal.printf(" - ADC đã lọc hiện tại: %.2f\n", filtered_adc_level);
+    terminal.printf(" => Mực nước tính toán: %.1f cm\n", smoothDistance);
+
     terminal.flush();
   } else {
     bool handled = false;
     if (key) {
-      if (dataS == "pre_0") {
-        data.pressure_cal_offset = filtered_adc_pressure;
+      if (dataS == "pre_clear") {
+        data.num_pressure_points = 0;
+        // Xóa sạch dữ liệu cũ để tránh nhầm lẫn
+        for(int i=0; i<MAX_CALIB_POINTS; i++) { data.pressure_points[i].adc = 0; data.pressure_points[i].value = 0; }
         savedata();
-        terminal.printf("Đã lưu offset áp suất: ADC=%.0f\n", filtered_adc_pressure);
+        terminal.println("Đã xóa calib áp suất.");
         handled = true;
       } else if (dataS.startsWith("pre_")) {
+        // Lệnh dạng pre_2.5
         float p_known = dataS.substring(4).toFloat();
-        if (p_known > 0 && filtered_adc_pressure > data.pressure_cal_offset) {
-          float gain = p_known / (filtered_adc_pressure - data.pressure_cal_offset);
-          data.pressure_cal_gain_x1M = round(gain * 1000000); // Lưu với 6 chữ số thập phân
-          savedata();
-          terminal.printf("Đã tính gain áp suất: %.4f\n", gain);
-        } else {
-          terminal.print("Lỗi: Giá trị ADC hoặc áp suất không hợp lệ.\n");
-        }
-        handled = true;
-      } else if (dataS == "level_0") {
-        data.level_cal_offset = filtered_adc_level;
+        // Quy đổi: 2.5 bar -> 250
+        uint16_t val_store = (uint16_t)(p_known * 100);
+        CalibPoint pt;
+        pt.adc = (uint16_t)round(filtered_adc_pressure);
+        pt.value = val_store;
+        addOrUpdateCalibPoint(pt, data.pressure_points, data.num_pressure_points);
         savedata();
-        terminal.printf("Đã lưu offset mực nước: ADC=%.0f\n", filtered_adc_level);
+        terminal.printf("Đã lưu điểm áp suất: ADC=%d -> %.2f bar\n", pt.adc, p_known);
+        handled = true;
+      } else if (dataS == "level_clear") {
+        data.num_level_points = 0;
+        for(int i=0; i<MAX_CALIB_POINTS; i++) { data.level_points[i].adc = 0; data.level_points[i].value = 0; }
+        savedata();
+        terminal.println("Đã xóa calib mực nước.");
         handled = true;
       } else if (dataS.startsWith("level_")) {
+        // Lệnh dạng level_120
         float l_known = dataS.substring(6).toFloat();
-        if (l_known > 0 && filtered_adc_level > data.level_cal_offset) {
-          float gain = l_known / (filtered_adc_level - data.level_cal_offset);
-          data.level_cal_gain_x1M = round(gain * 1000000); // Áp dụng tương tự cho mực nước
-          savedata();
-          terminal.printf("Đã tính gain mực nước: %.4f\n", gain);
-        } else {
-          terminal.print("Lỗi: Giá trị ADC hoặc mực nước không hợp lệ.\n");
-        }
+        CalibPoint pt;
+        pt.adc = (uint16_t)round(filtered_adc_level);
+        pt.value = (uint16_t)l_known; // Lưu trực tiếp cm
+        addOrUpdateCalibPoint(pt, data.level_points, data.num_level_points);
+        savedata();
+        terminal.printf("Đã lưu điểm mực nước: ADC=%d -> %d cm\n", pt.adc, pt.value);
         handled = true;
       }
     }
@@ -1593,13 +1675,7 @@ BLYNK_WRITE(V29) // Info
   timer.restartTimer(timer_2);
 }
 //-------------------------------------------------------------------
-BLYNK_WRITE(V33) { // Check Clo
-  if (param.asInt() == 1) {
-    DateTime dt(data.time_clo);
-    terminal.clear();
-    Blynk.virtualWrite(V10, "Châm CLO: ", data.clo, " kg vào lúc ", dt.hour(), ":", dt.minute(), "-", dt.day(), "/", dt.month(), "/", dt.year());
-  }
-}
+
 BLYNK_WRITE(V37) { // LLG1_1m3
   LLG1_1m3 = param.asInt();
 }
@@ -1627,21 +1703,6 @@ void setup() {
   cs.begin(ee, PAGE_SIZE, MEMORY_SIZE / PAGE_SIZE); // Cập nhật số trang: 4096 / 32 = 128 trang
   cs.read(data);
   memcpy(&dataCheck, &data, sizeof(data));
-
-  // Khởi tạo giá trị hiệu chuẩn mặc định nếu chưa có
-  if (data.pressure_cal_gain_x1M == 0) {
-    Serial.println("Initializing default calibration for pressure sensor.");
-    // Giả định: 0 bar -> ADC 186, 6 bar -> ADC 805
-    data.pressure_cal_offset = 186;
-    data.pressure_cal_gain_x1M = round((6.0f / (805.0f - 186.0f)) * 1000000); // gain ~ 0.009693
-  }
-  if (data.level_cal_gain_x1M == 0) {
-    Serial.println("Initializing default calibration for water level sensor.");
-    // Giả định: 0cm -> ADC 196, 500cm -> ADC 750
-    data.level_cal_offset = 196;
-    data.level_cal_gain_x1M = round((500.0f / (750.0f - 196.0f)) * 1000000); // gain ~ 0.902527
-  }
-  savedata(); // Lưu lại nếu có thay đổi
 
   pcf8575_1.begin();
   pcf8575_1.pinMode(S0pin, OUTPUT);

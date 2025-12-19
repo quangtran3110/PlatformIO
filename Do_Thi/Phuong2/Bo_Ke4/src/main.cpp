@@ -342,6 +342,8 @@ void readcurrent() // C2
   pcf8575_1.digitalWrite(S2, LOW);
   pcf8575_1.digitalWrite(S3, LOW);
   float rms0 = emon0.calcIrms(1480);
+  Serial.print("Irms0: ");
+  Serial.println(rms0);
   if (rms0 < 2) {
     Irms0 = 0;
     yIrms0 = 0;
