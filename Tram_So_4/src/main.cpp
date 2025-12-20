@@ -71,7 +71,7 @@
 #define BLYNK_AUTH_TOKEN "ra1gZtR0irrwiTH1L-L_nhXI6TMRH7M9"
 #define VOLUME_TOKEN "RyDZuYiRC4oaG5MsFI2kw4WsQpKiw2Ko"
 
-#define BLYNK_FIRMWARE_VERSION "251219"
+#define BLYNK_FIRMWARE_VERSION "251220"
 
 const char *ssid = "tram bom so 4";
 const char *password = "0943950555";
@@ -201,9 +201,9 @@ struct Data {
 
   // --- DỮ LIỆU HIỆU CHUẨN MỚI ---
   CalibPoint pressure_points[MAX_CALIB_POINTS];
-  uint8_t    num_pressure_points;
+  uint8_t num_pressure_points;
   CalibPoint level_points[MAX_CALIB_POINTS];
-  uint8_t    num_level_points;
+  uint8_t num_level_points;
 } data, dataCheck;
 I2C_eeprom_cyclic_store<Data> cs;
 
@@ -918,7 +918,8 @@ float interpolate(float current_adc, const CalibPoint points[], uint8_t num_poin
   float x1 = p1->adc, y1 = p1->value;
   float x2 = p2->adc, y2 = p2->value;
 
-  if (x2 == x1) return y1;
+  if (x2 == x1)
+    return y1;
 
   return y1 + (x - x1) * (y2 - y1) / (x2 - x1);
 }
@@ -1341,92 +1342,103 @@ BLYNK_WRITE(V10) // String
     terminal.clear();
     byte error, address;
     int nDevices;
-    terminal.println("Scanning for I2C devices...");
+    Blynk.virtualWrite(V10, "Scanning for I2C devices...\n");
     nDevices = 0;
     for (address = 1; address < 127; address++) {
       Wire.beginTransmission(address);
       error = Wire.endTransmission();
       if (error == 0) {
-        terminal.print("I2C device found at address 0x");
-        if (address < 16) {
-          terminal.print("0");
-        }
-        terminal.println(address, HEX);
+        String log = "I2C device found at address 0x";
+        if (address < 16)
+          log += "0";
+        log += String(address, HEX);
+        log += "\n";
+        Blynk.virtualWrite(V10, log);
         nDevices++;
       } else if (error == 4) {
-        terminal.print("Unknown error at address 0x");
-        terminal.println(address, HEX);
+        String log = "Unknown error at address 0x";
+        log += String(address, HEX);
+        log += "\n";
+        Blynk.virtualWrite(V10, log);
       }
     }
     if (nDevices == 0)
-      terminal.println("No I2C devices found.");
+      Blynk.virtualWrite(V10, "No I2C devices found.\n");
     // terminal.clear();
   } else if (dataS == "calib") {
     terminal.clear();
-    terminal.println("--- THÔNG TIN HIỆU CHUẨN ---");
+    Blynk.virtualWrite(V10, "--- THÔNG TIN HIỆU CHUẨN ---\n");
 
     // In thông tin áp suất
-    terminal.println("\n[CẢM BIẾN ÁP SUẤT]");
-    terminal.printf(" - Số điểm: %d/%d\n", data.num_pressure_points, MAX_CALIB_POINTS);
+    Blynk.virtualWrite(V10, "[CẢM BIẾN ÁP SUẤT]\n");
+    char buff[100];
+    snprintf(buff, sizeof(buff), " - Số điểm: %d/%d\n", data.num_pressure_points, MAX_CALIB_POINTS);
+    Blynk.virtualWrite(V10, buff);
     for (uint8_t i = 0; i < data.num_pressure_points; i++) {
-      terminal.printf(" #%d: ADC=%d -> %.2f bar\n", i + 1, data.pressure_points[i].adc, data.pressure_points[i].value / 100.0f);
+      snprintf(buff, sizeof(buff), " #%d: ADC=%d -> %.2f bar\n", i + 1, data.pressure_points[i].adc, data.pressure_points[i].value / 100.0f);
+      Blynk.virtualWrite(V10, buff);
     }
-    terminal.printf(" - ADC đã lọc hiện tại: %.2f\n", filtered_adc_pressure);
-    terminal.printf(" => Áp suất tính toán: %.2f bar\n", Result1);
+    snprintf(buff, sizeof(buff), " - ADC đã lọc hiện tại: %.2f\n", filtered_adc_pressure);
+    Blynk.virtualWrite(V10, buff);
+    snprintf(buff, sizeof(buff), " => Áp suất tính toán: %.2f bar\n", Result1);
+    Blynk.virtualWrite(V10, buff);
 
     // In thông tin mực nước
-    terminal.println("\n[CẢM BIẾN MỰC NƯỚC]");
-    terminal.printf(" - Số điểm: %d/%d\n", data.num_level_points, MAX_CALIB_POINTS);
+    Blynk.virtualWrite(V10, "[CẢM BIẾN MỰC NƯỚC]\n");
+    snprintf(buff, sizeof(buff), " - Số điểm: %d/%d\n", data.num_level_points, MAX_CALIB_POINTS);
+    Blynk.virtualWrite(V10, buff);
     for (uint8_t i = 0; i < data.num_level_points; i++) {
-      terminal.printf(" #%d: ADC=%d -> %d cm\n", i + 1, data.level_points[i].adc, data.level_points[i].value);
+      snprintf(buff, sizeof(buff), " #%d: ADC=%d -> %d cm\n", i + 1, data.level_points[i].adc, data.level_points[i].value);
+      Blynk.virtualWrite(V10, buff);
     }
-    terminal.printf(" - ADC đã lọc hiện tại: %.2f\n", filtered_adc_level);
-    terminal.printf(" => Mực nước tính toán: %.1f cm\n", smoothDistance);
+    snprintf(buff, sizeof(buff), " - ADC đã lọc hiện tại: %.2f\n", filtered_adc_level);
+    Blynk.virtualWrite(V10, buff);
+    snprintf(buff, sizeof(buff), " => Mực nước tính toán: %.1f cm\n", smoothDistance);
+    Blynk.virtualWrite(V10, buff);
 
-    terminal.flush();
+  } else if (dataS == "pre_clear") {
+    data.num_pressure_points = 0;
+    // Xóa sạch dữ liệu cũ để tránh nhầm lẫn
+    for (int i = 0; i < MAX_CALIB_POINTS; i++) {
+      data.pressure_points[i].adc = 0;
+      data.pressure_points[i].value = 0;
+    }
+    savedata();
+    Blynk.virtualWrite(V10, "Đã xóa calib áp suất.\n");
+  } else if (dataS.startsWith("pre_")) {
+    // Lệnh dạng pre_2.5
+    float p_known = dataS.substring(4).toFloat();
+    // Quy đổi: 2.5 bar -> 250
+    uint16_t val_store = (uint16_t)(p_known * 100);
+    CalibPoint pt;
+    pt.adc = (uint16_t)round(filtered_adc_pressure);
+    pt.value = val_store;
+    addOrUpdateCalibPoint(pt, data.pressure_points, data.num_pressure_points);
+    savedata();
+    char buff[64];
+    snprintf(buff, sizeof(buff), "Đã lưu điểm áp suất: ADC=%d -> %.2f bar\n", pt.adc, p_known);
+    Blynk.virtualWrite(V10, buff);
+  } else if (dataS == "level_clear") {
+    data.num_level_points = 0;
+    for (int i = 0; i < MAX_CALIB_POINTS; i++) {
+      data.level_points[i].adc = 0;
+      data.level_points[i].value = 0;
+    }
+    savedata();
+    Blynk.virtualWrite(V10, "Đã xóa calib mực nước.\n");
+  } else if (dataS.startsWith("level_")) {
+    // Lệnh dạng level_120
+    float l_known = dataS.substring(6).toFloat();
+    CalibPoint pt;
+    pt.adc = (uint16_t)round(filtered_adc_level);
+    pt.value = (uint16_t)l_known; // Lưu trực tiếp cm
+    addOrUpdateCalibPoint(pt, data.level_points, data.num_level_points);
+    savedata();
+    char buff[64];
+    snprintf(buff, sizeof(buff), "Đã lưu điểm mực nước: ADC=%d -> %d cm\n", pt.adc, pt.value);
+    Blynk.virtualWrite(V10, buff);
   } else {
-    bool handled = false;
-    if (key) {
-      if (dataS == "pre_clear") {
-        data.num_pressure_points = 0;
-        // Xóa sạch dữ liệu cũ để tránh nhầm lẫn
-        for(int i=0; i<MAX_CALIB_POINTS; i++) { data.pressure_points[i].adc = 0; data.pressure_points[i].value = 0; }
-        savedata();
-        terminal.println("Đã xóa calib áp suất.");
-        handled = true;
-      } else if (dataS.startsWith("pre_")) {
-        // Lệnh dạng pre_2.5
-        float p_known = dataS.substring(4).toFloat();
-        // Quy đổi: 2.5 bar -> 250
-        uint16_t val_store = (uint16_t)(p_known * 100);
-        CalibPoint pt;
-        pt.adc = (uint16_t)round(filtered_adc_pressure);
-        pt.value = val_store;
-        addOrUpdateCalibPoint(pt, data.pressure_points, data.num_pressure_points);
-        savedata();
-        terminal.printf("Đã lưu điểm áp suất: ADC=%d -> %.2f bar\n", pt.adc, p_known);
-        handled = true;
-      } else if (dataS == "level_clear") {
-        data.num_level_points = 0;
-        for(int i=0; i<MAX_CALIB_POINTS; i++) { data.level_points[i].adc = 0; data.level_points[i].value = 0; }
-        savedata();
-        terminal.println("Đã xóa calib mực nước.");
-        handled = true;
-      } else if (dataS.startsWith("level_")) {
-        // Lệnh dạng level_120
-        float l_known = dataS.substring(6).toFloat();
-        CalibPoint pt;
-        pt.adc = (uint16_t)round(filtered_adc_level);
-        pt.value = (uint16_t)l_known; // Lưu trực tiếp cm
-        addOrUpdateCalibPoint(pt, data.level_points, data.num_level_points);
-        savedata();
-        terminal.printf("Đã lưu điểm mực nước: ADC=%d -> %d cm\n", pt.adc, pt.value);
-        handled = true;
-      }
-    }
-    if (!handled) {
-      Blynk.virtualWrite(V10, "Mật mã sai.\nVui lòng nhập lại!\n");
-    }
+    Blynk.virtualWrite(V10, "Mật mã sai.\nVui lòng nhập lại!\n");
   }
 }
 BLYNK_WRITE(V11) // Chọn thời gian chạy 2 Bơm
