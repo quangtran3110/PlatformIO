@@ -69,7 +69,7 @@
 #define VOLUME_TOKEN_G2 "Hc5DgCBzl4Oi5hW_JOaNZ6oBKoGy5kFI"
 #define VOLUME_TOKEN_G3 "JTnEpJjGVVJ8DM1aJx7zZT4cyNYJrhr_"
 
-#define BLYNK_FIRMWARE_VERSION "250923"
+#define BLYNK_FIRMWARE_VERSION "251224"
 #define BLYNK_PRINT Serial
 #define APP_DEBUG
 
@@ -97,9 +97,10 @@ RTC_DS3231 rtc_module;
 char daysOfTheWeek[7][12] = {"CN", "T2", "T3", "T4", "T5", "T6", "T7"};
 //-----------------------------
 #include <Eeprom24C32_64.h>
-#define EEPROM_ADDRESS 0x57
-static Eeprom24C32_64 eeprom(EEPROM_ADDRESS);
-const word address = 0;
+#include <I2C_eeprom_cyclic_store.h>
+#define MEMORY_SIZE 4096
+#define PAGE_SIZE 32
+I2C_eeprom ee(0x57, MEMORY_SIZE);
 //-----------------------------
 #include "PCF8575.h"
 PCF8575 pcf8575_1(0x20);
@@ -181,7 +182,16 @@ int LLG2_1m3, LLG1_1m3, LLG3_1m3;
 int G1_start, G2_start, G3_start, B1_start, B2_start, B3_start, B4_start;
 bool G1_save = false, G2_save = false, G3_save = false, B1_save = false, B2_save = false, B3_save = false, B4_save = false;
 //----------------------------------
+#define DATA_VERSION 3
+
+#define MAX_CALIB_POINTS 5
+struct CalibPoint {
+  uint16_t adc;   // Giá trị ADC (0-1023)
+  uint16_t value; // Giá trị quy đổi (cm)
+};
+
 struct Data {
+  uint8_t version;
   byte SetAmpemax, SetAmpemin;
   byte SetAmpe1max, SetAmpe1min;
   byte SetAmpe2max, SetAmpe2min;
@@ -203,11 +213,11 @@ struct Data {
   int timerun_G1, timerun_G2, timerun_G3, timerun_B1, timerun_B2, timerun_B3, timerun_B4;
   byte key_noti;
   // Thêm các trường hiệu chuẩn cho cảm biến mực nước
-  uint16_t level_cal_offset_x100; // Giá trị đọc được ở điểm 0 (ADC * 100).
-  uint16_t level_cal_gain_x1000;  // Hệ số khuếch đại (gain * 1000).
+  CalibPoint level_points[MAX_CALIB_POINTS];
+  uint8_t num_level_points;
 } data, dataCheck;
 const struct Data dataDefault = {};
-
+I2C_eeprom_cyclic_store<Data> cs;
 // Cấu trúc để lưu trạng thái trước đó của các biến, tối ưu việc gửi dữ liệu
 struct PrevState {
   float Irms0 = -1.0, Irms1 = -1.0, Irms2 = -1.0, Irms3 = -1.0, Irms4 = -1.0, Irms5 = -1.0, Irms6 = -1.0, Irms7 = -1.0, Irms8 = -1.0;
@@ -352,6 +362,65 @@ void updata() {
   }
 }
 //----------------------------------
+
+// --- CÁC HÀM HỖ TRỢ HIỆU CHUẨN ĐA ĐIỂM ---
+void sortCalibPoints(CalibPoint points[], uint8_t num_points) {
+  for (uint8_t i = 1; i < num_points; i++) {
+    CalibPoint key = points[i];
+    int8_t j = i - 1;
+    while (j >= 0 && points[j].adc > key.adc) {
+      points[j + 1] = points[j];
+      j--;
+    }
+    points[j + 1] = key;
+  }
+}
+
+void addOrUpdateCalibPoint(CalibPoint new_point, CalibPoint points[], uint8_t &num_points) {
+  if (num_points > MAX_CALIB_POINTS)
+    num_points = 0; // Reset nếu dữ liệu bị lỗi
+  if (num_points < MAX_CALIB_POINTS) {
+    points[num_points] = new_point;
+    num_points++;
+  } else {
+    int8_t closest_idx = -1;
+    uint16_t min_diff = 65535;
+    for (uint8_t i = 0; i < num_points; i++) {
+      uint16_t diff = abs((int)points[i].value - (int)new_point.value);
+      if (closest_idx == -1 || diff < min_diff) {
+        min_diff = diff;
+        closest_idx = i;
+      }
+    }
+    if (closest_idx != -1)
+      points[closest_idx] = new_point;
+  }
+  sortCalibPoints(points, num_points);
+}
+
+float interpolate(float current_adc, const CalibPoint points[], uint8_t num_points) {
+  if (num_points < 2)
+    return (num_points == 1) ? (float)points[0].value : 0.0f;
+  const CalibPoint *p1, *p2;
+  if (current_adc <= points[0].adc) {
+    p1 = &points[0];
+    p2 = &points[1];
+  } else if (current_adc >= points[num_points - 1].adc) {
+    p1 = &points[num_points - 2];
+    p2 = &points[num_points - 1];
+  } else {
+    uint8_t i = 0;
+    while (i < num_points - 1 && current_adc > points[i + 1].adc)
+      i++;
+    p1 = &points[i];
+    p2 = &points[i + 1];
+  }
+  float x = current_adc, x1 = p1->adc, y1 = p1->value, x2 = p2->adc, y2 = p2->value;
+  if (x2 == x1)
+    return y1;
+  return y1 + (x - x1) * (y2 - y1) / (x2 - x1);
+}
+
 void bridge_Tram2C(String token, int virtual_pin, float(value_to_send)) {
   String server_path = server_name + "batch/update?token=" + token + "&V" + String(virtual_pin) + "=" + value_to_send;
   http.begin(client, server_path.c_str());
@@ -395,10 +464,10 @@ void event_pressure() {
 void savedata() {
   if (memcmp(&data, &dataCheck, sizeof(dataDefault)) == 0) {
     // Serial.println("structures same no need to write to EEPROM");
-  } else {
+  } else if (cs.write(data)) {
     // Serial.println("\nWrite bytes to EEPROM memory...");
     data.save_num = data.save_num + 1;
-    eeprom.writeBytes(address, sizeof(dataDefault), (byte *)&data);
+    memcpy(&dataCheck, &data, sizeof(data));
     Blynk.setProperty(V5, "label", data.save_num);
   }
 }
@@ -719,6 +788,7 @@ BLYNK_WRITE(V4) // PROTECT
 BLYNK_WRITE(V5) // data string
 {
   String dataS = param.asStr();
+  dataS.trim(); // Xóa khoảng trắng và ký tự xuống dòng thừa
   if (dataS == "help") {
     keyterminal.clear();
     Blynk.virtualWrite(V5,
@@ -732,9 +802,9 @@ BLYNK_WRITE(V5) // data string
                        "update    : Cap nhat firmware (OTA)\n"
                        "i2c       : Quet cac thiet bi I2C\n"
                        "save_num  : Xem so lan ghi vao EEPROM\n"
-                       "level_0   : Hieu chuan muc nuoc 0 cm\n"
-                       "level_<so>: Hieu chuan tai muc nuoc <so> cm\n"
-                       "ok        : Xac nhan luu khoi luong CLO\n");
+                       "level_<so>: Calib tai muc nuoc <so> cm\n"
+                       "level_clear : Xoa calib muc nuoc\n"
+                       "calib     : Xem thong tin calib\n");
   }
   if ((dataS == "t2")) {
     keyterminal.clear();
@@ -819,32 +889,41 @@ BLYNK_WRITE(V5) // data string
       keyterminal.clear();
       Blynk.virtualWrite(V5, "Đã lưu - CLO:", data.clo, "kg");
     }
-  } else if (dataS == "level_0") { // Lệnh hiệu chuẩn điểm 0 cm cho mực nước
-    if (keySet) {
-      data.level_cal_offset_x100 = kalman_filtered_adc_value * 100;
-      savedata();
-      char buffer[60];
-      sprintf(buffer, "Đã lưu offset mực nước: %.0f\n", kalman_filtered_adc_value);
-      Blynk.virtualWrite(V5, buffer);
+  } else if (dataS == "calib") {
+    keyterminal.clear();
+    Blynk.virtualWrite(V5, "--- THÔNG TIN HIỆU CHUẨN ---\n");
+    Blynk.virtualWrite(V5, "[CẢM BIẾN MỰC NƯỚC]\n");
+    char buff[100];
+    snprintf(buff, sizeof(buff), " - Số điểm: %d/%d\n", data.num_level_points, MAX_CALIB_POINTS);
+    Blynk.virtualWrite(V5, buff);
+    for (uint8_t i = 0; i < data.num_level_points; i++) {
+      snprintf(buff, sizeof(buff), " #%d: ADC=%d -> %d cm\n", i + 1, data.level_points[i].adc, data.level_points[i].value);
+      Blynk.virtualWrite(V5, buff);
     }
+    snprintf(buff, sizeof(buff), " - ADC hiện tại: %.2f\n", kalman_filtered_adc_value);
+    Blynk.virtualWrite(V5, buff);
+    snprintf(buff, sizeof(buff), " => Mực nước: %.1f cm\n", smoothDistance);
+    Blynk.virtualWrite(V5, buff);
+  } else if (dataS == "level_clear") {
+    data.num_level_points = 0;
+    for (int i = 0; i < MAX_CALIB_POINTS; i++) {
+      data.level_points[i].adc = 0;
+      data.level_points[i].value = 0;
+    }
+    savedata();
+    Blynk.virtualWrite(V5, "Đã xóa calib mực nước.\n");
   } else if (dataS.startsWith("level_")) { // Lệnh hiệu chuẩn điểm mực nước đã biết, ví dụ: level_150
-    if (keySet) {
-      String numStr = dataS.substring(6);
-      float level_known = numStr.toFloat();
-      float adc_at_known = kalman_filtered_adc_value;
-      float adc_zero = data.level_cal_offset_x100 / 100.0f;
+    String numStr = dataS.substring(6);
+    float level_known = numStr.toFloat();
+    CalibPoint pt;
+    pt.adc = (uint16_t)round(kalman_filtered_adc_value);
+    pt.value = (uint16_t)level_known;
+    addOrUpdateCalibPoint(pt, data.level_points, data.num_level_points);
+    savedata();
+    char buff[64];
+    snprintf(buff, sizeof(buff), "Đã lưu điểm: ADC=%d -> %d cm\n", pt.adc, pt.value);
+    Blynk.virtualWrite(V5, buff);
 
-      if (adc_at_known > adc_zero) {
-        float gain = level_known / (adc_at_known - adc_zero);
-        data.level_cal_gain_x1000 = gain * 1000;
-        savedata();
-        char buffer[80];
-        sprintf(buffer, "Đã hiệu chuẩn tại %.1f cm. Gain mới: %.3f\n", level_known, gain);
-        Blynk.virtualWrite(V5, buffer);
-      } else {
-        Blynk.virtualWrite(V5, "Lỗi: ADC đọc được phải > ADC tại điểm 0\n");
-      }
-    }
   } else if (dataS == "i2c") {
     i2c_scaner();
   } else {
@@ -1346,7 +1425,7 @@ BLYNK_WRITE(V31) // On G2
 BLYNK_WRITE(V47) // On-Off Nen khi 1
 {
   int data47 = param.asInt();
-  if (keySwitchQ) {
+  if (keySwitchQ || keySwitchP || keySwitchD) {
     if (data47 == 1) {
       pcf8575_1.digitalWrite(pin_NK1, HIGH);
     } else {
@@ -1357,7 +1436,7 @@ BLYNK_WRITE(V47) // On-Off Nen khi 1
 BLYNK_WRITE(V48) // On-Off Nen khi 2
 {
   int data48 = param.asInt();
-  if (keySwitchQ) {
+  if (keySwitchQ || keySwitchP || keySwitchD) {
     if (data48 == 1) {
       pcf8575_1.digitalWrite(pin_NK2, HIGH);
     } else {
@@ -2039,6 +2118,7 @@ void time_run_motor() {
 }
 
 //----------------------------------------------------
+
 /**
  * @brief Đọc và xử lý giá trị từ cảm biến mực nước bằng bộ lọc Median + Kalman.
  */
@@ -2065,14 +2145,7 @@ void MeasureAndProcessWaterLevel() // C14
   kalman_filtered_adc_value = levelKalmanFilter.updateEstimate(median_value);
 
   // 5. Chuyển đổi giá trị ADC đã làm mịn sang đơn vị đo thực tế (cm)
-  float gain = data.level_cal_gain_x1000 / 1000.0f;
-  float offset = data.level_cal_offset_x100 / 100.0f;
-
-  if (gain > 0) {
-    smoothDistance = gain * (kalman_filtered_adc_value - offset);
-  } else {
-    smoothDistance = 0.0f;
-  }
+  smoothDistance = interpolate(kalman_filtered_adc_value, data.level_points, data.num_level_points);
 
   // Giới hạn giá trị trong khoảng hợp lý
   smoothDistance = constrain(smoothDistance, 0.0, dosau * 1.4); // Cho phép vượt 40%
@@ -2110,7 +2183,7 @@ BLYNK_WRITE(V52) {
 }
 //----------------------------------------------------
 void setup() {
-  Serial.begin(9600);
+  Serial.begin(115200);
   WiFi.mode(WIFI_STA);
   WiFi.begin(ssid, password);
   Blynk.config(BLYNK_AUTH_TOKEN);
@@ -2168,18 +2241,21 @@ void setup() {
 
   rtc_module.begin();
 
-  eeprom.initialize();
-  eeprom.readBytes(address, sizeof(dataDefault), (byte *)&data);
-  memcpy(&dataCheck, &data, sizeof(dataDefault));
+  ee.begin();
+  cs.begin(ee, PAGE_SIZE, MEMORY_SIZE / PAGE_SIZE);
 
-  // Khởi tạo giá trị hiệu chuẩn mặc định nếu chưa có (lần chạy đầu tiên)
-  if (data.level_cal_gain_x1000 == 0) {
-    Serial.println("Initializing default calibration values for water level sensor.");
-    // Giả định: 0cm -> ADC 199, 515cm -> ADC 936
-    data.level_cal_offset_x100 = 199.0f * 100;
-    data.level_cal_gain_x1000 = (515.0f / (936.0f - 199.0f)) * 1000; // gain ~ 0.698
+  if (!cs.read(data) || data.version != DATA_VERSION) {
+    Serial.println("EEPROM invalid or old version. Resetting...");
+    memset(&data, 0, sizeof(data));
+    data.version = DATA_VERSION;
     savedata();
   }
+  // Kiểm tra và sửa lỗi dữ liệu calib nếu bị sai lệch cấu trúc
+  if (data.num_level_points > MAX_CALIB_POINTS) {
+    data.num_level_points = 0;
+    savedata();
+  }
+  memcpy(&dataCheck, &data, sizeof(data));
 
   timer.setTimeout(5000L, []() {
     timer_I = timer.setInterval(1589, []() {
