@@ -37,6 +37,7 @@
 #define BLYNK_AUTH_TOKEN "SZfJItqPgAVkiB8VdBuzyl5f94BU3E4x"
 
 #define BLYNK_FIRMWARE_VERSION "250606"
+#define BLYNK_FIRMWARE_VERSION "251224"
 //------------------
 #include "EmonLib.h"
 #include "PCF8575.h"
@@ -89,6 +90,7 @@ bool key_bom = true, key_gieng = true;
 bool blynk_first_connect = false;
 
 float volume, percent, percent1, dungtich, smoothDistance;
+float volume, percent, percent1, dungtich, smoothDistance, smoothed_adc_level;
 float Irms0, Irms1, Irms2, value, sensor_pre_raw, clo_cache = 0;
 
 long distance, distance1, t;
@@ -149,7 +151,16 @@ int digitalSmooth(int rawIn, int *sensSmoothArray) {
   return total / k; // divide by number of samples
 }
 //-----------------------------
+#define DATA_VERSION 1
+#define MAX_CALIB_POINTS 5
+
+struct CalibPoint {
+  uint16_t adc;   // Giá trị ADC (0-1023)
+  uint16_t value; // Giá trị quy đổi (Áp suất * 100, Mực nước cm)
+};
+
 struct Data {
+  uint8_t version;
   byte SetAmpemax, SetAmpemin;
   byte SetAmpe1max, SetAmpe1min;
   byte SetAmpe2max, SetAmpe2min;
@@ -165,6 +176,10 @@ struct Data {
   int phao_max, phao_min;
   byte pre_zero;
   int pre_num;
+  CalibPoint pressure_points[MAX_CALIB_POINTS];
+  uint8_t num_pressure_points;
+  CalibPoint level_points[MAX_CALIB_POINTS];
+  uint8_t num_level_points;
 } data, dataCheck;
 const struct Data dataDefault = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
 
@@ -252,11 +267,14 @@ void up() {
 }
 void savedata() {
   if (memcmp(&data, &dataCheck, sizeof(dataDefault)) == 0) {
+  if (memcmp(&data, &dataCheck, sizeof(data)) == 0) {
     // Serial.println("structures same no need to write to EEPROM");
   } else {
     // Serial.println("\nWrite bytes to EEPROM memory...");
     data.save_num = data.save_num + 1;
     eeprom.writeBytes(address, sizeof(dataDefault), (byte *)&data);
+    eeprom.writeBytes(address, sizeof(data), (byte *)&data);
+    memcpy(&dataCheck, &data, sizeof(data));
     Blynk.setProperty(V11, "label", data.save_num);
   }
 }
@@ -340,6 +358,55 @@ void on_time() {
     on_cap1();
   }
 }
+
+// --- CÁC HÀM HỖ TRỢ HIỆU CHUẨN ĐA ĐIỂM ---
+void sortCalibPoints(CalibPoint points[], uint8_t num_points) {
+  for (uint8_t i = 1; i < num_points; i++) {
+    CalibPoint key = points[i];
+    int8_t j = i - 1;
+    while (j >= 0 && points[j].adc > key.adc) {
+      points[j + 1] = points[j];
+      j--;
+    }
+    points[j + 1] = key;
+  }
+}
+
+void addOrUpdateCalibPoint(CalibPoint new_point, CalibPoint points[], uint8_t &num_points) {
+  if (num_points > MAX_CALIB_POINTS) num_points = 0;
+  if (num_points < MAX_CALIB_POINTS) {
+    points[num_points] = new_point;
+    num_points++;
+  } else {
+    int8_t closest_idx = -1;
+    uint16_t min_diff = 65535;
+    for (uint8_t i = 0; i < num_points; i++) {
+      uint16_t diff = abs((int)points[i].value - (int)new_point.value);
+      if (closest_idx == -1 || diff < min_diff) {
+        min_diff = diff;
+        closest_idx = i;
+      }
+    }
+    if (closest_idx != -1) points[closest_idx] = new_point;
+  }
+  sortCalibPoints(points, num_points);
+}
+
+float interpolate(float current_adc, const CalibPoint points[], uint8_t num_points) {
+  if (num_points < 2) return (num_points == 1) ? (float)points[0].value : 0.0f;
+  const CalibPoint *p1, *p2;
+  if (current_adc <= points[0].adc) { p1 = &points[0]; p2 = &points[1]; }
+  else if (current_adc >= points[num_points - 1].adc) { p1 = &points[num_points - 2]; p2 = &points[num_points - 1]; }
+  else {
+    uint8_t i = 0;
+    while (i < num_points - 1 && current_adc > points[i + 1].adc) i++;
+    p1 = &points[i]; p2 = &points[i + 1];
+  }
+  float x = current_adc, x1 = p1->adc, y1 = p1->value, x2 = p2->adc, y2 = p2->value;
+  if (x2 == x1) return y1;
+  return y1 + (x - x1) * (y2 - y1) / (x2 - x1);
+}
+
 //-------------------------------------------------------------------
 void readPressure() { // C0 - Ap Luc
   pcf8575_1.digitalWrite(S0pin, LOW);
@@ -353,6 +420,9 @@ void readPressure() { // C0 - Ap Luc
     value -= sensor_pre;
   }
   Result = (((sensor_pre - data.pre_zero) * range_pre) / (data.pre_num - data.pre_zero));
+  // Sử dụng nội suy đa điểm
+  float val = interpolate(sensor_pre, data.pressure_points, data.num_pressure_points);
+  Result = val / 100.0f; // Quy đổi về bar
 }
 void MeasureCmForSmoothing() { // C1-  Muc Nuoc
   pcf8575_1.digitalWrite(S0pin, HIGH);
@@ -371,6 +441,17 @@ void MeasureCmForSmoothing() { // C1-  Muc Nuoc
         keytank = true;
       });
     }
+  int raw_adc = analogRead(A0);
+  // Lọc nhiễu ADC trước
+  smoothed_adc_level = digitalSmooth(raw_adc, sensSmoothArray1);
+  // Nội suy ra cm
+  smoothDistance = interpolate(smoothed_adc_level, data.level_points, data.num_level_points);
+
+  volume = (dai * smoothDistance * rong) / 1000000;
+  if ((smoothDistance - dosau >= 20) && (data.key_noti) && (keytank)) {
+    Blynk.logEvent("info", String("Nước trong bể cao vượt mức ") + (smoothDistance - dosau) + String(" cm"));
+    keytank = false;
+    timer1.setTimeout(1800000L, []() { keytank = true; });
   }
 }
 //-------------------------------------------------------------------
@@ -687,6 +768,17 @@ BLYNK_WRITE(V11) // String
     hidden();
     Blynk.virtualWrite(V11, "Ok!\nNhập mã để điều khiển!\n");
   } else if (dataS == "save") {
+  } else if (dataS == "help") {
+    terminal.clear();
+    Blynk.virtualWrite(V11, "--- DANH SÁCH LỆNH ---\n"
+                            "pre_X.X   : Calib áp suất tại X.X bar\n"
+                            "level_YYY : Calib mực nước tại YYY cm\n"
+                            "calib_pre : Xem thong tin calib ap suat\n"
+                            "calib_level : Xem thong tin calib muc nuoc\n"
+                            "pre_clear : Xóa calib áp suất\n"
+                            "level_clear : Xóa calib mực nước\n"
+                            "save      : Luu cai dat\n");
+  }else if (dataS == "save") {
     terminal.clear();
     savedata();
     Blynk.virtualWrite(V11, "Đã lưu cài đặt.\n");
@@ -716,6 +808,54 @@ BLYNK_WRITE(V11) // String
       terminal.clear();
       Blynk.virtualWrite(V11, "Đã lưu - CLO:", data.clo, "kg");
     }
+  } else if (dataS == "calib_pre") {
+    terminal.clear();
+    Blynk.virtualWrite(V11, "--- CALIB ÁP SUẤT ---\n");
+    char buff[64];
+    snprintf(buff, sizeof(buff), "Points: %d/%d\n", data.num_pressure_points, MAX_CALIB_POINTS);
+    Blynk.virtualWrite(V11, buff);
+    for (uint8_t i = 0; i < data.num_pressure_points; i++) {
+      snprintf(buff, sizeof(buff), "#%d: ADC=%d -> %.2f bar\n", i + 1, data.pressure_points[i].adc, data.pressure_points[i].value / 100.0f);
+      Blynk.virtualWrite(V11, buff);
+    }
+    snprintf(buff, sizeof(buff), "ADC: %.2f -> %.2f bar\n", sensor_pre, Result);
+    Blynk.virtualWrite(V11, buff);
+  } else if (dataS == "calib_level") {
+    terminal.clear();
+    Blynk.virtualWrite(V11, "--- CALIB MỰC NƯỚC ---\n");
+    char buff[64];
+    snprintf(buff, sizeof(buff), "Points: %d/%d\n", data.num_level_points, MAX_CALIB_POINTS);
+    Blynk.virtualWrite(V11, buff);
+    for (uint8_t i = 0; i < data.num_level_points; i++) {
+      snprintf(buff, sizeof(buff), "#%d: ADC=%d -> %d cm\n", i + 1, data.level_points[i].adc, data.level_points[i].value);
+      Blynk.virtualWrite(V11, buff);
+    }
+    snprintf(buff, sizeof(buff), "ADC: %.0f -> %.1f cm\n", smoothed_adc_level, smoothDistance);
+    Blynk.virtualWrite(V11, buff);
+  } else if (dataS == "pre_clear") {
+    data.num_pressure_points = 0;
+    savedata();
+    Blynk.virtualWrite(V11, "Đã xóa calib áp suất.\n");
+  } else if (dataS == "level_clear") {
+    data.num_level_points = 0;
+    savedata();
+    Blynk.virtualWrite(V11, "Đã xóa calib mực nước.\n");
+  } else if (dataS.startsWith("pre_")) {
+    float val = dataS.substring(4).toFloat();
+    CalibPoint pt;
+    pt.adc = (uint16_t)round(sensor_pre);
+    pt.value = (uint16_t)(val * 100);
+    addOrUpdateCalibPoint(pt, data.pressure_points, data.num_pressure_points);
+    savedata();
+    Blynk.virtualWrite(V11, "Đã lưu điểm áp suất.\n");
+  } else if (dataS.startsWith("level_")) {
+    float val = dataS.substring(6).toFloat();
+    CalibPoint pt;
+    pt.adc = (uint16_t)round(smoothed_adc_level);
+    pt.value = (uint16_t)val;
+    addOrUpdateCalibPoint(pt, data.level_points, data.num_level_points);
+    savedata();
+    Blynk.virtualWrite(V11, "Đã lưu điểm mực nước.\n");
   } else {
     Blynk.virtualWrite(V11, "Mật mã sai.\nVui lòng nhập lại!\n");
   }
@@ -821,12 +961,22 @@ BLYNK_WRITE(V22) { // Lưu giá trị Zero áp lực
       savedata();
     }
   }
+  // if (calib_pre_sta == 1) {
+  //   if (param.asInt() == HIGH) {
+  //     data.pre_zero = sensor_pre;
+  //     savedata();
+  //   }
+  // }
 }
 BLYNK_WRITE(V23) { // Lưu giá trị Pre_num
   if (calib_pre_sta == 1) {
     data.pre_num = (((sensor_pre - data.pre_zero) * range_pre) / param.asFloat()) + data.pre_zero;
     savedata();
   }
+  // if (calib_pre_sta == 1) {
+  //   data.pre_num = (((sensor_pre - data.pre_zero) * range_pre) / param.asFloat()) + data.pre_zero;
+  //   savedata();
+  // }
 }
 //-------------------------
 BLYNK_WRITE(V24) // Lưu lượng G1_1m3
@@ -881,6 +1031,19 @@ void setup() {
   rtc_module.begin();
   eeprom.initialize();
   eeprom.readBytes(address, sizeof(dataDefault), (byte *)&data);
+  eeprom.readBytes(address, sizeof(data), (byte *)&data);
+
+  // Kiểm tra phiên bản dữ liệu
+  if (data.version != DATA_VERSION) {
+    Serial.println("EEPROM version mismatch. Resetting...");
+    memset(&data, 0, sizeof(data));
+    data.version = DATA_VERSION;
+    savedata();
+  }
+  // Kiểm tra an toàn mảng
+  if (data.num_pressure_points > MAX_CALIB_POINTS) data.num_pressure_points = 0;
+  if (data.num_level_points > MAX_CALIB_POINTS) data.num_level_points = 0;
+  memcpy(&dataCheck, &data, sizeof(data));
 
   //------------------------------------
   timer.setTimeout(5000L, []() {

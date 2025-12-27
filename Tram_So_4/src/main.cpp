@@ -1,3 +1,4 @@
+
 /*V0 - Button C2-1
  *V1 - Button C2-2
  *V2 - Button C1
@@ -71,7 +72,7 @@
 #define BLYNK_AUTH_TOKEN "ra1gZtR0irrwiTH1L-L_nhXI6TMRH7M9"
 #define VOLUME_TOKEN "RyDZuYiRC4oaG5MsFI2kw4WsQpKiw2Ko"
 
-#define BLYNK_FIRMWARE_VERSION "251224"
+#define BLYNK_FIRMWARE_VERSION "251220"
 
 const char *ssid = "tram bom so 4";
 const char *password = "0943950555";
@@ -176,10 +177,7 @@ struct CalibPoint {
   uint16_t value; // Giá trị quy đổi (Áp suất * 100, Mực nước cm)
 };
 
-#define DATA_VERSION 1 // Tăng số này lên khi thay đổi cấu trúc Data để reset EEPROM
-
-struct Data { // Bỏ packed để trình biên dịch tự căn chỉnh bộ nhớ (tránh lỗi Exception 9)
-  uint8_t version; // Biến quản lý phiên bản dữ liệu
+struct Data {
   struct Flags {
     uint8_t man : 1;
     uint8_t mode_cap2 : 1;
@@ -406,7 +404,7 @@ String dataForm(float value, int leng, int decimal) {
   }
   return str;
 }
-//-------------------------------------------------------------------
+
 void savedata() {
   if (memcmp(&data, &dataCheck, sizeof(data)) != 0) {
     Serial.println("\nData changed, writing to EEPROM...");
@@ -870,7 +868,6 @@ void sortCalibPoints(CalibPoint points[], uint8_t num_points) {
 }
 
 void addOrUpdateCalibPoint(CalibPoint new_point, CalibPoint points[], uint8_t &num_points) {
-  if (num_points > MAX_CALIB_POINTS) num_points = 0; // Reset nếu dữ liệu bị lỗi
   if (num_points < MAX_CALIB_POINTS) {
     points[num_points] = new_point;
     num_points++;
@@ -1278,7 +1275,6 @@ BLYNK_WRITE(V7) // max
 BLYNK_WRITE(V10) // String
 {
   String dataS = param.asStr();
-  dataS.trim(); // Xóa khoảng trắng thừa
   if (dataS == "help") {
     terminal.clear();
     Blynk.virtualWrite(V10,
@@ -1293,8 +1289,6 @@ BLYNK_WRITE(V10) // String
                        "--- HIỆU CHUẨN ---\n"
                        "pre_X.X   : Calib áp suất tại X.X bar\n"
                        "level_YYY : Calib mực nước tại YYY cm\n"
-                       "calib_pre : Xem thong tin calib ap suat\n"
-                       "calib_level : Xem thong tin calib muc nuoc\n"
                        "pre_clear : Xóa calib áp suất\n"
                        "level_clear : Xóa calib mực nước\n");
   } else if (dataS == "M") {
@@ -1372,9 +1366,12 @@ BLYNK_WRITE(V10) // String
     if (nDevices == 0)
       Blynk.virtualWrite(V10, "No I2C devices found.\n");
     // terminal.clear();
-  } else if (dataS == "calib_pre") {
+  } else if (dataS == "calib") {
     terminal.clear();
-    Blynk.virtualWrite(V10, "--- THÔNG TIN HIỆU CHUẨN ÁP SUẤT ---\n");
+    Blynk.virtualWrite(V10, "--- THÔNG TIN HIỆU CHUẨN ---\n");
+
+    // In thông tin áp suất
+    Blynk.virtualWrite(V10, "[CẢM BIẾN ÁP SUẤT]\n");
     char buff[100];
     snprintf(buff, sizeof(buff), " - Số điểm: %d/%d\n", data.num_pressure_points, MAX_CALIB_POINTS);
     Blynk.virtualWrite(V10, buff);
@@ -1386,10 +1383,9 @@ BLYNK_WRITE(V10) // String
     Blynk.virtualWrite(V10, buff);
     snprintf(buff, sizeof(buff), " => Áp suất tính toán: %.2f bar\n", Result1);
     Blynk.virtualWrite(V10, buff);
-  } else if (dataS == "calib_level") {
-    terminal.clear();
-    Blynk.virtualWrite(V10, "--- THÔNG TIN HIỆU CHUẨN MỰC NƯỚC ---\n");
-    char buff[100];
+
+    // In thông tin mực nước
+    Blynk.virtualWrite(V10, "[CẢM BIẾN MỰC NƯỚC]\n");
     snprintf(buff, sizeof(buff), " - Số điểm: %d/%d\n", data.num_level_points, MAX_CALIB_POINTS);
     Blynk.virtualWrite(V10, buff);
     for (uint8_t i = 0; i < data.num_level_points; i++) {
@@ -1718,27 +1714,7 @@ void setup() {
   rtc_module.begin();
   ee.begin();
   cs.begin(ee, PAGE_SIZE, MEMORY_SIZE / PAGE_SIZE); // Cập nhật số trang: 4096 / 32 = 128 trang
-
-  // Kiểm tra tính toàn vẹn dữ liệu và phiên bản
-  if (!cs.read(data) || data.version != DATA_VERSION) {
-    Serial.println("EEPROM invalid or old version. Initializing defaults...");
-    // Xóa sạch dữ liệu cũ
-    memset(&data, 0, sizeof(data));
-    // Thiết lập phiên bản mới
-    data.version = DATA_VERSION;
-    // Ghi dữ liệu mặc định vào EEPROM ngay lập tức
-    savedata();
-  }
-
-  // Kiểm tra và sửa lỗi dữ liệu calib nếu bị sai lệch
-  if (data.num_pressure_points > MAX_CALIB_POINTS) {
-    data.num_pressure_points = 0;
-    savedata();
-  }
-  if (data.num_level_points > MAX_CALIB_POINTS) {
-    data.num_level_points = 0;
-    savedata();
-  }
+  cs.read(data);
   memcpy(&dataCheck, &data, sizeof(data));
 
   pcf8575_1.begin();
