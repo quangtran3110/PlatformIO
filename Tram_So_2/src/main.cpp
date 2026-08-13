@@ -476,7 +476,7 @@ void onG1() {
   if (!trip3) {
     status_g1 = HIGH;
     pcf8575_1.digitalWrite(pin_on_G1, LOW);
-    delay(200);
+    delay(2500);
     pcf8575_1.digitalWrite(pin_on_G1, HIGH);
   } else {
     keyterminal.clear();
@@ -486,14 +486,14 @@ void onG1() {
 void offG1() {
   status_g1 = LOW;
   pcf8575_1.digitalWrite(pin_off_G1, LOW);
-  delay(200);
+  delay(1000);
   pcf8575_1.digitalWrite(pin_off_G1, HIGH);
 }
 void onG2() {
   if (!trip1) {
     status_g2 = HIGH;
     pcf8575_1.digitalWrite(pin_on_G2, LOW);
-    delay(200);
+    delay(2500);
     pcf8575_1.digitalWrite(pin_on_G2, HIGH);
   } else {
     keyterminal.clear();
@@ -503,14 +503,14 @@ void onG2() {
 void offG2() {
   status_g2 = LOW;
   pcf8575_1.digitalWrite(pin_off_G2, LOW);
-  delay(200);
+  delay(1000);
   pcf8575_1.digitalWrite(pin_off_G2, HIGH);
 }
 void onG3() {
   if (!trip5) {
     status_g3 = HIGH;
     pcf8575_1.digitalWrite(pin_on_G3, LOW);
-    delay(200);
+    delay(2500);
     pcf8575_1.digitalWrite(pin_on_G3, HIGH);
   } else {
     keyterminal.clear();
@@ -520,7 +520,7 @@ void onG3() {
 void offG3() {
   status_g3 = LOW;
   pcf8575_1.digitalWrite(pin_off_G3, LOW);
-  delay(200);
+  delay(1000);
   pcf8575_1.digitalWrite(pin_off_G3, HIGH);
 }
 //----------------------------------
@@ -646,7 +646,7 @@ void i2c_scaner() {
   if (nDevices == 0)
     Blynk.virtualWrite(V5, "No I2C devices found\n");
 }
-//----------------------------------
+//------------------------+----------
 BLYNK_WRITE(V0) // Nguoi truc
 {
   if (keySwitchP || keySwitchD || keySwitchQ) {

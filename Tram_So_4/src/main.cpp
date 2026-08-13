@@ -157,7 +157,7 @@ int LLG1_1m3, reboot_num;
 int time_run_nenkhi = 5 * 60;
 int time_stop_nenkhi = 10 * 60;
 byte status_b1 = LOW, status_b2 = LOW, status_g1 = LOW;
-int G1_start, B1_start, B2_start;
+unsigned long G1_start = 0, B1_start = 0, B2_start = 0;
 bool G1_save = false, B1_save = false, B2_save = false;
 //-------------------
 int startup_cycles = 8; // Bỏ qua 5 chu kỳ đọc đầu tiên để cảm biến ổn định
@@ -407,14 +407,15 @@ String dataForm(float value, int leng, int decimal) {
 
 void savedata() {
   if (memcmp(&data, &dataCheck, sizeof(data)) != 0) {
-    Serial.println("\nData changed, writing to EEPROM...");
-    data.save_num = data.save_num + 1;
+    // Serial.println("\nData changed, writing to EEPROM...");
+    data.save_num++; // Tăng số lần lưu
     if (cs.write(data)) {
       memcpy(&dataCheck, &data, sizeof(data));
       Blynk.setProperty(V10, "label", data.save_num);
-      Serial.println("EEPROM write successful.");
+      // Serial.println("EEPROM write successful.");
     } else {
-      Serial.println("EEPROM write failed!");
+      // Serial.println("EEPROM write failed!");
+      data.save_num--; // Trả lại giá trị cũ nếu ghi thất bại
     }
   }
 }
@@ -549,11 +550,13 @@ void readPower() // C2 - Giếng    - I0
           status_g1 = LOW; // Cập nhật trạng thái để logic bảo vệ hoạt động
           xIrms0 = 0;      // Reset bộ đếm lỗi
         } else {
-          // Bể chưa đầy nhưng bơm không chạy -> Đây mới là lỗi thực sự.
-          offcap1(); // Tắt bơm (cập nhật status_g1 = LOW)
-          trip0 = true;
-          if (data.flags.key_noti)
-            Blynk.logEvent("error", String("Bơm GIẾNG lỗi không đo được DÒNG ĐIỆN!"));
+          if (keyp) {
+            // Bể chưa đầy nhưng bơm không chạy -> Đây mới là lỗi thực sự.
+            offcap1(); // Tắt bơm (cập nhật status_g1 = LOW)
+            trip0 = true;
+            if (data.flags.key_noti)
+              Blynk.logEvent("error", String("Bơm GIẾNG lỗi không đo được DÒNG ĐIỆN!"));
+          }
         }
       }
     }
@@ -616,14 +619,14 @@ void readPower1() // C3 - Bơm 1    - I1
     return;
   }
 
-  if (rms1 < 2) {
+  if (rms1 < 4) {
     Irms1 = 0;
     yIrms1 = 0;
     if (status_b1 == HIGH) {
       // Nếu có lệnh BẬT nhưng không có dòng, bắt đầu đếm lỗi
       xIrms1++;
       Serial.println("xIrms1: " + String(xIrms1));
-      if (xIrms1 > 3) {
+      if ((xIrms1 > 3) && (keyp)) {
         // Lệnh đang là BẬT nhưng không đo được dòng điện -> Động cơ lỗi không chạy
         offbom1(); // Hàm này đã bao gồm việc đặt status_b1 = LOW
         trip1 = true;
@@ -636,7 +639,7 @@ void readPower1() // C3 - Bơm 1    - I1
       savedata();
       B1_start = 0;
     }
-  } else if (rms1 >= 2) {
+  } else if (rms1 >= 4) {
     Irms1 = rms1;
     yIrms1 = yIrms1 + 1;
     xIrms1 = 0;
@@ -690,13 +693,13 @@ void readPower2() // C4 - Bơm 2    - I2
     return;
   }
 
-  if (rms2 < 2) {
+  if (rms2 < 4) {
     Irms2 = 0;
     yIrms2 = 0;
     if (status_b2 == HIGH) {
       // Nếu có lệnh BẬT nhưng không có dòng, bắt đầu đếm lỗi
       xIrms2++;
-      if (xIrms2 > 3) {
+      if ((xIrms2 > 3) && (keyp)) {
         // Lệnh đang là BẬT nhưng không đo được dòng điện -> Động cơ lỗi không chạy
         offbom2(); // Hàm này đã bao gồm việc đặt status_b2 = LOW
         trip2 = true;
@@ -709,7 +712,7 @@ void readPower2() // C4 - Bơm 2    - I2
       savedata();
       B2_start = 0;
     }
-  } else if (rms2 >= 2) {
+  } else if (rms2 >= 4) {
     Irms2 = rms2;
     yIrms2 = yIrms2 + 1;
     xIrms2 = 0;
@@ -763,10 +766,10 @@ void readPower3() // C5 - Nén khí  - I3
     return;
   }
 
-  if (rms3 < 1) {
+  if (rms3 < 3) {
     Irms3 = 0;
     yIrms3 = 0;
-  } else if (rms3 >= 1) {
+  } else if (rms3 >= 3) {
     Irms3 = rms3;
     yIrms3 = yIrms3 + 1;
     if ((yIrms3 > 3) && ((Irms3 >= data.SetAmpe3max && data.SetAmpe3max > 0) || (Irms3 <= data.SetAmpe3min && data.SetAmpe3min > 0))) {
@@ -892,7 +895,7 @@ void addOrUpdateCalibPoint(CalibPoint new_point, CalibPoint points[], uint8_t &n
 
 float interpolate(float current_adc, const CalibPoint points[], uint8_t num_points) {
   if (num_points < 2) {
-    return (num_points == 1) ? (float)points[0].value : 0.0f;
+    return (num_points == 1) ? (float)points[0].value : 0.0f; // Trả về 0 nếu chưa có điểm calib nào
   }
 
   const CalibPoint *p1, *p2;
@@ -919,7 +922,7 @@ float interpolate(float current_adc, const CalibPoint points[], uint8_t num_poin
   float x1 = p1->adc, y1 = p1->value;
   float x2 = p2->adc, y2 = p2->value;
 
-  if (x2 == x1)
+  if (abs(x2 - x1) < 0.001) // Tránh lỗi chia cho 0 nếu 2 điểm ADC trùng nhau
     return y1;
 
   return y1 + (x - x1) * (y2 - y1) / (x2 - x1);

@@ -356,32 +356,32 @@ void visible() {
 //------------
 void onG1() {
   pcf8575_1.digitalWrite(pin_on_G1, LOW);
-  delay(300);
+  delay(2500);
   pcf8575_1.digitalWrite(pin_on_G1, HIGH);
 }
 void offG1() {
   pcf8575_1.digitalWrite(pin_off_G1, LOW);
-  delay(300);
+  delay(1000);
   pcf8575_1.digitalWrite(pin_off_G1, HIGH);
 }
 void onG2() {
   pcf8575_1.digitalWrite(pin_on_G2, LOW);
-  delay(300);
+  delay(2500);
   pcf8575_1.digitalWrite(pin_on_G2, HIGH);
 }
 void offG2() {
   pcf8575_1.digitalWrite(pin_off_G2, LOW);
-  delay(300);
+  delay(1000);
   pcf8575_1.digitalWrite(pin_off_G2, HIGH);
 }
 void onG3() {
   pcf8575_1.digitalWrite(pin_on_G3, LOW);
-  delay(300);
+  delay(2500);
   pcf8575_1.digitalWrite(pin_on_G3, HIGH);
 }
 void offG3() {
   pcf8575_1.digitalWrite(pin_off_G3, LOW);
-  delay(300);
+  delay(1000);
   pcf8575_1.digitalWrite(pin_off_G3, HIGH);
 }
 //------------

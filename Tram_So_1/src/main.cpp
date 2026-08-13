@@ -47,22 +47,25 @@
 #include <ESP8266WiFi.h>
 #include <ESP8266httpUpdate.h>
 #include <Eeprom24C32_64.h>
+#include <I2C_eeprom_cyclic_store.h>
 #include <SPI.h>
+#include <SimpleKalmanFilter.h>
 #include <WiFiClientSecure.h>
 #include <WidgetRTC.h>
 #include <Wire.h>
 //-----------------------------
 #define APP_DEBUG
 #define BLYNK_PRINT Serial
-#define EEPROM_ADDRESS 0x57
-#define filterSamples 121
 #define URL_fw_Bin "https://raw.githubusercontent.com/quangtran3110/PlatformIO/main/Tram_So_1/.pio/build/nodemcuv2/firmware.bin"
 String server_name = "http://sgp1.blynk.cloud/external/api";
 //-----------------------------
 PCF8575 pcf8575_1(0x20);
 RTC_DS3231 rtc_module;
 EnergyMonitor emon0, emon1, emon2;
-static Eeprom24C32_64 eeprom(EEPROM_ADDRESS);
+#define MEMORY_SIZE 4096
+#define PAGE_SIZE 32
+I2C_eeprom ee(0x57, MEMORY_SIZE);
+
 WiFiClient client;
 HTTPClient http;
 //-----------------------------
@@ -77,7 +80,6 @@ const int S0pin = P15;
 const int S1pin = P14;
 const int S2pin = P13;
 const int S3pin = P12;
-const word address = 0;
 //-----------------------------
 char daysOfTheWeek[7][12] = {"CN", "T2", "T3", "T4", "T5", "T6", "T7"};
 char tz[] = "Asia/Ho_Chi_Minh";
@@ -89,9 +91,8 @@ bool key_memory = true, timer_I_status;
 bool key_bom = true, key_gieng = true;
 bool blynk_first_connect = false;
 
-float volume, percent, percent1, dungtich, smoothDistance;
 float volume, percent, percent1, dungtich, smoothDistance, smoothed_adc_level;
-float Irms0, Irms1, Irms2, value, sensor_pre_raw, clo_cache = 0;
+float Irms0, Irms1, Irms2, value, clo_cache = 0;
 
 long distance, distance1, t;
 
@@ -101,7 +102,7 @@ unsigned long rest_time = 0, dem_bom = 0, dem_cap1 = 0;
 uint32_t timestamp;
 
 float sensor_pre, Result;
-float sensor_tank;
+float filtered_adc_pressure, filtered_adc_level;
 int LLG1_1m3;
 int reboot_num = 0;
 int c, b, i = 0;
@@ -111,45 +112,28 @@ int timer_I;
 int dai = 566;
 int rong = 297;
 int dosau = 130;
-int sensSmoothArray1[filterSamples];
-int digitalSmooth(int rawIn, int *sensSmoothArray) {
-  int j, k, temp, top, bottom;
-  long total;
-  static int i;
-  static int sorted[filterSamples];
-  boolean done;
 
-  i = (i + 1) % filterSamples; // increment counter and roll over if necc. -  % (modulo operator) rolls over variable
-  sensSmoothArray[i] = rawIn;  // input new data into the oldest slot
+// --- Kalman Filters & Median ---
+SimpleKalmanFilter pressureKalmanFilter(1.0, 1.0, 0.01);
+SimpleKalmanFilter levelKalmanFilter(2.0, 2.0, 0.01);
 
-  // Serial.print("raw = ");
+const int MEDIAN_WINDOW_SIZE = 5;
+int median_buffer[MEDIAN_WINDOW_SIZE];
+int median_buffer_index = 0;
 
-  for (j = 0; j < filterSamples; j++) { // transfer data array into anther array for sorting and averaging
-    sorted[j] = sensSmoothArray[j];
-  }
-
-  done = 0;           // flag to know when we're done sorting
-  while (done != 1) { // simple swap sort, sorts numbers from lowest to highest
-    done = 1;
-    for (j = 0; j < (filterSamples - 1); j++) {
-      if (sorted[j] > sorted[j + 1]) { // numbers are out of order - swap
-        temp = sorted[j + 1];
-        sorted[j + 1] = sorted[j];
-        sorted[j] = temp;
-        done = 0;
-      }
+int getMedian(int arr[], int size) {
+  for (int i = 1; i < size; i++) {
+    int key = arr[i];
+    int j = i - 1;
+    while (j >= 0 && arr[j] > key) {
+      arr[j + 1] = arr[j];
+      j = j - 1;
     }
+    arr[j + 1] = key;
   }
-  bottom = max(((filterSamples * 20) / 100), 1);
-  top = min((((filterSamples * 80) / 100) + 1), (filterSamples - 1)); // the + 1 is to make up for asymmetry caused by integer rounding
-  k = 0;
-  total = 0;
-  for (j = bottom; j < top; j++) {
-    total += sorted[j]; // total remaining indices
-    k++;
-  }
-  return total / k; // divide by number of samples
+  return arr[size / 2];
 }
+
 //-----------------------------
 #define DATA_VERSION 1
 #define MAX_CALIB_POINTS 5
@@ -181,7 +165,7 @@ struct Data {
   CalibPoint level_points[MAX_CALIB_POINTS];
   uint8_t num_level_points;
 } data, dataCheck;
-const struct Data dataDefault = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+I2C_eeprom_cyclic_store<Data> cs;
 
 WidgetTerminal terminal(V11);
 WidgetRTC rtc_widget;
@@ -266,16 +250,14 @@ void up() {
   }
 }
 void savedata() {
-  if (memcmp(&data, &dataCheck, sizeof(dataDefault)) == 0) {
-  if (memcmp(&data, &dataCheck, sizeof(data)) == 0) {
-    // Serial.println("structures same no need to write to EEPROM");
-  } else {
-    // Serial.println("\nWrite bytes to EEPROM memory...");
-    data.save_num = data.save_num + 1;
-    eeprom.writeBytes(address, sizeof(dataDefault), (byte *)&data);
-    eeprom.writeBytes(address, sizeof(data), (byte *)&data);
-    memcpy(&dataCheck, &data, sizeof(data));
-    Blynk.setProperty(V11, "label", data.save_num);
+  if (memcmp(&data, &dataCheck, sizeof(data)) != 0) {
+    data.save_num++;
+    if (cs.write(data)) {
+      memcpy(&dataCheck, &data, sizeof(data));
+      Blynk.setProperty(V11, "label", data.save_num);
+    } else {
+      data.save_num--;
+    }
   }
 }
 void on_cap1() {
@@ -373,7 +355,6 @@ void sortCalibPoints(CalibPoint points[], uint8_t num_points) {
 }
 
 void addOrUpdateCalibPoint(CalibPoint new_point, CalibPoint points[], uint8_t &num_points) {
-  if (num_points > MAX_CALIB_POINTS) num_points = 0;
   if (num_points < MAX_CALIB_POINTS) {
     points[num_points] = new_point;
     num_points++;
@@ -387,23 +368,34 @@ void addOrUpdateCalibPoint(CalibPoint new_point, CalibPoint points[], uint8_t &n
         closest_idx = i;
       }
     }
-    if (closest_idx != -1) points[closest_idx] = new_point;
+    if (closest_idx != -1)
+      points[closest_idx] = new_point;
   }
   sortCalibPoints(points, num_points);
 }
 
 float interpolate(float current_adc, const CalibPoint points[], uint8_t num_points) {
-  if (num_points < 2) return (num_points == 1) ? (float)points[0].value : 0.0f;
+  if (num_points < 2)
+    return (num_points == 1) ? (float)points[0].value : 0.0f;
   const CalibPoint *p1, *p2;
-  if (current_adc <= points[0].adc) { p1 = &points[0]; p2 = &points[1]; }
-  else if (current_adc >= points[num_points - 1].adc) { p1 = &points[num_points - 2]; p2 = &points[num_points - 1]; }
-  else {
+  if (current_adc <= points[0].adc) {
+    p1 = &points[0];
+    p2 = &points[1];
+  } else if (current_adc >= points[num_points - 1].adc) {
+    p1 = &points[num_points - 2];
+    p2 = &points[num_points - 1];
+  } else {
     uint8_t i = 0;
-    while (i < num_points - 1 && current_adc > points[i + 1].adc) i++;
-    p1 = &points[i]; p2 = &points[i + 1];
+    while (i < num_points - 1 && current_adc > points[i + 1].adc)
+      i++;
+    p1 = &points[i];
+    p2 = &points[i + 1];
   }
-  float x = current_adc, x1 = p1->adc, y1 = p1->value, x2 = p2->adc, y2 = p2->value;
-  if (x2 == x1) return y1;
+  float x = current_adc;
+  float x1 = p1->adc, y1 = p1->value, x2 = p2->adc, y2 = p2->value;
+
+  if (abs(x2 - x1) < 0.001)
+    return y1;
   return y1 + (x - x1) * (y2 - y1) / (x2 - x1);
 }
 
@@ -413,15 +405,10 @@ void readPressure() { // C0 - Ap Luc
   pcf8575_1.digitalWrite(S1pin, LOW);
   pcf8575_1.digitalWrite(S2pin, LOW);
   pcf8575_1.digitalWrite(S3pin, LOW);
-  sensor_pre_raw = analogRead(A0);
-  if (sensor_pre_raw > 0) {
-    value += sensor_pre_raw;
-    sensor_pre = value / 16;
-    value -= sensor_pre;
-  }
-  Result = (((sensor_pre - data.pre_zero) * range_pre) / (data.pre_num - data.pre_zero));
-  // Sử dụng nội suy đa điểm
-  float val = interpolate(sensor_pre, data.pressure_points, data.num_pressure_points);
+  int raw_adc = analogRead(A0);
+
+  filtered_adc_pressure = pressureKalmanFilter.updateEstimate(raw_adc);
+  float val = interpolate(filtered_adc_pressure, data.pressure_points, data.num_pressure_points);
   Result = val / 100.0f; // Quy đổi về bar
 }
 void MeasureCmForSmoothing() { // C1-  Muc Nuoc
@@ -429,25 +416,23 @@ void MeasureCmForSmoothing() { // C1-  Muc Nuoc
   pcf8575_1.digitalWrite(S1pin, LOW);
   pcf8575_1.digitalWrite(S2pin, LOW);
   pcf8575_1.digitalWrite(S3pin, LOW);
-  sensor_tank = analogRead(A0);
-  distance1 = (((sensor_tank - 142) * 600) / (800 - 142));
-  if (distance1 > 0) {
-    smoothDistance = digitalSmooth(distance1, sensSmoothArray1);
-    volume = (dai * smoothDistance * rong) / 1000000;
-    if ((smoothDistance - dosau >= 20) && (data.key_noti) && (keytank)) {
-      Blynk.logEvent("info", String("Nước trong bể cao vượt mức ") + (smoothDistance - dosau) + String(" cm"));
-      keytank = false;
-      timer1.setTimeout(1800000L, []() {
-        keytank = true;
-      });
-    }
+
   int raw_adc = analogRead(A0);
-  // Lọc nhiễu ADC trước
-  smoothed_adc_level = digitalSmooth(raw_adc, sensSmoothArray1);
+
+  // 1. Median Filter
+  median_buffer[median_buffer_index] = raw_adc;
+  median_buffer_index = (median_buffer_index + 1) % MEDIAN_WINDOW_SIZE;
+  int sorted_buffer[MEDIAN_WINDOW_SIZE];
+  memcpy(sorted_buffer, median_buffer, sizeof(median_buffer));
+  int median_value = getMedian(sorted_buffer, MEDIAN_WINDOW_SIZE);
+
+  // 2. Kalman Filter
+  smoothed_adc_level = levelKalmanFilter.updateEstimate(median_value);
+
   // Nội suy ra cm
   smoothDistance = interpolate(smoothed_adc_level, data.level_points, data.num_level_points);
 
-  volume = (dai * smoothDistance * rong) / 1000000;
+  volume = (dai * smoothDistance * rong) / 1000000.0;
   if ((smoothDistance - dosau >= 20) && (data.key_noti) && (keytank)) {
     Blynk.logEvent("info", String("Nước trong bể cao vượt mức ") + (smoothDistance - dosau) + String(" cm"));
     keytank = false;
@@ -768,6 +753,9 @@ BLYNK_WRITE(V11) // String
     hidden();
     Blynk.virtualWrite(V11, "Ok!\nNhập mã để điều khiển!\n");
   } else if (dataS == "save") {
+    terminal.clear();
+    savedata();
+    Blynk.virtualWrite(V11, "Đã lưu cài đặt.\n");
   } else if (dataS == "help") {
     terminal.clear();
     Blynk.virtualWrite(V11, "--- DANH SÁCH LỆNH ---\n"
@@ -778,7 +766,7 @@ BLYNK_WRITE(V11) // String
                             "pre_clear : Xóa calib áp suất\n"
                             "level_clear : Xóa calib mực nước\n"
                             "save      : Luu cai dat\n");
-  }else if (dataS == "save") {
+  } else if (dataS == "save") {
     terminal.clear();
     savedata();
     Blynk.virtualWrite(V11, "Đã lưu cài đặt.\n");
@@ -818,7 +806,7 @@ BLYNK_WRITE(V11) // String
       snprintf(buff, sizeof(buff), "#%d: ADC=%d -> %.2f bar\n", i + 1, data.pressure_points[i].adc, data.pressure_points[i].value / 100.0f);
       Blynk.virtualWrite(V11, buff);
     }
-    snprintf(buff, sizeof(buff), "ADC: %.2f -> %.2f bar\n", sensor_pre, Result);
+    snprintf(buff, sizeof(buff), "ADC: %.2f -> %.2f bar\n", filtered_adc_pressure, Result);
     Blynk.virtualWrite(V11, buff);
   } else if (dataS == "calib_level") {
     terminal.clear();
@@ -843,7 +831,7 @@ BLYNK_WRITE(V11) // String
   } else if (dataS.startsWith("pre_")) {
     float val = dataS.substring(4).toFloat();
     CalibPoint pt;
-    pt.adc = (uint16_t)round(sensor_pre);
+    pt.adc = (uint16_t)round(filtered_adc_pressure);
     pt.value = (uint16_t)(val * 100);
     addOrUpdateCalibPoint(pt, data.pressure_points, data.num_pressure_points);
     savedata();
@@ -954,30 +942,6 @@ BLYNK_WRITE(V18) // Nen Khi
   }
   Blynk.virtualWrite(V18, data.status_nk1);
 }
-BLYNK_WRITE(V22) { // Lưu giá trị Zero áp lực
-  if (calib_pre_sta == 1) {
-    if (param.asInt() == HIGH) {
-      data.pre_zero = sensor_pre;
-      savedata();
-    }
-  }
-  // if (calib_pre_sta == 1) {
-  //   if (param.asInt() == HIGH) {
-  //     data.pre_zero = sensor_pre;
-  //     savedata();
-  //   }
-  // }
-}
-BLYNK_WRITE(V23) { // Lưu giá trị Pre_num
-  if (calib_pre_sta == 1) {
-    data.pre_num = (((sensor_pre - data.pre_zero) * range_pre) / param.asFloat()) + data.pre_zero;
-    savedata();
-  }
-  // if (calib_pre_sta == 1) {
-  //   data.pre_num = (((sensor_pre - data.pre_zero) * range_pre) / param.asFloat()) + data.pre_zero;
-  //   savedata();
-  // }
-}
 //-------------------------
 BLYNK_WRITE(V24) // Lưu lượng G1_1m3
 {
@@ -1029,20 +993,21 @@ void setup() {
   pcf8575_1.digitalWrite(pin_rst, HIGH);
 
   rtc_module.begin();
-  eeprom.initialize();
-  eeprom.readBytes(address, sizeof(dataDefault), (byte *)&data);
-  eeprom.readBytes(address, sizeof(data), (byte *)&data);
+  ee.begin();
+  cs.begin(ee, PAGE_SIZE, MEMORY_SIZE / PAGE_SIZE);
 
   // Kiểm tra phiên bản dữ liệu
-  if (data.version != DATA_VERSION) {
+  if (!cs.read(data) || data.version != DATA_VERSION) {
     Serial.println("EEPROM version mismatch. Resetting...");
     memset(&data, 0, sizeof(data));
     data.version = DATA_VERSION;
     savedata();
   }
   // Kiểm tra an toàn mảng
-  if (data.num_pressure_points > MAX_CALIB_POINTS) data.num_pressure_points = 0;
-  if (data.num_level_points > MAX_CALIB_POINTS) data.num_level_points = 0;
+  if (data.num_pressure_points > MAX_CALIB_POINTS)
+    data.num_pressure_points = 0;
+  if (data.num_level_points > MAX_CALIB_POINTS)
+    data.num_level_points = 0;
   memcpy(&dataCheck, &data, sizeof(data));
 
   //------------------------------------
