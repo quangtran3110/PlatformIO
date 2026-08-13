@@ -36,8 +36,7 @@
 #define BLYNK_TEMPLATE_NAME "TRẠM SỐ 1"
 #define BLYNK_AUTH_TOKEN "SZfJItqPgAVkiB8VdBuzyl5f94BU3E4x"
 
-#define BLYNK_FIRMWARE_VERSION "250606"
-#define BLYNK_FIRMWARE_VERSION "251224"
+#define BLYNK_FIRMWARE_VERSION "260813"
 //------------------
 #include "EmonLib.h"
 #include "PCF8575.h"
@@ -625,6 +624,36 @@ void rtctime() {
     }
   }
 }
+void i2c_scaner() {
+  byte error, address;
+  int nDevices;
+  String stringOne;
+
+  nDevices = 0;
+  for (address = 1; address < 127; address++) {
+    // The i2c_scanner uses the return value of
+    // the Write.endTransmisstion to see if
+    // a device did acknowledge to the address.
+    Wire.beginTransmission(address);
+    error = Wire.endTransmission();
+
+    if (error == 0) {
+      stringOne = String(address, HEX);
+      if (address < 16)
+        Blynk.virtualWrite(V5, "I2C device found at address 0x0", stringOne, " !\n");
+      Blynk.virtualWrite(V5, "I2C device found at address 0x", stringOne, " !\n");
+      nDevices++;
+    } else if (error == 4) {
+      stringOne = String(address, HEX);
+
+      if (address < 16)
+        Blynk.virtualWrite(V5, "Unknown error at address 0x0", stringOne, " !\n");
+      Blynk.virtualWrite(V5, "I2C device found at address 0x", stringOne, " !\n");
+    }
+  }
+  if (nDevices == 0)
+    Blynk.virtualWrite(V5, "No I2C devices found\n");
+}
 //-------------------------------------------------------------------
 BLYNK_WRITE(V0) // Gieng
 {
@@ -766,10 +795,6 @@ BLYNK_WRITE(V11) // String
                             "pre_clear : Xóa calib áp suất\n"
                             "level_clear : Xóa calib mực nước\n"
                             "save      : Luu cai dat\n");
-  } else if (dataS == "save") {
-    terminal.clear();
-    savedata();
-    Blynk.virtualWrite(V11, "Đã lưu cài đặt.\n");
   } else if (dataS == "reset") {
     terminal.clear();
     trip2 = false;
@@ -844,6 +869,8 @@ BLYNK_WRITE(V11) // String
     addOrUpdateCalibPoint(pt, data.level_points, data.num_level_points);
     savedata();
     Blynk.virtualWrite(V11, "Đã lưu điểm mực nước.\n");
+  } else if (dataS == "i2c") {
+    i2c_scaner();
   } else {
     Blynk.virtualWrite(V11, "Mật mã sai.\nVui lòng nhập lại!\n");
   }
