@@ -24,7 +24,7 @@
 #define BLYNK_TEMPLATE_NAME "CT Tuyên Thạnh"
 #define BLYNK_AUTH_TOKEN "-TEktfE94b5Z8XxPE7JglkNlhmp6t_Qd"
 
-#define BLYNK_FIRMWARE_VERSION "260815"
+#define BLYNK_FIRMWARE_VERSION "260814"
 //------------------
 #define BLYNK_PRINT Serial
 #include "EmonLib.h"
@@ -174,12 +174,12 @@ void rtctime();
 void updateBlynkMenuLabels() {
   BlynkParamAllocated modeMenu(96);
   modeMenu.add("THỦ CÔNG");
-  modeMenu.add("TỰ ĐỘNG NGHỈ ĐÊM");
-  modeMenu.add("TỰ ĐỘNG THEO LỊCH");
+  modeMenu.add("TĐ NGHỈ ĐÊM");
+  modeMenu.add("TĐ THEO LỊCH");
   Blynk.setProperty(V7, "labels", modeMenu);
 
   BlynkParamAllocated scheduleMenu(255);
-  scheduleMenu.add("TRỐNG");
+  scheduleMenu.add("...");
   scheduleMenu.add("GIỜ NGHỈ ĐÊM");
   scheduleMenu.add("BƠM 1 - LẦN 1");
   scheduleMenu.add("BƠM 2 - LẦN 1");
@@ -216,7 +216,7 @@ void connectionstatus() {
     Blynk.connect(1000);
     return;
   }
-  Serial.println("WiFi va Blynk binh thuong");
+  // Serial.println("WiFi va Blynk binh thuong");
 }
 
 void serviceExternalWatchdog() {
@@ -1471,10 +1471,10 @@ BLYNK_WRITE(V17) // Info
       uint16_t nowMinute = now.hour() * 60U + now.minute();
       if (isTimeInSchedule(nowMinute, data.night_start, data.night_stop)) {
         bool restPump1 = (getNightShiftDayIndex(now, nowMinute) % 2UL) == 0;
-        Blynk.virtualWrite(V11, restPump1 ? "Ca hiện tại: ưu tiên BƠM 1 nghỉ.\n"
-                                          : "Ca hiện tại: ưu tiên BƠM 2 nghỉ.\n");
+        Blynk.virtualWrite(V11, restPump1 ? "Ca hiện tại: BƠM 2 chạy.\n"
+                                          : "Ca hiện tại: BƠM 1 chạy.\n");
       } else {
-        Blynk.virtualWrite(V11, "Ngoài giờ nghỉ: yêu cầu chạy cả hai bơm.\n");
+        Blynk.virtualWrite(V11, "Ngoài giờ nghỉ: Chạy 2 bơm.\n");
       }
     }
   } else {
