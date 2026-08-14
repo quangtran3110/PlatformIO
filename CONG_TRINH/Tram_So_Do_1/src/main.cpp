@@ -59,6 +59,8 @@ const char *password = "Password";
 // Hai bơm cấp 2 đang sử dụng.
 const int pin_B1 = P7;
 const int pin_B2 = P6;
+// Tín hiệu heartbeat gửi sang mạch watchdog ngoài.
+const int pin_WATCHDOG = P8;
 // Ngõ ra dự phòng, chưa sử dụng.
 const int pin_P5 = P5;
 const int pin_P4 = P4;
@@ -92,6 +94,9 @@ bool key_bom = true, key_bom2 = true;
 bool blynk_first_connect = false;
 // Trạng thái mặc định khớp với mạch fail-safe: relay nhả, hai bơm chạy.
 bool status_b1 = PUMP_STATE_ON, status_b2 = PUMP_STATE_ON;
+const unsigned long WATCHDOG_TOGGLE_INTERVAL_MS = 5000UL;
+uint8_t watchdogOutputLevel = LOW;
+unsigned long watchdogLastToggleMs = 0;
 
 float volume, smoothDistance, smoothed_adc_level;
 float Irms0, Irms1, Irms2;
@@ -213,6 +218,21 @@ void connectionstatus() {
   }
   Serial.println("WiFi va Blynk binh thuong");
 }
+
+void serviceExternalWatchdog() {
+  unsigned long now = millis();
+  if ((unsigned long)(now - watchdogLastToggleMs) < WATCHDOG_TOGGLE_INTERVAL_MS)
+    return;
+
+  watchdogLastToggleMs = now;
+  uint8_t nextLevel = (watchdogOutputLevel == LOW) ? HIGH : LOW;
+  if (pcf8575_1.digitalWrite(pin_WATCHDOG, nextLevel)) {
+    watchdogOutputLevel = nextLevel;
+  } else {
+    Serial.println("Khong gui duoc heartbeat den watchdog");
+  }
+}
+
 void update_started() {
   Serial.println("CALLBACK:  HTTP update process started");
 }
@@ -220,6 +240,8 @@ void update_finished() {
   Serial.println("CALLBACK:  HTTP update process finished");
 }
 void update_progress(int cur, int total) {
+  // OTA có thể giữ chương trình trong hàm update lâu hơn ngưỡng 20 giây.
+  serviceExternalWatchdog();
   Serial.printf("CALLBACK:  HTTP update process at %d of %d bytes...\n", cur, total);
 }
 void update_error(int err) {
@@ -1479,6 +1501,11 @@ void setup() {
   Serial.begin(115200);
 
   pcf8575_1.begin();
+  // Khởi tạo heartbeat sớm; sau đó P8 phải đổi mức mỗi 5 giây.
+  pcf8575_1.pinMode(pin_WATCHDOG, OUTPUT, watchdogOutputLevel);
+  pcf8575_1.digitalWrite(pin_WATCHDOG, watchdogOutputLevel);
+  watchdogLastToggleMs = millis();
+
   pcf8575_1.pinMode(S0pin, OUTPUT);
   pcf8575_1.pinMode(S1pin, OUTPUT);
   pcf8575_1.pinMode(S2pin, OUTPUT);
@@ -1598,6 +1625,7 @@ void setup() {
   });
 }
 void loop() {
+  serviceExternalWatchdog();
   Blynk.run();
   timer.run();
   timer1.run();
