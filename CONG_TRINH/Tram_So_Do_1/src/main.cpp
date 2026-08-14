@@ -24,7 +24,7 @@
 #define BLYNK_TEMPLATE_NAME "CT Tuyên Thạnh"
 #define BLYNK_AUTH_TOKEN "-TEktfE94b5Z8XxPE7JglkNlhmp6t_Qd"
 
-#define BLYNK_FIRMWARE_VERSION "260814"
+#define BLYNK_FIRMWARE_VERSION "260815"
 //------------------
 #define BLYNK_PRINT Serial
 #include "EmonLib.h"
@@ -72,6 +72,11 @@ const uint8_t PUMP_STATE_ON = HIGH;
 // Mức điện xuất ra relay active-LOW.
 const uint8_t RELAY_LEVEL_ON = LOW;
 const uint8_t RELAY_LEVEL_OFF = HIGH;
+// Hai bơm cấp 2 dùng tiếp điểm NC:
+// relay nhả (HIGH) -> NC đóng -> bơm chạy;
+// relay kích (LOW) -> NC mở -> bơm dừng.
+const uint8_t PUMP_RELAY_RUN_LEVEL = RELAY_LEVEL_OFF;
+const uint8_t PUMP_RELAY_STOP_LEVEL = RELAY_LEVEL_ON;
 
 const int S0pin = P15;
 const int S1pin = P14;
@@ -85,7 +90,8 @@ bool key = false;
 bool trip1 = false, trip2 = false;
 bool key_bom = true, key_bom2 = true;
 bool blynk_first_connect = false;
-bool status_b1 = PUMP_STATE_OFF, status_b2 = PUMP_STATE_OFF;
+// Trạng thái mặc định khớp với mạch fail-safe: relay nhả, hai bơm chạy.
+bool status_b1 = PUMP_STATE_ON, status_b2 = PUMP_STATE_ON;
 
 float volume, smoothDistance, smoothed_adc_level;
 float Irms0, Irms1, Irms2;
@@ -314,7 +320,7 @@ void on_bom_1() {
     yIrms0 = 0;
     xSetAmpe1 = 0;
     status_b1 = PUMP_STATE_ON;
-    pcf8575_1.digitalWrite(pin_B1, RELAY_LEVEL_ON);
+    pcf8575_1.digitalWrite(pin_B1, PUMP_RELAY_RUN_LEVEL);
     Blynk.virtualWrite(V0, status_b1);
   }
 }
@@ -323,7 +329,7 @@ void off_bom_1() {
   xSetAmpe1 = 0;
   if (status_b1 != PUMP_STATE_OFF) {
     status_b1 = PUMP_STATE_OFF;
-    pcf8575_1.digitalWrite(pin_B1, RELAY_LEVEL_OFF);
+    pcf8575_1.digitalWrite(pin_B1, PUMP_RELAY_STOP_LEVEL);
     Blynk.virtualWrite(V0, status_b1);
   }
 }
@@ -336,7 +342,7 @@ void on_bom_2() {
     yIrms1 = 0;
     xSetAmpe2 = 0;
     status_b2 = PUMP_STATE_ON;
-    pcf8575_1.digitalWrite(pin_B2, RELAY_LEVEL_ON);
+    pcf8575_1.digitalWrite(pin_B2, PUMP_RELAY_RUN_LEVEL);
     Blynk.virtualWrite(V1, status_b2);
   }
 }
@@ -345,7 +351,7 @@ void off_bom_2() {
   xSetAmpe2 = 0;
   if (status_b2 != PUMP_STATE_OFF) {
     status_b2 = PUMP_STATE_OFF;
-    pcf8575_1.digitalWrite(pin_B2, RELAY_LEVEL_OFF);
+    pcf8575_1.digitalWrite(pin_B2, PUMP_RELAY_STOP_LEVEL);
     Blynk.virtualWrite(V1, status_b2);
   }
 }
@@ -1477,17 +1483,26 @@ void setup() {
   pcf8575_1.pinMode(S1pin, OUTPUT);
   pcf8575_1.pinMode(S2pin, OUTPUT);
   pcf8575_1.pinMode(S3pin, OUTPUT);
-  // Ngõ ra cấp 1 và nén khí vẫn được đặt về trạng thái an toàn để dự phòng.
-  pcf8575_1.pinMode(pin_G1, OUTPUT);
-  pcf8575_1.digitalWrite(pin_G1, RELAY_LEVEL_OFF);
-  pcf8575_1.pinMode(pin_B1, OUTPUT);
-  pcf8575_1.digitalWrite(pin_B1, RELAY_LEVEL_OFF);
-  pcf8575_1.pinMode(pin_B2, OUTPUT);
-  pcf8575_1.digitalWrite(pin_B2, RELAY_LEVEL_OFF);
-  pcf8575_1.pinMode(pin_NK1, OUTPUT);
-  pcf8575_1.digitalWrite(pin_NK1, RELAY_LEVEL_OFF);
-  pcf8575_1.pinMode(pin_rst, OUTPUT);
-  pcf8575_1.digitalWrite(pin_rst, HIGH);
+  // Bơm cấp 2 dùng tiếp điểm NC nên mặc định để relay nhả (HIGH): bơm chạy.
+  // PCF8575 cũng khởi động ở mức HIGH, phù hợp trạng thái fail-safe này.
+  pcf8575_1.pinMode(pin_B1, OUTPUT, PUMP_RELAY_RUN_LEVEL);
+  pcf8575_1.pinMode(pin_B2, OUTPUT, PUMP_RELAY_RUN_LEVEL);
+  pcf8575_1.digitalWrite(pin_B1, PUMP_RELAY_RUN_LEVEL);
+  pcf8575_1.digitalWrite(pin_B2, PUMP_RELAY_RUN_LEVEL);
+
+  // Các ngõ ra dự phòng vẫn được để relay nhả.
+  pcf8575_1.pinMode(pin_P5, OUTPUT);
+  pcf8575_1.digitalWrite(pin_P5, RELAY_LEVEL_OFF);
+  pcf8575_1.pinMode(pin_P4, OUTPUT);
+  pcf8575_1.digitalWrite(pin_P4, RELAY_LEVEL_OFF);
+  pcf8575_1.pinMode(pin_P3, OUTPUT);
+  pcf8575_1.digitalWrite(pin_P3, RELAY_LEVEL_OFF);
+  pcf8575_1.pinMode(pin_P2, OUTPUT);
+  pcf8575_1.digitalWrite(pin_P2, RELAY_LEVEL_OFF);
+  pcf8575_1.pinMode(pin_P1, OUTPUT);
+  pcf8575_1.digitalWrite(pin_P1, RELAY_LEVEL_OFF);
+  pcf8575_1.pinMode(pin_P0, OUTPUT);
+  pcf8575_1.digitalWrite(pin_P0, RELAY_LEVEL_OFF);
 
   emon0.current(A0, 105);
   emon1.current(A0, 105);
