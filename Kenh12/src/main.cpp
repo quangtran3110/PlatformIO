@@ -38,12 +38,33 @@ const int S2pin = P1;
 const int S3pin = P0;
 const int XKC_in = P4;
 const int pin_WATCHDOG = P8;
+const int relay1 = P12;
+const int relay2 = P13;
+const int pin_fan = P14;
+
+// Relay 1 cap nguon modem 4G qua tiep diem NC.
+// Module relay dang gia dinh kich muc LOW:
+//   HIGH -> cuon relay nha  -> NC dong -> modem CO DIEN.
+//   LOW  -> cuon relay kich -> NC mo   -> modem MAT DIEN.
+// Neu module relay thuc te kich muc HIGH, chi can dao hai hang sau.
+const uint8_t RELAY1_COIL_ON_LEVEL = LOW;
+const uint8_t RELAY1_COIL_OFF_LEVEL = HIGH;
+const uint8_t MODEM_POWER_ON_LEVEL = RELAY1_COIL_OFF_LEVEL;
+const uint8_t MODEM_POWER_CUT_LEVEL = RELAY1_COIL_ON_LEVEL;
+
+const unsigned long NETWORK_CHECK_INTERVAL_MS = 10000UL;
+const unsigned long NETWORK_FAILURE_RESET_DELAY_MS = 5UL * 60UL * 1000UL;
+const unsigned long MODEM_POWER_CUT_MS = 10000UL;
+const unsigned long MODEM_BOOT_WAIT_MS = 120UL * 1000UL;
+const unsigned long MODEM_RESET_MIN_INTERVAL_MS = 15UL * 60UL * 1000UL;
+const unsigned long MODEM_RESET_LOCKOUT_MS = 6UL * 60UL * 60UL * 1000UL;
+const uint8_t MAX_MODEM_RESETS_WITHOUT_RECOVERY = 3;
 
 #define XKC_LOTTIE_VPIN V1
 const char XKC_WATER_ANIMATION_URL[] =
     "https://cdn.jsdelivr.net/gh/quangtran3110/blynk-lottie-assets@main/Water%20Animation.json";
 const char XKC_EMPTY_ANIMATION_URL[] =
-    "https://cdn.jsdelivr.net/gh/quangtran3110/blynk-lottie-assets@main/WaterEmptyAnimation.json";
+    "https://cdn.jsdelivr.net/gh/quangtran3110/blynk-lottie-assets@main/WaterEmptyAnimation-V1.json";
 const unsigned long XKC_READ_INTERVAL_MS = 100UL;
 const unsigned long XKC_DEBOUNCE_MS = 500UL;
 
@@ -73,6 +94,22 @@ bool xkcCandidateKnown = false;
 bool xkcStableStateKnown = false;
 bool xkcWidgetNeedsUpdate = true;
 unsigned long xkcCandidateChangedMs = 0;
+
+enum ModemRecoveryState : uint8_t {
+  MODEM_RECOVERY_IDLE,
+  MODEM_RECOVERY_POWER_CUT,
+  MODEM_RECOVERY_BOOT_WAIT
+};
+
+ModemRecoveryState modemRecoveryState = MODEM_RECOVERY_IDLE;
+bool networkFailureTracked = false;
+bool modemHasBeenReset = false;
+unsigned long networkFailureStartedMs = 0;
+unsigned long modemRecoveryStateChangedMs = 0;
+unsigned long modemRelayLastAttemptMs = 0;
+unsigned long lastModemResetMs = 0;
+unsigned long modemResetLockoutStartedMs = 0;
+uint8_t modemResetAttemptsWithoutRecovery = 0;
 
 // Chuoi xu ly ap suat: Median 5 mau -> Kalman -> noi suy hieu chuan da diem.
 const uint8_t PRESSURE_MEDIAN_WINDOW_SIZE = 5;
@@ -115,36 +152,146 @@ WidgetTerminal terminal(V0);
 BLYNK_CONNECTED() {
   // Thuoc tinh widget can duoc gui lai sau moi lan thiet bi ket noi Blynk.
   xkcWidgetNeedsUpdate = true;
+  networkFailureTracked = false;
+  modemResetAttemptsWithoutRecovery = 0;
+  key_pluse = true;
 }
 //-------------------------
-void connectionstatus() {
-  if ((WiFi.status() != WL_CONNECTED)) {
-    Serial.println("Khong ket noi WIFI");
-    WiFi.begin(ssid, password);
-    reboot_num = reboot_num + 1;
-    if (reboot_num % 5) {
-      key_pluse = false;
-    }
+bool writeModemPowerLevel(uint8_t level) {
+  if (!pcf8575Ready)
+    return false;
+
+  if (!pcf8575_1.digitalWrite(relay1, level)) {
+    Serial.println("Loi dieu khien relay nguon modem");
+    return false;
   }
-  if ((WiFi.status() == WL_CONNECTED) && (!Blynk.connected())) {
-    reboot_num = reboot_num + 1;
-    if ((reboot_num == 1) || (reboot_num == 2)) {
-      Serial.println("...");
-      WiFi.disconnect();
-      delay(1000);
-      WiFi.begin(ssid, password);
-    }
-    if (reboot_num % 5 == 0) {
-      ESP.restart();
-    }
+  return true;
+}
+
+bool startModemPowerCycle(bool manualRequest = false) {
+  unsigned long now = millis();
+  if (!pcf8575Ready || modemRecoveryState != MODEM_RECOVERY_IDLE)
+    return false;
+
+  if (!manualRequest && modemHasBeenReset &&
+      (unsigned long)(now - lastModemResetMs) < MODEM_RESET_MIN_INTERVAL_MS) {
+    return false;
   }
-  if (Blynk.connected()) {
+
+  if (!manualRequest &&
+      modemResetAttemptsWithoutRecovery >= MAX_MODEM_RESETS_WITHOUT_RECOVERY) {
+    if ((unsigned long)(now - modemResetLockoutStartedMs) < MODEM_RESET_LOCKOUT_MS) {
+      return false;
+    }
+    modemResetAttemptsWithoutRecovery = 0;
+  }
+
+  if (!writeModemPowerLevel(MODEM_POWER_CUT_LEVEL))
+    return false;
+
+  modemRecoveryState = MODEM_RECOVERY_POWER_CUT;
+  modemRecoveryStateChangedMs = now;
+  modemRelayLastAttemptMs = now;
+  lastModemResetMs = now;
+  modemHasBeenReset = true;
+  key_pluse = false;
+  if (manualRequest) {
+    Serial.printf("Reset modem 4G thu cong: cat nguon trong %lu giay\n",
+                  MODEM_POWER_CUT_MS / 1000UL);
+  } else {
+    modemResetAttemptsWithoutRecovery++;
+    if (modemResetAttemptsWithoutRecovery == MAX_MODEM_RESETS_WITHOUT_RECOVERY)
+      modemResetLockoutStartedMs = now;
+    Serial.printf("Cat nguon modem 4G trong %lu giay, lan tu dong thu %u\n",
+                  MODEM_POWER_CUT_MS / 1000UL,
+                  modemResetAttemptsWithoutRecovery);
+  }
+  return true;
+}
+
+void serviceModemPowerCycle() {
+  if (modemRecoveryState == MODEM_RECOVERY_IDLE || !pcf8575Ready)
+    return;
+
+  unsigned long now = millis();
+  if (modemRecoveryState == MODEM_RECOVERY_POWER_CUT) {
+    if ((unsigned long)(now - modemRecoveryStateChangedMs) < MODEM_POWER_CUT_MS ||
+        (unsigned long)(now - modemRelayLastAttemptMs) < 1000UL) {
+      return;
+    }
+
+    modemRelayLastAttemptMs = now;
+    if (writeModemPowerLevel(MODEM_POWER_ON_LEVEL)) {
+      modemRecoveryState = MODEM_RECOVERY_BOOT_WAIT;
+      modemRecoveryStateChangedMs = now;
+      Serial.printf("Da cap lai nguon modem, cho khoi dong %lu giay\n",
+                    MODEM_BOOT_WAIT_MS / 1000UL);
+    }
+    return;
+  }
+
+  if (modemRecoveryState == MODEM_RECOVERY_BOOT_WAIT &&
+      WiFi.status() == WL_CONNECTED && Blynk.connected()) {
+    modemRecoveryState = MODEM_RECOVERY_IDLE;
+    networkFailureTracked = false;
+    modemResetAttemptsWithoutRecovery = 0;
     key_pluse = true;
-    if (reboot_num != 0) {
-      reboot_num = 0;
-    }
+    Serial.println("Modem va Blynk da ket noi lai");
+    return;
+  }
+
+  if (modemRecoveryState == MODEM_RECOVERY_BOOT_WAIT &&
+      (unsigned long)(now - modemRecoveryStateChangedMs) >= MODEM_BOOT_WAIT_MS) {
+    modemRecoveryState = MODEM_RECOVERY_IDLE;
+    networkFailureTracked = true;
+    networkFailureStartedMs = now;
+    WiFi.begin(ssid, password);
+    Serial.println("Het thoi gian cho modem, bat dau ket noi lai WiFi/Blynk");
   }
 }
+
+void connectionstatus() {
+  if (modemRecoveryState != MODEM_RECOVERY_IDLE)
+    return;
+
+  bool wifiConnected = (WiFi.status() == WL_CONNECTED);
+  if (!wifiConnected) {
+    key_pluse = false;
+    WiFi.reconnect();
+  } else if (!Blynk.connected()) {
+    key_pluse = false;
+    // Gioi han toi da 1 giay; khong huy lien ket WiFi khi chi mat Internet/Blynk.
+    Blynk.connect(1000);
+  }
+
+  bool networkHealthy =
+      (WiFi.status() == WL_CONNECTED) && Blynk.connected();
+  unsigned long now = millis();
+  if (networkHealthy) {
+    if (networkFailureTracked)
+      Serial.println("Ket noi WiFi/Blynk da phuc hoi");
+    networkFailureTracked = false;
+    modemResetAttemptsWithoutRecovery = 0;
+    key_pluse = true;
+    reboot_num = 0;
+    return;
+  }
+
+  if (!networkFailureTracked) {
+    networkFailureTracked = true;
+    networkFailureStartedMs = now;
+    Serial.println(WiFi.status() == WL_CONNECTED
+                       ? "WiFi con ket noi nhung mat Internet/Blynk"
+                       : "Mat ket noi toi WiFi cua modem 4G");
+    return;
+  }
+
+  if ((unsigned long)(now - networkFailureStartedMs) >=
+      NETWORK_FAILURE_RESET_DELAY_MS) {
+    startModemPowerCycle(false);
+  }
+}
+//-------------------------
 void update_started() {
   Serial.println("CALLBACK:  HTTP update process started");
 }
@@ -202,8 +349,8 @@ void updateXkcLottieWidget() {
   const char *animationUrl =
       xkcStableHasWater ? XKC_WATER_ANIMATION_URL : XKC_EMPTY_ANIMATION_URL;
   Blynk.setProperty(XKC_LOTTIE_VPIN, "url", animationUrl);
-  //Blynk.setProperty(XKC_LOTTIE_VPIN, "autoplay", "true");
-  //Blynk.setProperty(XKC_LOTTIE_VPIN, "loop", "true");
+  // Blynk.setProperty(XKC_LOTTIE_VPIN, "autoplay", "true");
+  // Blynk.setProperty(XKC_LOTTIE_VPIN, "loop", "true");
   Blynk.virtualWrite(XKC_LOTTIE_VPIN, "play");
   xkcWidgetNeedsUpdate = false;
 }
@@ -235,16 +382,13 @@ void readXkcSensor() {
     xkcStableHasWater = xkcCandidateHasWater;
     xkcStableStateKnown = true;
     xkcWidgetNeedsUpdate = true;
-    //Serial.printf("XKC: %s\n", xkcStableHasWater ? "CO NUOC" : "KHONG CO NUOC");
+    // Serial.printf("XKC: %s\n", xkcStableHasWater ? "CO NUOC" : "KHONG CO NUOC");
   }
 
   if (xkcWidgetNeedsUpdate)
     updateXkcLottieWidget();
 }
-
 //-------------------------
-void send_data() {
-}
 
 uint32_t pressureCalibChecksum(const PressureCalibStorage &storage) {
   const uint8_t *bytes = reinterpret_cast<const uint8_t *>(&storage);
@@ -269,9 +413,9 @@ void sortPressureCalibPoints() {
 }
 
 void setDefaultPressureCalibration() {
-  // Giu gan nguyen dac tuyen cu: ADC 197.5..1005 tuong ung 0..5 bar.
-  pressureCalibPoints[0] = {198, 0};
-  pressureCalibPoints[1] = {1005, 500};
+  // Mac dinh cho cam bien 0..6 bar: ADC 198..1005 tuong ung 0..6 bar.
+  pressureCalibPoints[0] = {168, 0};
+  pressureCalibPoints[1] = {1005, 600};
   numPressureCalibPoints = 2;
 }
 
@@ -301,7 +445,7 @@ void loadPressureCalibration() {
 
   if (!isPressureCalibStorageValid(storage)) {
     setDefaultPressureCalibration();
-    Serial.println("Chua co calib ap suat hop le, dung mac dinh 0..5 bar");
+    Serial.println("Chua co calib ap suat hop le, dung mac dinh 0..6 bar");
     return;
   }
 
@@ -440,31 +584,6 @@ void printPressureCalibration() {
   Blynk.virtualWrite(V0, line);
 }
 
-void savedata() {
-  save_num = save_num + 1;
-  EEPROM.begin(EEPROM_SIZE_BYTES);
-  delay(10);
-  EEPROM.put(156, reboot_num);
-  EEPROM.put(160, save_num);
-  EEPROM.commit();
-  EEPROM.end();
-}
-
-void updata() {
-}
-void tem() {
-  sensors.requestTemperatures();
-  // Serial.println(sensors.getDeviceCount());
-  for (byte i = 0; i < sensors.getDeviceCount(); i++) {
-    temp[i] = sensors.getTempCByIndex(i);
-    nhietdo = temp[i];
-    // Blynk.virtualWrite(V36, temp[i]);
-  }
-  if (temp[0] > 42) {
-    Blynk.logEvent("error-5", String("Nhiệt độ tủ cao: ") + temp[0] + String("°C"));
-  }
-}
-
 void pressure() {
   // Kenh C0 cua CD74HC4067: S0=S1=S2=S3=LOW.
   pcf8575_1.digitalWrite(S0pin, LOW);
@@ -488,12 +607,55 @@ void pressure() {
   filteredAdcPressure = pressureKalmanFilter.updateEstimate(medianAdc);
   Result1 = interpolatePressure(filteredAdcPressure);
   pressureFilterReady = true;
+  /*
+  static unsigned long lastPrintMs = 0;
+  if (millis() - lastPrintMs >= 1000) {
+    lastPrintMs = millis();
+    Serial.printf("ADC raw: %.0f | ADC filtered: %.2f | Pressure: %.2f bar\n",
+                  sensorValue, filteredAdcPressure, Result1);
+  }
+                  */
+}
+//-------------------------
+void savedata() {
+  save_num = save_num + 1;
+  EEPROM.begin(EEPROM_SIZE_BYTES);
+  delay(10);
+  EEPROM.put(156, reboot_num);
+  EEPROM.put(160, save_num);
+  EEPROM.commit();
+  EEPROM.end();
+}
+//-------------------------
+void send_data_TanLap1() {
+}
+void updata() {
+  
+}
+void tem() {
+  sensors.requestTemperatures();
+  // Serial.println(sensors.getDeviceCount());
+  for (byte i = 0; i < sensors.getDeviceCount(); i++) {
+    temp[i] = sensors.getTempCByIndex(i);
+    nhietdo = temp[i];
+    // Blynk.virtualWrite(V36, temp[i]);
+    // Serial.printf("Nhiet do %u: %.2f °C\n", i, temp[i]);
+  }
+  if (temp[0] > 42) {
+    Blynk.logEvent("error-5", String("Nhiệt độ tủ cao: ") + temp[0] + String("°C"));
+  }
 }
 
 BLYNK_WRITE(V0) {
   String dataS = param.asStr();
   dataS.trim();
-  if (dataS == "update") {
+  if (dataS == "modem_reset") {
+    terminal.clear();
+    bool started = startModemPowerCycle(true);
+    Blynk.virtualWrite(V0, started
+                               ? "Da bat dau reset nguon modem 4G.\n"
+                               : "Khong the reset modem: dang reset hoac PCF8575 loi.\n");
+  } else if (dataS == "update") {
     terminal.clear();
     Blynk.virtualWrite(V0, "ESP UPDATE...");
     update_fw();
@@ -504,13 +666,14 @@ BLYNK_WRITE(V0) {
                        "pre_N_X.X  : Thay diem calib thu N\n"
                        "calib_pre  : Xem cac diem calib\n"
                        "pre_clear  : Khoi phuc calib mac dinh\n"
+                       "modem_reset: Reset nguon modem 4G\n"
                        "update     : Cap nhat firmware\n");
   } else if (dataS == "calib_pre") {
     printPressureCalibration();
   } else if (dataS == "pre_clear") {
     setDefaultPressureCalibration();
     bool saved = savePressureCalibration();
-    Blynk.virtualWrite(V0, saved ? "Da khoi phuc calib mac dinh 0..5 bar.\n"
+    Blynk.virtualWrite(V0, saved ? "Da khoi phuc calib mac dinh 0..6 bar.\n"
                                  : "Loi ghi EEPROM, calib chi co hieu luc den khi khoi dong lai.\n");
   } else if (dataS.startsWith("pre_") && dataS.indexOf('_', 4) >= 0) {
     int separator = dataS.indexOf('_', 4);
@@ -597,10 +760,15 @@ void setup() {
   pcf8575_1.pinMode(S3pin, OUTPUT, LOW);
   pcf8575_1.pinMode(XKC_in, INPUT_PULLUP);
   pcf8575_1.pinMode(pin_WATCHDOG, OUTPUT, LOW);
+  pcf8575_1.pinMode(relay1, OUTPUT, MODEM_POWER_ON_LEVEL);
+  pcf8575_1.pinMode(relay2, OUTPUT, HIGH);  // OFF relay
+  pcf8575_1.pinMode(pin_fan, OUTPUT, HIGH); // OFF relay
 
   pcf8575Ready = pcf8575_1.begin();
   if (!pcf8575Ready) {
     Serial.println("Khong tim thay PCF8575");
+  } else {
+    Serial.println("PCF8575 da san sang");
   }
 
   EEPROM.begin(EEPROM_SIZE_BYTES);
@@ -612,6 +780,7 @@ void setup() {
   loadPressureCalibration();
 
   timer.setInterval(XKC_READ_INTERVAL_MS, readXkcSensor);
+  timer.setInterval(NETWORK_CHECK_INTERVAL_MS, connectionstatus);
   timer.setTimeout(5000, []() {
     time1 = timer.setInterval(5612, []() {
       tem();
@@ -621,16 +790,12 @@ void setup() {
       timer.restartTimer(time2);
     });
     time2 = timer.setInterval(123, pressure);
-    timer.setInterval(600005, []() { // 10p
-      connectionstatus();
-      timer.restartTimer(time1);
-      timer.restartTimer(time2);
-    });
   });
 }
 void loop() {
   ESP.wdtFeed();
   serviceExternalWatchdog();
+  serviceModemPowerCycle();
   Blynk.run();
   timer.run();
 }

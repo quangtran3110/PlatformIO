@@ -2460,7 +2460,7 @@ void serviceExternalWatchdog() {
 
   watchdogLastToggleMs = now;
   uint8_t nextLevel = (watchdogOutputLevel == LOW) ? HIGH : LOW;
-  if (pcf8575_1.digitalWrite(pin_WATCHDOG, nextLevel)) {
+  if (pcf8575_2.digitalWrite(pin_WATCHDOG, nextLevel)) {
     watchdogOutputLevel = nextLevel;
   } else {
     Serial.println("Khong gui duoc heartbeat den watchdog");

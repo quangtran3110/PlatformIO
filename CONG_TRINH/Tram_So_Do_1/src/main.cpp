@@ -24,7 +24,7 @@
 #define BLYNK_TEMPLATE_NAME "CT Tuyên Thạnh"
 #define BLYNK_AUTH_TOKEN "-TEktfE94b5Z8XxPE7JglkNlhmp6t_Qd"
 
-#define BLYNK_FIRMWARE_VERSION "260814"
+#define BLYNK_FIRMWARE_VERSION "260822"
 //------------------
 #define BLYNK_PRINT Serial
 #include "EmonLib.h"
@@ -54,8 +54,8 @@ I2C_eeprom ee(0x57, MEMORY_SIZE);
 WiFiClient client;
 HTTPClient http;
 //-----------------------------
-const char *ssid = "Wifi";
-const char *password = "Password";
+const char *ssid = "Tram Cap Nuoc";
+const char *password = "12345678";
 // Hai bơm cấp 2 đang sử dụng.
 const int pin_B1 = P7;
 const int pin_B2 = P6;
@@ -108,8 +108,8 @@ int c = 0, b = 0;
 int xSetAmpe1 = 0, xSetAmpe2 = 0;
 int timer_I = -1;
 int unlockTimerId = -1;
-const int dai = 566;
-const int rong = 297;
+const int dai = 1640;
+const int rong = 640;
 
 // --- Kalman Filters & Median ---
 SimpleKalmanFilter pressureKalmanFilter(1.0, 1.0, 0.01);
@@ -1533,7 +1533,7 @@ void setup() {
 
   emon0.current(A0, 105);
   emon1.current(A0, 105);
-  emon2.current(A0, 105);
+  emon2.current(A0, 120);
 
   WiFi.mode(WIFI_STA);
   WiFi.begin(ssid, password);
