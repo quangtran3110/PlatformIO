@@ -70,7 +70,7 @@
 #define VOLUME_TOKEN_G2 "Hc5DgCBzl4Oi5hW_JOaNZ6oBKoGy5kFI"
 #define VOLUME_TOKEN_G3 "JTnEpJjGVVJ8DM1aJx7zZT4cyNYJrhr_"
 
-#define BLYNK_FIRMWARE_VERSION "260819"
+#define BLYNK_FIRMWARE_VERSION "260826"
 #define BLYNK_PRINT Serial
 #define APP_DEBUG
 
@@ -148,6 +148,7 @@ const int S3 = P0;
 const int dai = 2000;
 const int rong = 1000;
 const int dosau = 515; // Chiều cao tối đa của bể (cm)
+const float LEVEL_SENSOR_BOTTOM_OFFSET_CM = 100.0f; // Cảm biến đặt cao hơn đáy bể 1 m
 int volume, volume1, dungtich;
 float smoothDistance; // Thay int bằng float để có độ chính xác cao hơn
 
@@ -424,6 +425,35 @@ void addOrUpdateCalibPoint(CalibPoint new_point, CalibPoint points[], uint8_t &n
       points[closest_idx] = new_point;
   }
   sortCalibPoints(points, num_points);
+}
+
+bool isNonNegativeNumber(const String &text, bool allow_decimal) {
+  if (text.length() == 0)
+    return false;
+
+  bool has_digit = false;
+  bool has_decimal = false;
+  for (uint16_t i = 0; i < text.length(); i++) {
+    char ch = text.charAt(i);
+    if (ch >= '0' && ch <= '9') {
+      has_digit = true;
+    } else if (allow_decimal && ch == '.' && !has_decimal) {
+      has_decimal = true;
+    } else {
+      return false;
+    }
+  }
+  return has_digit;
+}
+
+bool replaceCalibPoint(uint8_t point_number, CalibPoint new_point,
+                       CalibPoint points[], uint8_t num_points) {
+  if (point_number < 1 || point_number > num_points)
+    return false;
+
+  points[point_number - 1] = new_point;
+  sortCalibPoints(points, num_points);
+  return true;
 }
 
 float interpolate(float current_adc, const CalibPoint points[], uint8_t num_points) {
@@ -818,7 +848,8 @@ BLYNK_WRITE(V5) // data string
                        "update    : Cap nhat firmware (OTA)\n"
                        "i2c       : Quet cac thiet bi I2C\n"
                        "save_num  : Xem so lan ghi vao EEPROM\n"
-                       "level_<so>: Calib tai muc nuoc <so> cm\n"
+                       "level_YYY : Calib tai muc nuoc YYY cm\n"
+                       "level_N_YYY: Thay diem muc nuoc thu N\n"
                        "level_clear : Xoa calib muc nuoc\n"
                        "calib     : Xem thong tin calib\n");
   }
@@ -915,7 +946,7 @@ BLYNK_WRITE(V5) // data string
     }
     snprintf(buff, sizeof(buff), " - ADC hiện tại: %.2f\n", kalman_filtered_adc_value);
     Blynk.virtualWrite(V5, buff);
-    snprintf(buff, sizeof(buff), " => Mực nước: %.1f cm\n", smoothDistance);
+    snprintf(buff, sizeof(buff), " => Mực nước (đã bù +100 cm): %.1f cm\n", smoothDistance);
     Blynk.virtualWrite(V5, buff);
   } else if (dataS == "level_clear") {
     data.num_level_points = 0;
@@ -925,17 +956,50 @@ BLYNK_WRITE(V5) // data string
     }
     savedata();
     Blynk.virtualWrite(V5, "Đã xóa calib mực nước.\n");
-  } else if (dataS.startsWith("level_")) { // Lệnh hiệu chuẩn điểm mực nước đã biết, ví dụ: level_150
-    String numStr = dataS.substring(6);
-    float level_known = numStr.toFloat();
-    CalibPoint pt;
-    pt.adc = (uint16_t)round(kalman_filtered_adc_value);
-    pt.value = (uint16_t)level_known;
-    addOrUpdateCalibPoint(pt, data.level_points, data.num_level_points);
-    savedata();
-    char buff[64];
-    snprintf(buff, sizeof(buff), "Đã lưu điểm: ADC=%d -> %d cm\n", pt.adc, pt.value);
-    Blynk.virtualWrite(V5, buff);
+  } else if (dataS.startsWith("level_") && dataS.indexOf('_', 6) >= 0) {
+    int separator = dataS.indexOf('_', 6);
+    String point_text = dataS.substring(6, separator);
+    String value_text = dataS.substring(separator + 1);
+
+    if (!isNonNegativeNumber(point_text, false) || !isNonNegativeNumber(value_text, false)) {
+      Blynk.virtualWrite(V5, "Sai định dạng. Dùng level_N_YYY (ví dụ level_5_500).\n");
+    } else {
+      int point_number = point_text.toInt();
+      unsigned long level_known = value_text.toInt();
+      if (point_number < 1 || point_number > data.num_level_points) {
+        Blynk.virtualWrite(V5, "Điểm mực nước không tồn tại. Xem danh sách bằng calib.\n");
+      } else if (level_known > 65535UL) {
+        Blynk.virtualWrite(V5, "Giá trị mực nước vượt giới hạn lưu trữ.\n");
+      } else {
+        CalibPoint pt;
+        pt.adc = (uint16_t)round(kalman_filtered_adc_value);
+        pt.value = (uint16_t)level_known;
+        replaceCalibPoint((uint8_t)point_number, pt, data.level_points, data.num_level_points);
+        savedata();
+        char buff[80];
+        snprintf(buff, sizeof(buff), "Đã thay điểm #%d: ADC=%d -> %d cm\n", point_number, pt.adc, pt.value);
+        Blynk.virtualWrite(V5, buff);
+      }
+    }
+  } else if (dataS.startsWith("level_")) { // Lệnh thêm điểm mực nước đã biết, ví dụ: level_500
+    String value_text = dataS.substring(6);
+    if (!isNonNegativeNumber(value_text, false)) {
+      Blynk.virtualWrite(V5, "Sai định dạng. Dùng level_YYY (ví dụ level_500).\n");
+    } else {
+      unsigned long level_known = value_text.toInt();
+      if (level_known > 65535UL) {
+        Blynk.virtualWrite(V5, "Giá trị mực nước vượt giới hạn lưu trữ.\n");
+      } else {
+        CalibPoint pt;
+        pt.adc = (uint16_t)round(kalman_filtered_adc_value);
+        pt.value = (uint16_t)level_known;
+        addOrUpdateCalibPoint(pt, data.level_points, data.num_level_points);
+        savedata();
+        char buff[64];
+        snprintf(buff, sizeof(buff), "Đã lưu điểm: ADC=%d -> %d cm\n", pt.adc, pt.value);
+        Blynk.virtualWrite(V5, buff);
+      }
+    }
   } else if (dataS == "i2c") {
     i2c_scaner();
   } else {
@@ -2431,7 +2495,7 @@ void MeasureAndProcessWaterLevel() // C15
   kalman_filtered_adc_value = levelKalmanFilter.updateEstimate(median_value);
 
   // 5. Chuyển đổi giá trị ADC đã làm mịn sang đơn vị đo thực tế (cm)
-  smoothDistance = interpolate(kalman_filtered_adc_value, data.level_points, data.num_level_points);
+  smoothDistance = interpolate(kalman_filtered_adc_value, data.level_points, data.num_level_points) + LEVEL_SENSOR_BOTTOM_OFFSET_CM;
 
   // Giới hạn giá trị trong khoảng hợp lý
   smoothDistance = constrain(smoothDistance, 0.0, dosau * 1.4); // Cho phép vượt 40%
