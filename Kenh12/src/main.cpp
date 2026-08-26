@@ -7,7 +7,7 @@
 #define BLYNK_TEMPLATE_NAME "Áp lực tuyến"
 #define BLYNK_AUTH_TOKEN "sVtMTLTQgaRjQTl31V7Qewtdv2KVs9ST"
 
-#define BLYNK_FIRMWARE_VERSION "260818"
+#define BLYNK_FIRMWARE_VERSION "260826"
 #define BLYNK_PRINT Serial
 #define APP_DEBUG
 
@@ -71,10 +71,10 @@ const unsigned long XKC_DEBOUNCE_MS = 500UL;
 OneWire oneWire(D5); // Chân D5 là chân dữ liệu của cảm biến DS18B20
 DallasTemperature sensors(&oneWire);
 
-// const char *ssid = "net";
-// const char *password = "Password";
-const char *ssid = "tram bom so 4";
-const char *password = "0943950555";
+const char *ssid = "net";
+const char *password = "Password";
+// const char *ssid = "tram bom so 4";
+// const char *password = "0943950555";
 
 float Result1 = 0.0f;
 float temp[1], nhietdo;
@@ -627,10 +627,22 @@ void savedata() {
   EEPROM.end();
 }
 //-------------------------
-void send_data_TanLap1() {
-}
 void updata() {
-  
+  if (WiFi.status() != WL_CONNECTED)
+    return;
+
+  String server_path = server_name + "batch/update?token=" + BLYNK_AUTH_TOKEN +
+                       "&V2=" + String(nhietdo, 2) +
+                       "&V3=" + String(Result1, 2);
+  http.begin(client, server_path.c_str());
+  http.GET();
+  http.end();
+
+  String server_path_TanLap1 = TanLap1 + "batch/update?token=" + BLYNK_AUTH_TOKEN +
+                               "&V16=" + String(Result1, 2);
+  http.begin(client, server_path_TanLap1.c_str());
+  http.GET();
+  http.end();
 }
 void tem() {
   sensors.requestTemperatures();
@@ -784,8 +796,7 @@ void setup() {
   timer.setTimeout(5000, []() {
     time1 = timer.setInterval(5612, []() {
       tem();
-      send_data();
-      // updata();
+      updata();
       timer.restartTimer(time1);
       timer.restartTimer(time2);
     });
