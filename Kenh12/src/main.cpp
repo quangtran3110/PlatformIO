@@ -7,7 +7,7 @@
 #define BLYNK_TEMPLATE_NAME "Áp lực tuyến"
 #define BLYNK_AUTH_TOKEN "sVtMTLTQgaRjQTl31V7Qewtdv2KVs9ST"
 
-#define BLYNK_FIRMWARE_VERSION "260826"
+#define BLYNK_FIRMWARE_VERSION "260827"
 #define BLYNK_PRINT Serial
 #define APP_DEBUG
 
@@ -617,6 +617,37 @@ void pressure() {
                   */
 }
 //-------------------------
+void i2c_scaner() {
+  byte error, address;
+  int nDevices;
+  String stringOne;
+
+  nDevices = 0;
+  for (address = 1; address < 127; address++) {
+    // The i2c_scanner uses the return value of
+    // the Write.endTransmisstion to see if
+    // a device did acknowledge to the address.
+    Wire.beginTransmission(address);
+    error = Wire.endTransmission();
+
+    if (error == 0) {
+      stringOne = String(address, HEX);
+      if (address < 16)
+        Blynk.virtualWrite(V0, "I2C device found at address 0x0", stringOne, " !\n");
+      Blynk.virtualWrite(V0, "I2C device found at address 0x", stringOne, " !\n");
+      nDevices++;
+    } else if (error == 4) {
+      stringOne = String(address, HEX);
+
+      if (address < 16)
+        Blynk.virtualWrite(V0, "Unknown error at address 0x0", stringOne, " !\n");
+      Blynk.virtualWrite(V0, "I2C device found at address 0x", stringOne, " !\n");
+    }
+  }
+  if (nDevices == 0)
+    Blynk.virtualWrite(V0, "No I2C devices found\n");
+}
+//-------------------------
 void savedata() {
   save_num = save_num + 1;
   EEPROM.begin(EEPROM_SIZE_BYTES);
@@ -651,7 +682,7 @@ void tem() {
     temp[i] = sensors.getTempCByIndex(i);
     nhietdo = temp[i];
     // Blynk.virtualWrite(V36, temp[i]);
-    // Serial.printf("Nhiet do %u: %.2f °C\n", i, temp[i]);
+    //Serial.printf("Nhiet do %u: %.2f °C\n", i, temp[i]);
   }
   if (temp[0] > 42) {
     Blynk.logEvent("error-5", String("Nhiệt độ tủ cao: ") + temp[0] + String("°C"));
@@ -749,6 +780,8 @@ BLYNK_WRITE(V0) {
       Blynk.virtualWrite(V0, saved ? "Da them/cap nhat diem calib ap suat.\n"
                                    : "Da cap nhat trong RAM nhung loi ghi EEPROM.\n");
     }
+  } else if (dataS == "i2c") {
+    i2c_scaner();
   }
 }
 
