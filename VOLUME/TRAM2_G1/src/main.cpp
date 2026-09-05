@@ -1,11 +1,15 @@
-#define BLYNK_TEMPLATE_ID "TMPL6JV0UpS1X"
-#define BLYNK_TEMPLATE_NAME "VOLUME"
-#define BLYNK_AUTH_TOKEN "L_2oEOyv4bmrdsesIoasyKiEEOFZVgBO"
+#define BLYNK_TEMPLATE_ID "TMPL6WbAke1zD"
+#define BLYNK_TEMPLATE_NAME "TRAM2.G1     G2"
+#define BLYNK_AUTH_TOKEN "1WF0Mg7ga5gVFG3QSuXlVvMaWsuu6eIH"
 
-#define BLYNK_FIRMWARE_VERSION "260904"
+#define BLYNK_FIRMWARE_VERSION "260905"
 #define BLYNK_PRINT Serial
 #define APP_DEBUG
 
+// Core & Standard libraries (Arduino, stdint, cstdint)
+#include <Arduino.h>
+#include <stdint.h>
+#include <cstdint>
 #include <BlynkSimpleEsp8266.h>
 #include <ESP8266HTTPClient.h>
 #include <ESP8266WiFi.h>
@@ -42,10 +46,15 @@ constexpr int32_t LOCAL_UTC_OFFSET_SECONDS = 7L * 60L * 60L;
 constexpr uint32_t MIN_VALID_UNIX = 1704067200UL; // 2024-01-01 00:00:00 UTC
 constexpr uint32_t MAX_VALID_UNIX = 4102444799UL; // 2099-12-31 23:59:59 UTC
 
-constexpr uint32_t LIVE_UPLOAD_INTERVAL_MS = 120000UL;
+constexpr uint32_t LIVE_UPLOAD_INTERVAL_MS = 90UL * 1000UL;
 constexpr uint32_t DAILY_RETRY_MIN_MS = 15000UL;
 constexpr uint32_t DAILY_RETRY_MAX_MS = 300000UL;
 constexpr uint32_t PULSE_PERSIST_MIN_INTERVAL_MS = 250UL;
+// 100 pulse/hour gives 36 seconds minimum; keep 6 seconds of flow tolerance.
+constexpr uint32_t MIN_VALID_PULSE_INTERVAL_US = 30000000UL;
+// The meter output is configured for a 4.2-second pulse.
+constexpr uint32_t MIN_VALID_PULSE_WIDTH_US = 3200000UL;
+constexpr uint32_t MAX_VALID_PULSE_WIDTH_US = 5200000UL;
 constexpr uint16_t HTTP_TIMEOUT_MS = 5000;
 
 struct __attribute__((packed)) PersistedState {
@@ -86,6 +95,11 @@ BlynkTimer timer;
 
 PersistedState state = {};
 volatile uint32_t pulseCount = 0;
+volatile uint32_t rejectedPulseCount = 0;
+volatile uint32_t lastAcceptedPulseMicros = 0;
+volatile uint32_t lastPulseEdgeMicros = 0;
+volatile bool pulseFilterArmed = false;
+volatile bool pulseEdgeTracking = false;
 
 bool storageReady = false;
 bool rtcPresent = false;
@@ -121,6 +135,29 @@ uint32_t readPulseCount() {
   uint32_t value = pulseCount;
   interrupts();
   return value;
+}
+
+uint32_t readRejectedPulseCount() {
+  noInterrupts();
+  uint32_t value = rejectedPulseCount;
+  interrupts();
+  return value;
+}
+
+void releasePulseFiltersAfterQuietPeriod() {
+  noInterrupts();
+  uint32_t nowMicros = micros();
+  if (pulseFilterArmed &&
+      static_cast<uint32_t>(nowMicros - lastAcceptedPulseMicros) >=
+          MIN_VALID_PULSE_INTERVAL_US) {
+    pulseFilterArmed = false;
+  }
+  if (pulseEdgeTracking &&
+      static_cast<uint32_t>(nowMicros - lastPulseEdgeMicros) >
+          MAX_VALID_PULSE_WIDTH_US) {
+    pulseEdgeTracking = false;
+  }
+  interrupts();
 }
 
 bool timeReached(uint32_t nowMs, uint32_t targetMs) {
@@ -532,6 +569,7 @@ void applyCloudTime(uint32_t cloudUnix) {
 }
 
 void servicePulsePersistence() {
+  releasePulseFiltersAfterQuietPeriod();
   if (!storageReady) {
     return;
   }
@@ -656,14 +694,14 @@ void updateFirmware() {
   }
 }
 
-void printTerminalMain() {
-  String clearUrl = String(BLYNK_API_BASE) + "batch/update?token=" + MAIN_TOKEN +
-                    "&V50=clr";
-  apiGet(clearUrl);
-
-  String messageUrl = String(BLYNK_API_BASE) + "batch/update?token=" + MAIN_TOKEN +
-                      "&V50=" + urlEncode(terminalText);
-  apiGet(messageUrl);
+void printTerminalDevice() {
+  Serial.println(terminalText);
+  String messageUrl = String(BLYNK_API_BASE) + "batch/update?token=" +
+                      BLYNK_AUTH_TOKEN + "&V0=" + urlEncode(terminalText);
+  int messageStatus = apiGet(messageUrl);
+  if (messageStatus != HTTP_CODE_OK) {
+    Serial.printf("V0 API: HTTP %d\n", messageStatus);
+  }
 }
 
 void scanI2cOnce() {
@@ -674,6 +712,7 @@ void scanI2cOnce() {
 
   String report = "I2C scan:\n";
   uint8_t found = 0;
+  uint8_t scanErrors = 0;
   for (uint8_t address = 1; address < 127; address++) {
     Wire.beginTransmission(address);
     uint8_t error = Wire.endTransmission();
@@ -682,18 +721,21 @@ void scanI2cOnce() {
       snprintf(line, sizeof(line), "- found 0x%02X\n", address);
       report += line;
       found++;
-    } else if (error == 4) {
-      char line[32];
-      snprintf(line, sizeof(line), "- unknown error 0x%02X\n", address);
-      report += line;
+    } else if (error != 2) {
+      scanErrors++;
     }
   }
   if (found == 0) {
-    report += "- no device\n";
+    report += "- I2C ERROR: no device found\n";
   }
+  if (scanErrors > 0) {
+    report += "- I2C ERROR: bus communication failure (" + String(scanErrors) + ")\n";
+  }
+  report += "Pulse accepted: " + String(readPulseCount()) + "\n";
+  report += "Pulse rejected: " + String(readRejectedPulseCount()) + "\n";
   report += "WiFi: " + String(WiFi.RSSI()) + " dBm\n";
   terminalText = report;
-  printTerminalMain();
+  printTerminalDevice();
 }
 
 BLYNK_CONNECTED() {
@@ -707,18 +749,18 @@ BLYNK_WRITE(InternalPinRTC) {
 
 BLYNK_WRITE(V0) {
   String command = param.asStr();
-  if (command == "rst_G1") {
+  if (command == "rst") {
     persistState();
     terminalText = "ESP khoi dong lai sau 3s";
-    printTerminalMain();
+    printTerminalDevice();
     delay(3000);
     ESP.restart();
-  } else if (command == "update_G1") {
+  } else if (command == "update") {
     persistState();
     terminalText = "UPDATE FIRMWARE...";
-    printTerminalMain();
+    printTerminalDevice();
     updateFirmware();
-  } else if (command == "rst_vl_G1") {
+  } else if (command == "rst_vl") {
     noInterrupts();
     pulseCount = 0;
     interrupts();
@@ -728,17 +770,44 @@ BLYNK_WRITE(V0) {
     persistState();
     lastLiveSentPulse = UINT32_MAX;
     terminalText = "Da reset Volume hien tai; giu nguyen du lieu ngay dang cho gui";
-    printTerminalMain();
-  } else if (command == "i2c_G1") {
+    printTerminalDevice();
+  } else if (command == "i2c") {
     keyI2cScan = true;
-  } else if (command == "savedata_G1") {
+  } else if (command == "savedata") {
     bool saved = persistState();
     terminalText = saved ? "DATA_SAVE... ok!" : "DATA_SAVE... error!";
-    printTerminalMain();
+    printTerminalDevice();
   }
 }
 
 IRAM_ATTR void buttonPressed() {
+  uint32_t nowMicros = micros();
+  if (!pulseEdgeTracking) {
+    lastPulseEdgeMicros = nowMicros;
+    pulseEdgeTracking = true;
+    return;
+  }
+
+  uint32_t pulseWidth = nowMicros - lastPulseEdgeMicros;
+  lastPulseEdgeMicros = nowMicros;
+  if (pulseWidth < MIN_VALID_PULSE_WIDTH_US) {
+    rejectedPulseCount++;
+    return;
+  }
+  if (pulseWidth > MAX_VALID_PULSE_WIDTH_US) {
+    return;
+  }
+
+  pulseEdgeTracking = false;
+  if (pulseFilterArmed &&
+      static_cast<uint32_t>(nowMicros - lastAcceptedPulseMicros) <
+          MIN_VALID_PULSE_INTERVAL_US) {
+    rejectedPulseCount++;
+    return;
+  }
+
+  lastAcceptedPulseMicros = nowMicros;
+  pulseFilterArmed = true;
   pulseCount++;
 }
 
@@ -773,7 +842,7 @@ void setup() {
     Serial.println(F("RTC: cho dong bo thoi gian tu Blynk"));
   }
 
-  attachInterrupt(digitalPinToInterrupt(D6), buttonPressed, RISING);
+  attachInterrupt(digitalPinToInterrupt(D6), buttonPressed, CHANGE);
   serviceClockAndRollover();
 
   timer.setInterval(1000L, serviceClockAndRollover);

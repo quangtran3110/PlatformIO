@@ -1,0 +1,19 @@
+CompileFlags:
+  Remove:
+    - -mlongcalls
+    - -mtext-section-literals
+    - -free
+    - -fipa-pta
+    - -falign-functions=4
+  Add:
+    - -Wno-unknown-argument
+    - -Wno-unknown-warning-option
+    - -D__attribute__(x)=
+    - -D__USER_LABEL_PREFIX__=
+    - -D__ASMNAME(cname)=cname
+    - -isystem
+    - C:/Users/quang/.platformio/packages/toolchain-xtensa/xtensa-lx106-elf/include/c++/10.3.0
+    - -isystem
+    - C:/Users/quang/.platformio/packages/toolchain-xtensa/xtensa-lx106-elf/include/c++/10.3.0/xtensa-lx106-elf
+    - -isystem
+    - C:/Users/quang/.platformio/packages/toolchain-xtensa/xtensa-lx106-elf/include/c++/10.3.0/backward

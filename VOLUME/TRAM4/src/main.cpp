@@ -14,8 +14,8 @@
 #include <RTClib.h>
 #include <SPI.h>
 #include <TimeLib.h>
-#include <WidgetTerminal.h>
 #include <WiFiClientSecure.h>
+#include <UrlEncode.h>
 #include <Wire.h>
 
 const char *ssid = "tram bom so 4";
@@ -88,7 +88,6 @@ I2C_eeprom ee(EEPROM_I2C_ADDRESS, EEPROM_SIZE);
 RTC_DS3231 rtcModule;
 BearSSL::WiFiClientSecure apiClient;
 BlynkTimer timer;
-WidgetTerminal terminal(V0);
 
 PersistedState state = {};
 volatile uint32_t pulseCount = 0;
@@ -241,7 +240,7 @@ bool writeDailyRecord(uint8_t slot, DailyRecord &record) {
     return false;
   }
   record.crc = crc16Ccitt(reinterpret_cast<const uint8_t *>(&record),
-                         offsetof(DailyRecord, crc));
+                          offsetof(DailyRecord, crc));
   return ee.writeBlockVerify(dailyRecordAddress(slot),
                              reinterpret_cast<const uint8_t *>(&record), sizeof(record));
 }
@@ -258,7 +257,7 @@ bool persistState() {
   candidate.generation = state.generation + 1UL;
   candidate.reserved = 0;
   candidate.crc = crc16Ccitt(reinterpret_cast<const uint8_t *>(&candidate),
-                            offsetof(PersistedState, crc));
+                             offsetof(PersistedState, crc));
 
   uint8_t nextSlot = currentStateSlot < 0
                          ? 0
@@ -694,12 +693,12 @@ void updateFirmware() {
 
 void printTerminalDevice() {
   Serial.println(terminalText);
-  if (!Blynk.connected()) {
-    return;
+  String messageUrl = String(BLYNK_API_BASE) + "batch/update?token=" +
+                      BLYNK_AUTH_TOKEN + "&V0=" + urlEncode(terminalText);
+  int messageStatus = apiGet(messageUrl);
+  if (messageStatus != HTTP_CODE_OK) {
+    Serial.printf("V0 API: HTTP %d\n", messageStatus);
   }
-  terminal.clear();
-  terminal.println(terminalText);
-  terminal.flush();
 }
 
 void scanI2cOnce() {
@@ -710,6 +709,7 @@ void scanI2cOnce() {
 
   String report = "I2C scan:\n";
   uint8_t found = 0;
+  uint8_t scanErrors = 0;
   for (uint8_t address = 1; address < 127; address++) {
     Wire.beginTransmission(address);
     uint8_t error = Wire.endTransmission();
@@ -718,14 +718,15 @@ void scanI2cOnce() {
       snprintf(line, sizeof(line), "- found 0x%02X\n", address);
       report += line;
       found++;
-    } else if (error == 4) {
-      char line[32];
-      snprintf(line, sizeof(line), "- unknown error 0x%02X\n", address);
-      report += line;
+    } else if (error != 2) {
+      scanErrors++;
     }
   }
   if (found == 0) {
-    report += "- no device\n";
+    report += "- I2C ERROR: no device found\n";
+  }
+  if (scanErrors > 0) {
+    report += "- I2C ERROR: bus communication failure (" + String(scanErrors) + ")\n";
   }
   report += "Pulse accepted: " + String(readPulseCount()) + "\n";
   report += "Pulse rejected: " + String(readRejectedPulseCount()) + "\n";
