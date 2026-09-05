@@ -669,7 +669,7 @@ void updata() {
   http.GET();
   http.end();
 
-  String server_path_TanLap1 = TanLap1 + "batch/update?token=" + BLYNK_AUTH_TOKEN +
+  String server_path_TanLap1 = server_name + "batch/update?token=" + TanLap1 +
                                "&V16=" + String(Result1, 2);
   http.begin(client, server_path_TanLap1.c_str());
   http.GET();
