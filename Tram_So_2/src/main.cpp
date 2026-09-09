@@ -70,7 +70,7 @@
 #define VOLUME_TOKEN_G2 "Hc5DgCBzl4Oi5hW_JOaNZ6oBKoGy5kFI"
 #define VOLUME_TOKEN_G3 "JTnEpJjGVVJ8DM1aJx7zZT4cyNYJrhr_"
 
-#define BLYNK_FIRMWARE_VERSION "260826"
+#define BLYNK_FIRMWARE_VERSION "260909"
 #define BLYNK_PRINT Serial
 #define APP_DEBUG
 
@@ -192,6 +192,10 @@ bool G1_save = false, G2_save = false, G3_save = false, B1_save = false, B2_save
 const unsigned long WATCHDOG_TOGGLE_INTERVAL_MS = 5000UL;
 uint8_t watchdogOutputLevel = LOW;
 unsigned long watchdogLastToggleMs = 0;
+// Khi Auto dang thu khoi dong bom, state machine se tu xu ly truong hop
+// chua co dong. Bao ve qua/thieu dong sau khi bom da len dong van giu nguyen.
+bool auto_start_guard_b2 = false;
+bool auto_start_guard_b4 = false;
 //----------------------------------
 #define DATA_VERSION 3
 
@@ -269,9 +273,46 @@ WidgetTerminal keyterminal(V5);
 WidgetTerminal volume_terminal(V50);
 WidgetRTC rtc_widget;
 BlynkTimer timer, timer1;
+
+String pending_auto_notice;
+bool pending_auto_notice_is_error = false;
+
+void logAutoPumpStep(const String &message) {
+  Serial.println(String("[AUTO B2/B4] ") + message);
+}
+
+void sendAutoPumpNotice(const String &message, bool is_error) {
+  logAutoPumpStep(message);
+
+  if (!data.key_noti) {
+    pending_auto_notice = "";
+    return;
+  }
+
+  if (!Blynk.connected()) {
+    pending_auto_notice = message;
+    pending_auto_notice_is_error = is_error;
+    return;
+  }
+
+  // Chi gui cac ket qua chot len Notifications. Khong ghi vao Terminal V5
+  // vi Terminal co the bi clear va khong phu hop de luu lich su su kien.
+  Blynk.logEvent(is_error ? "error" : "info", message);
+
+  pending_auto_notice = "";
+}
+
 BLYNK_CONNECTED() {
   rtc_widget.begin();
   blynk_first_connect = true;
+
+  // EEPROM la nguon trang thai dieu khien. Xuat lai de V17/V3 tren app
+  // khong chi hien gia tri cu dang luu tren Blynk Cloud.
+  Blynk.virtualWrite(V17, data.en_auto_b2_b4);
+  Blynk.virtualWrite(V3, data.key_noti);
+
+  if (pending_auto_notice.length() > 0)
+    sendAutoPumpNotice(pending_auto_notice, pending_auto_notice_is_error);
 }
 //----------------------------------
 /*void connectionstatus() {
@@ -1795,13 +1836,19 @@ void readcurrent2() // C2 - 11 KW
     Irms2 = 0;
     yIrms2 = 0;
     if (status_b4 == HIGH) {
-      xIrms2++;
-      if ((xIrms2 > 3) && (data.protect)) {
+      if (auto_start_guard_b4) {
+        // Trong luc Auto dang xac nhan khoi dong, de state machine quyet dinh
+        // thu lai hay dung han. Khong vo hieu hoa bao ve qua/thieu dong.
         xIrms2 = 0;
-        off_Bom4();
-        trip2 = true;
-        if (data.key_noti)
-          Blynk.logEvent("error", String("Bơm 11Kw lỗi\nKhông đo được DÒNG ĐIỆN"));
+      } else {
+        xIrms2++;
+        if ((xIrms2 > 3) && (data.protect)) {
+          xIrms2 = 0;
+          off_Bom4();
+          trip2 = true;
+          if (data.key_noti)
+            Blynk.logEvent("error", String("Bơm 11Kw lỗi\nKhông đo được DÒNG ĐIỆN"));
+        }
       }
     }
     if (B4_start != 0) {
@@ -2028,13 +2075,17 @@ void readcurrent6() // C6 - 30kw
     Irms6 = 0;
     yIrms6 = 0;
     if (status_b2 == HIGH) {
-      xIrms6++;
-      if ((xIrms6 > 3) && (data.protect)) {
+      if (auto_start_guard_b2) {
         xIrms6 = 0;
-        off_Bom2();
-        trip6 = true;
-        if (data.key_noti)
-          Blynk.logEvent("error", String("Bơm 30Kw lỗi\nKhông đo được DÒNG ĐIỆN"));
+      } else {
+        xIrms6++;
+        if ((xIrms6 > 3) && (data.protect)) {
+          xIrms6 = 0;
+          off_Bom2();
+          trip6 = true;
+          if (data.key_noti)
+            Blynk.logEvent("error", String("Bơm 30Kw lỗi\nKhông đo được DÒNG ĐIỆN"));
+        }
       }
     }
     if (B2_start != 0) {
@@ -2136,29 +2187,40 @@ void processAutoPumps() {
     AUTO_STOP_FOR_B4,
     AUTO_WAIT_STOP_FOR_B4,
     AUTO_VERIFY_B4,
+    AUTO_RETRY_WAIT_B4,
     AUTO_STOP_B4_FOR_B2,
     AUTO_WAIT_STOP_FOR_B2,
-    AUTO_VERIFY_B2
+    AUTO_VERIFY_B2,
+    AUTO_RETRY_WAIT_B2
   };
 
   static AutoPumpState state = AUTO_IDLE;
   static bool schedule_initialized = false;
+  static bool first_evaluation_after_boot = true;
   static bool last_window_state = false;
   static unsigned long phase_started_ms = 0;
   static unsigned long stopped_since_ms = 0;
   static unsigned long current_since_ms = 0;
+  static uint8_t start_attempt = 0;
 
   const unsigned long STOP_SETTLE_MS = 2000UL;
   const unsigned long RUN_CONFIRM_MS = 10000UL;
   const unsigned long STOP_TIMEOUT_MS = 30000UL;
-  const unsigned long START_TIMEOUT_MS = 45000UL;
+  const unsigned long START_ATTEMPT_TIMEOUT_MS = 20000UL;
+  const unsigned long RETRY_COOLDOWN_MS = 5000UL;
+  const uint8_t MAX_START_ATTEMPTS = 2;
+  const int BOOT_EDGE_RECOVERY_MINUTES = 5;
 
   // Tắt Auto thì hủy quy trình đang chờ và không can thiệp các bơm.
   if (!data.en_auto_b2_b4) {
     state = AUTO_IDLE;
     schedule_initialized = false;
+    first_evaluation_after_boot = false;
     stopped_since_ms = 0;
     current_since_ms = 0;
+    start_attempt = 0;
+    auto_start_guard_b2 = false;
+    auto_start_guard_b4 = false;
     return;
   }
 
@@ -2179,10 +2241,29 @@ void processAutoPumps() {
   }
 
   // Vừa khởi động hoặc vừa bật Auto: chỉ đồng bộ thời gian,
-  // không tự chạy bơm khi đang ở giữa một khung giờ.
+  // không tự chạy bơm khi đang ở giữa một khung giờ. Riêng lần đầu sau khi
+  // ESP khởi động, cho phép phục hồi nếu chỉ vừa đi qua mép giờ tối đa 5 phút.
   if (!schedule_initialized) {
     last_window_state = is_in_window;
     schedule_initialized = true;
+
+    if (first_evaluation_after_boot) {
+      int edge_mins = is_in_window ? start_mins : stop_mins;
+      int mins_after_edge = current_time_mins - edge_mins;
+      if (mins_after_edge < 0)
+        mins_after_edge += 24 * 60;
+
+      if (mins_after_edge <= BOOT_EDGE_RECOVERY_MINUTES) {
+        phase_started_ms = millis();
+        stopped_since_ms = 0;
+        current_since_ms = 0;
+        start_attempt = 0;
+        state = is_in_window ? AUTO_STOP_FOR_B4 : AUTO_STOP_B4_FOR_B2;
+        logAutoPumpStep("ESP vừa khởi động gần mốc hẹn giờ, phục hồi quy trình đổi bơm.");
+      }
+    }
+
+    first_evaluation_after_boot = false;
     return;
   }
 
@@ -2192,7 +2273,12 @@ void processAutoPumps() {
     phase_started_ms = millis();
     stopped_since_ms = 0;
     current_since_ms = 0;
+    start_attempt = 0;
+    auto_start_guard_b2 = false;
+    auto_start_guard_b4 = false;
     state = is_in_window ? AUTO_STOP_FOR_B4 : AUTO_STOP_B4_FOR_B2;
+    logAutoPumpStep(is_in_window ? "Đến giờ chuyển từ Bơm 30 kW sang Bơm 11 kW."
+                                 : "Đến giờ chuyển từ Bơm 11 kW sang Bơm 30 kW.");
   }
 
   unsigned long now_ms = millis();
@@ -2200,6 +2286,8 @@ void processAutoPumps() {
   switch (state) {
   case AUTO_STOP_FOR_B4:
     // Đầu khung giờ: phát lệnh tắt cả ba bơm 1, 2, 3 một lần.
+    auto_start_guard_b2 = false;
+    auto_start_guard_b4 = false;
     off_Bom1();
     off_Bom2();
     off_Bom3();
@@ -2211,8 +2299,8 @@ void processAutoPumps() {
   case AUTO_WAIT_STOP_FOR_B4:
     if (trip2) {
       state = AUTO_IDLE;
-      if (data.key_noti)
-        Blynk.logEvent("error", "Không thể chạy Bơm 4: bơm đang báo lỗi.");
+      auto_start_guard_b4 = false;
+      sendAutoPumpNotice("Không thể chạy Bơm 11 kW: cờ bảo vệ trip2 đang bật.", true);
       break;
     }
 
@@ -2222,8 +2310,14 @@ void processAutoPumps() {
 
       if ((unsigned long)(now_ms - stopped_since_ms) >= STOP_SETTLE_MS) {
         // Nếu Bơm 4 đã chạy thì không phát thêm xung khởi động.
-        if (Irms2 == 0)
+        start_attempt = 1;
+        auto_start_guard_b4 = true;
+        if (Irms2 == 0) {
           on_Bom4();
+          logAutoPumpStep("Đã phát lệnh chạy Bơm 11 kW, lần 1/2.");
+        } else {
+          logAutoPumpStep("Bơm 11 kW đã có dòng, bắt đầu xác nhận ổn định.");
+        }
 
         phase_started_ms = millis();
         current_since_ms = (Irms2 != 0) ? phase_started_ms : 0;
@@ -2236,8 +2330,8 @@ void processAutoPumps() {
     if (state == AUTO_WAIT_STOP_FOR_B4 &&
         (unsigned long)(now_ms - phase_started_ms) >= STOP_TIMEOUT_MS) {
       state = AUTO_IDLE;
-      if (data.key_noti)
-        Blynk.logEvent("error", "Chuyển sang Bơm 4 thất bại: Bơm 1, 2 hoặc 3 chưa dừng.");
+      auto_start_guard_b4 = false;
+      sendAutoPumpNotice("Chuyển sang Bơm 11 kW thất bại: Bơm 1, 2 hoặc 3 chưa dừng.", true);
     }
     break;
 
@@ -2245,6 +2339,8 @@ void processAutoPumps() {
     if (trip2) {
       state = AUTO_IDLE;
       current_since_ms = 0;
+      auto_start_guard_b4 = false;
+      sendAutoPumpNotice("Bơm 11 kW phát sinh trip2 trong lúc xác nhận khởi động.", true);
       break;
     }
 
@@ -2254,23 +2350,56 @@ void processAutoPumps() {
 
       if ((unsigned long)(now_ms - current_since_ms) >= RUN_CONFIRM_MS) {
         state = AUTO_IDLE; // Xác nhận xong, Auto không can thiệp nữa.
-        if (data.key_noti)
-          Blynk.logEvent("info", "Bơm 4 đã chạy ổn định liên tục >10 giây.");
+        auto_start_guard_b4 = false;
+        sendAutoPumpNotice("Đổi từ Bơm 30 kW sang Bơm 11 kW thành công.", false);
       }
     } else {
       current_since_ms = 0;
     }
 
-    if (state == AUTO_VERIFY_B4 && (unsigned long)(now_ms - phase_started_ms) >= START_TIMEOUT_MS) {
+    if (state == AUTO_VERIFY_B4 &&
+        (unsigned long)(now_ms - phase_started_ms) >= START_ATTEMPT_TIMEOUT_MS) {
       off_Bom4();
+      auto_start_guard_b4 = false;
+      current_since_ms = 0;
+
+      if (start_attempt < MAX_START_ATTEMPTS) {
+        phase_started_ms = millis();
+        state = AUTO_RETRY_WAIT_B4;
+        logAutoPumpStep("Bơm 11 kW chưa lên dòng ổn định; chờ 5 giây rồi thử lại lần cuối.");
+      } else {
+        if (data.protect)
+          trip2 = true;
+        state = AUTO_IDLE;
+        sendAutoPumpNotice("Đổi sang Bơm 11 kW thất bại sau 2 lần thử; đã dừng Auto.", true);
+      }
+    }
+    break;
+
+  case AUTO_RETRY_WAIT_B4:
+    if (trip2) {
       state = AUTO_IDLE;
-      if (data.key_noti)
-        Blynk.logEvent("error", "Bơm 4 không duy trì được dòng liên tục 10 giây.");
+      auto_start_guard_b4 = false;
+      sendAutoPumpNotice("Hủy lần thử lại Bơm 11 kW vì cờ bảo vệ trip2 đang bật.", true);
+      break;
+    }
+
+    if ((unsigned long)(now_ms - phase_started_ms) >= RETRY_COOLDOWN_MS) {
+      start_attempt++;
+      auto_start_guard_b4 = true;
+      if (Irms2 == 0)
+        on_Bom4();
+      phase_started_ms = millis();
+      current_since_ms = (Irms2 != 0) ? phase_started_ms : 0;
+      state = AUTO_VERIFY_B4;
+      logAutoPumpStep("Đã phát lệnh chạy Bơm 11 kW, lần 2/2.");
     }
     break;
 
   case AUTO_STOP_B4_FOR_B2:
     // Cuối khung giờ: dừng Bơm 4 trước khi chạy Bơm 2.
+    auto_start_guard_b4 = false;
+    auto_start_guard_b2 = false;
     off_Bom4();
     phase_started_ms = millis();
     stopped_since_ms = 0;
@@ -2280,8 +2409,8 @@ void processAutoPumps() {
   case AUTO_WAIT_STOP_FOR_B2:
     if (trip6) {
       state = AUTO_IDLE;
-      if (data.key_noti)
-        Blynk.logEvent("error", "Không thể chạy Bơm 2: bơm đang báo lỗi.");
+      auto_start_guard_b2 = false;
+      sendAutoPumpNotice("Không thể chạy Bơm 30 kW: cờ bảo vệ trip6 đang bật.", true);
       break;
     }
 
@@ -2291,8 +2420,14 @@ void processAutoPumps() {
 
       if ((unsigned long)(now_ms - stopped_since_ms) >= STOP_SETTLE_MS) {
         // Nếu Bơm 2 đã chạy thì chỉ chuyển sang bước xác nhận.
-        if (Irms6 == 0)
+        start_attempt = 1;
+        auto_start_guard_b2 = true;
+        if (Irms6 == 0) {
           on_Bom2();
+          logAutoPumpStep("Đã phát lệnh chạy Bơm 30 kW, lần 1/2.");
+        } else {
+          logAutoPumpStep("Bơm 30 kW đã có dòng, bắt đầu xác nhận ổn định.");
+        }
 
         phase_started_ms = millis();
         current_since_ms = (Irms6 != 0) ? phase_started_ms : 0;
@@ -2305,8 +2440,8 @@ void processAutoPumps() {
     if (state == AUTO_WAIT_STOP_FOR_B2 &&
         (unsigned long)(now_ms - phase_started_ms) >= STOP_TIMEOUT_MS) {
       state = AUTO_IDLE;
-      if (data.key_noti)
-        Blynk.logEvent("error", "Chuyển sang Bơm 2 thất bại: Bơm 4 chưa dừng.");
+      auto_start_guard_b2 = false;
+      sendAutoPumpNotice("Chuyển sang Bơm 30 kW thất bại: Bơm 11 kW chưa dừng.", true);
     }
     break;
 
@@ -2314,6 +2449,8 @@ void processAutoPumps() {
     if (trip6) {
       state = AUTO_IDLE;
       current_since_ms = 0;
+      auto_start_guard_b2 = false;
+      sendAutoPumpNotice("Bơm 30 kW phát sinh trip6 trong lúc xác nhận khởi động.", true);
       break;
     }
 
@@ -2323,18 +2460,49 @@ void processAutoPumps() {
 
       if ((unsigned long)(now_ms - current_since_ms) >= RUN_CONFIRM_MS) {
         state = AUTO_IDLE; // Xác nhận xong, người vận hành được quyền đổi bơm.
-        if (data.key_noti)
-          Blynk.logEvent("info", "Bơm 2 đã chạy ổn định liên tục 10 giây.");
+        auto_start_guard_b2 = false;
+        sendAutoPumpNotice("Đổi từ Bơm 11 kW sang Bơm 30 kW thành công.", false);
       }
     } else {
       current_since_ms = 0;
     }
 
-    if (state == AUTO_VERIFY_B2 && (unsigned long)(now_ms - phase_started_ms) >= START_TIMEOUT_MS) {
+    if (state == AUTO_VERIFY_B2 &&
+        (unsigned long)(now_ms - phase_started_ms) >= START_ATTEMPT_TIMEOUT_MS) {
       off_Bom2();
+      auto_start_guard_b2 = false;
+      current_since_ms = 0;
+
+      if (start_attempt < MAX_START_ATTEMPTS) {
+        phase_started_ms = millis();
+        state = AUTO_RETRY_WAIT_B2;
+        logAutoPumpStep("Bơm 30 kW chưa lên dòng ổn định; chờ 5 giây rồi thử lại lần cuối.");
+      } else {
+        if (data.protect)
+          trip6 = true;
+        state = AUTO_IDLE;
+        sendAutoPumpNotice("Đổi sang Bơm 30 kW thất bại sau 2 lần thử; đã dừng Auto.", true);
+      }
+    }
+    break;
+
+  case AUTO_RETRY_WAIT_B2:
+    if (trip6) {
       state = AUTO_IDLE;
-      if (data.key_noti)
-        Blynk.logEvent("error", "Bơm 2 không duy trì được dòng liên tục 10 giây.");
+      auto_start_guard_b2 = false;
+      sendAutoPumpNotice("Hủy lần thử lại Bơm 30 kW vì cờ bảo vệ trip6 đang bật.", true);
+      break;
+    }
+
+    if ((unsigned long)(now_ms - phase_started_ms) >= RETRY_COOLDOWN_MS) {
+      start_attempt++;
+      auto_start_guard_b2 = true;
+      if (Irms6 == 0)
+        on_Bom2();
+      phase_started_ms = millis();
+      current_since_ms = (Irms6 != 0) ? phase_started_ms : 0;
+      state = AUTO_VERIFY_B2;
+      logAutoPumpStep("Đã phát lệnh chạy Bơm 30 kW, lần 2/2.");
     }
     break;
 

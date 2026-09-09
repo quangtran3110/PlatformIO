@@ -14,8 +14,8 @@
 #include <RTClib.h>
 #include <SPI.h>
 #include <TimeLib.h>
-#include <WiFiClientSecure.h>
 #include <UrlEncode.h>
+#include <WiFiClientSecure.h>
 #include <Wire.h>
 
 const char *ssid = "tram bom so 4";
@@ -52,6 +52,8 @@ constexpr uint32_t MIN_VALID_PULSE_INTERVAL_US = 30000000UL;
 constexpr uint32_t MIN_VALID_PULSE_WIDTH_US = 3200000UL;
 constexpr uint32_t MAX_VALID_PULSE_WIDTH_US = 5200000UL;
 constexpr uint16_t HTTP_TIMEOUT_MS = 5000;
+constexpr uint8_t FLOW_PULSE_PIN = D6;
+constexpr uint8_t PULSE_ACTIVE_LEVEL = HIGH;
 
 struct __attribute__((packed)) PersistedState {
   uint32_t magic;
@@ -170,8 +172,8 @@ uint32_t makeDayKey(const DateTime &localTime) {
 }
 
 uint32_t currentLocalDayKey() {
-  DateTime localTime = rtcModule.now() + TimeSpan(LOCAL_UTC_OFFSET_SECONDS);
-  return makeDayKey(localTime);
+  // Blynk's rtc sync already supplies the device's local time.
+  return makeDayKey(rtcModule.now());
 }
 
 uint32_t closeTimestampUtc(uint32_t dayKey) {
@@ -561,7 +563,7 @@ void applyCloudTime(uint32_t cloudUnix) {
   state.flags |= STATE_FLAG_RTC_TRUSTED;
   state.lastRtcUnix = cloudUnix;
   persistState();
-  Serial.printf("RTC: dong bo UTC %lu\n", static_cast<unsigned long>(cloudUnix));
+  Serial.printf("RTC: dong bo gio dia phuong %lu\n", static_cast<unsigned long>(cloudUnix));
   serviceClockAndRollover();
 }
 
@@ -779,23 +781,25 @@ BLYNK_WRITE(V0) {
 
 IRAM_ATTR void buttonPressed() {
   uint32_t nowMicros = micros();
-  if (!pulseEdgeTracking) {
+
+  if (digitalRead(FLOW_PULSE_PIN) == PULSE_ACTIVE_LEVEL) {
     lastPulseEdgeMicros = nowMicros;
     pulseEdgeTracking = true;
     return;
   }
 
-  uint32_t pulseWidth = nowMicros - lastPulseEdgeMicros;
-  lastPulseEdgeMicros = nowMicros;
-  if (pulseWidth < MIN_VALID_PULSE_WIDTH_US) {
-    rejectedPulseCount++;
-    return;
-  }
-  if (pulseWidth > MAX_VALID_PULSE_WIDTH_US) {
+  if (!pulseEdgeTracking) {
     return;
   }
 
+  uint32_t pulseWidth = nowMicros - lastPulseEdgeMicros;
   pulseEdgeTracking = false;
+  if (pulseWidth < MIN_VALID_PULSE_WIDTH_US ||
+      pulseWidth > MAX_VALID_PULSE_WIDTH_US) {
+    rejectedPulseCount++;
+    return;
+  }
+
   if (pulseFilterArmed &&
       static_cast<uint32_t>(nowMicros - lastAcceptedPulseMicros) <
           MIN_VALID_PULSE_INTERVAL_US) {
@@ -839,7 +843,8 @@ void setup() {
     Serial.println(F("RTC: cho dong bo thoi gian tu Blynk"));
   }
 
-  attachInterrupt(digitalPinToInterrupt(D6), buttonPressed, CHANGE);
+  pinMode(FLOW_PULSE_PIN, INPUT);
+  attachInterrupt(digitalPinToInterrupt(FLOW_PULSE_PIN), buttonPressed, CHANGE);
   serviceClockAndRollover();
 
   timer.setInterval(1000L, serviceClockAndRollover);
