@@ -29,8 +29,8 @@ const char *MAIN_TOKEN = "BDm1LNQi_LhtaKAQU8RWUaGbiOyKIcd3";
 const char *BLYNK_API_BASE = "https://sgp1.blynk.cloud/external/api/";
 #define URL_fw_Bin "https://raw.githubusercontent.com/quangtran3110/PlatformIO/main/VOLUME/TRAM2_G1/.pio/build/nodemcuv2/firmware.bin"
 
-constexpr uint8_t EEPROM_I2C_ADDRESS = 0x57;
-constexpr uint16_t EEPROM_SIZE = 4096;
+constexpr uint8_t EEPROM_I2C_ADDRESS = 0x50;
+constexpr uint32_t EEPROM_SIZE = 32768UL;
 constexpr uint8_t EEPROM_PAGE_SIZE = 32;
 
 constexpr uint8_t STATE_SLOT_COUNT = 64;
