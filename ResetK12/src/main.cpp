@@ -2,7 +2,7 @@
 #define BLYNK_TEMPLATE_NAME "RESETK12"
 #define BLYNK_AUTH_TOKEN "0WCBRojUNdIx0yKeuJVnM96EAoqX_QmL"
 
-#define BLYNK_FIRMWARE_VERSION "260911.1"
+#define BLYNK_FIRMWARE_VERSION "260911.2"
 #define BLYNK_PRINT Serial
 #define APP_DEBUG
 
@@ -14,7 +14,7 @@ const char *ssid = "net";
 const char *password = "Password";
 const char *firmwareUrl =
     "https://raw.githubusercontent.com/quangtran3110/PlatformIO/refs/heads/"
-    "main/Kenh12/ResetK12/.pio/build/nodemcuv2/firmware.bin";
+    "main/ResetK12/.pio/build/nodemcuv2/firmware.bin";
 
 const uint32_t OTA_RTC_OFFSET_WORDS = 32;
 const uint32_t OTA_RTC_MAGIC = 0x4B31324FUL; // "K12O"
