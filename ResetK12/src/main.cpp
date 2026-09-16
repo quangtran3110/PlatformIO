@@ -2,7 +2,7 @@
 #define BLYNK_TEMPLATE_NAME "RESETK12"
 #define BLYNK_AUTH_TOKEN "0WCBRojUNdIx0yKeuJVnM96EAoqX_QmL"
 
-#define BLYNK_FIRMWARE_VERSION "260911.2"
+#define BLYNK_FIRMWARE_VERSION "260916.1"
 #define BLYNK_PRINT Serial
 #define APP_DEBUG
 
@@ -23,6 +23,16 @@ const int OTA_NETWORK_TIMEOUT_MS = 8000;
 const int32_t OTA_ERROR_WIFI_TIMEOUT = -1001;
 const int32_t OTA_ERROR_NO_UPDATE = -1002;
 int8_t lastOtaProgressBucket = -1;
+
+const unsigned long BLYNK_OFFLINE_RESET_INTERVAL_MS = 30UL * 60UL * 1000UL;
+const unsigned long MODEM_RESET_PULSE_MS = 10UL * 1000UL;
+const uint8_t MAX_AUTOMATIC_RESET_ATTEMPTS = 15;
+bool blynkOfflineTracking = false;
+bool automaticResetPulseActive = false;
+bool automaticResetLimitLogged = false;
+uint8_t automaticResetAttempts = 0;
+unsigned long offlineIntervalStartedMs = 0;
+unsigned long automaticResetPulseStartedMs = 0;
 
 enum OtaRtcPhase : uint32_t {
   OTA_RTC_NONE = 0,
@@ -70,6 +80,73 @@ void clearOtaRtcState() {
 void setResetRelaySafe() {
   pinMode(D3, OUTPUT);
   digitalWrite(D3, HIGH);
+}
+
+void resetAutomaticRecoveryState() {
+  bool hadOfflineState = blynkOfflineTracking || automaticResetPulseActive ||
+                         automaticResetAttempts > 0;
+  setResetRelaySafe();
+  blynkOfflineTracking = false;
+  automaticResetPulseActive = false;
+  automaticResetLimitLogged = false;
+  automaticResetAttempts = 0;
+  offlineIntervalStartedMs = millis();
+  automaticResetPulseStartedMs = 0;
+
+  if (hadOfflineState) {
+    Serial.println("Blynk reconnected: D3 HIGH, automatic reset counter cleared");
+  }
+}
+
+void serviceAutomaticBlynkRecovery() {
+  unsigned long now = millis();
+
+  if (Blynk.connected()) {
+    if (blynkOfflineTracking || automaticResetPulseActive ||
+        automaticResetAttempts > 0) {
+      resetAutomaticRecoveryState();
+    }
+    return;
+  }
+
+  if (!blynkOfflineTracking) {
+    // A lost Blynk session must never leave the modem reset relay energized.
+    setResetRelaySafe();
+    blynkOfflineTracking = true;
+    offlineIntervalStartedMs = now;
+    Serial.println("Blynk disconnected: automatic 30-minute timer started");
+    return;
+  }
+
+  if (automaticResetPulseActive) {
+    if (static_cast<unsigned long>(now - automaticResetPulseStartedMs) >=
+        MODEM_RESET_PULSE_MS) {
+      setResetRelaySafe();
+      automaticResetPulseActive = false;
+      Serial.printf("Automatic reset %u/%u finished: D3 HIGH\n",
+                    automaticResetAttempts, MAX_AUTOMATIC_RESET_ATTEMPTS);
+    }
+    return;
+  }
+
+  if (automaticResetAttempts >= MAX_AUTOMATIC_RESET_ATTEMPTS) {
+    if (!automaticResetLimitLogged) {
+      automaticResetLimitLogged = true;
+      Serial.println("Automatic reset limit reached: D3 remains HIGH");
+    }
+    return;
+  }
+
+  if (static_cast<unsigned long>(now - offlineIntervalStartedMs) >=
+      BLYNK_OFFLINE_RESET_INTERVAL_MS) {
+    digitalWrite(D3, LOW);
+    automaticResetPulseActive = true;
+    automaticResetPulseStartedMs = now;
+    offlineIntervalStartedMs = now;
+    automaticResetAttempts++;
+    Serial.printf("Blynk offline 30 minutes: automatic reset %u/%u, D3 LOW\n",
+                  automaticResetAttempts, MAX_AUTOMATIC_RESET_ATTEMPTS);
+  }
 }
 
 void otaStarted() {
@@ -185,6 +262,8 @@ void handleOtaBootState() {
 }
 
 BLYNK_CONNECTED() {
+  resetAutomaticRecoveryState();
+  Blynk.virtualWrite(V0, 0);
 }
 BLYNK_WRITE(V0) {
   int pinValue = param.asInt();
@@ -218,5 +297,14 @@ void setup() {
   delay(5000);
 }
 void loop() {
+  serviceAutomaticBlynkRecovery();
+  if (automaticResetPulseActive) {
+    // Do not enter a potentially blocking network reconnect while D3 is LOW.
+    // This keeps the modem power-cut pulse close to exactly 10 seconds.
+    delay(1);
+    return;
+  }
+
   Blynk.run();
+  serviceAutomaticBlynkRecovery();
 }
