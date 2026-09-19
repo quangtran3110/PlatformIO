@@ -1,6 +1,6 @@
-#define BLYNK_TEMPLATE_ID "TMPL6VP9MY4gS"
+#define BLYNK_TEMPLATE_ID "TMPL6WyEmVeSK"
 #define BLYNK_TEMPLATE_NAME "VOLUME"
-#define BLYNK_AUTH_TOKEN "jaQFoaOgdcZcKbyI_ME_oi6tThEf4FR5"
+#define BLYNK_AUTH_TOKEN "l9_wgiR92junPEnOHeSqsljr9c0wQkJ6"
 
 #define BLYNK_FIRMWARE_VERSION "260919.2"
 #define BLYNK_PRINT Serial
@@ -19,21 +19,21 @@
 #include <UrlEncode.h>
 #include <Wire.h>
 
-const char *ssid = "NHA MAY NUOC CAI CAT";
-const char *password = "12345678";
+const char *ssid = "Tram Bom So 1";
+const char *password = "0943950555";
 
-const char *MAIN_TOKEN = "vcz0jVXPSGPK6XmFP5Dqi_etQA32VNPL";
-#define URL_fw_Bin "https://raw.githubusercontent.com/quangtran3110/PlatformIO/main/VOLUME/TRAM_CC_G1/.pio/build/nodemcuv2/firmware.bin"
+const char *MAIN_TOKEN = "SZfJItqPgAVkiB8VdBuzyl5f94BU3E4x";
+#define URL_fw_Bin "https://raw.githubusercontent.com/quangtran3110/PlatformIO/refs/heads/main/VOLUME/TRAM1/.pio/build/nodemcuv2/firmware.bin"
 
 #define USE_RTC_DS3231
 constexpr uint8_t EEPROM_I2C_ADDRESS = 0x57;
 constexpr uint32_t EEPROM_SIZE = 4096;
-constexpr uint32_t STATE_MAGIC = 0x43314451UL; // "C1DQ"
+constexpr uint32_t STATE_MAGIC = 0x54314451UL; // "T1DQ"
 constexpr uint8_t FLOW_PULSE_PIN = D6;
-constexpr uint8_t PULSE_ACTIVE_LEVEL = HIGH;
+constexpr uint8_t PULSE_ACTIVE_LEVEL = LOW;
 
-const char *PIN_LIVE = "V51";
-const char *PIN_DAILY = "V52";
+const char *PIN_LIVE = "V24";
+const char *PIN_DAILY = "V25";
 const char *PIN_TERMINAL = "V0";
 
 #include "../../shared/volume_reader_core.h"
