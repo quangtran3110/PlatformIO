@@ -12,8 +12,8 @@ TRAM2-G1 + G2: yowot65383@liondapt.com
 TRAM2-G3 + TRAM4: dosete3269@fidhost.com
 TRAMBHD + TRAM_CC_G3: 54j0j62njkcos95@edupolska.edu.pl
 TRAM_CC_G1 + G2: xon58380@omeie.com
-TRAM 3: be1i3ktxf4@everymail.shop
+TRAM 3 + TRAM 1: be1i3ktxf4@everymail.shop
 
-
+RESETK12: gidebev484@bowlfuel.com
 
 fejet25731@coloruz.com

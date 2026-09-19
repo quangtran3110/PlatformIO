@@ -7,7 +7,7 @@
 #define BLYNK_TEMPLATE_NAME "Áp lực tuyến"
 #define BLYNK_AUTH_TOKEN "sVtMTLTQgaRjQTl31V7Qewtdv2KVs9ST"
 
-#define BLYNK_FIRMWARE_VERSION "260827"
+#define BLYNK_FIRMWARE_VERSION "260910"
 #define BLYNK_PRINT Serial
 #define APP_DEBUG
 
@@ -85,6 +85,21 @@ int save_num;
 unsigned long watchdogLastToggleMs = 0;
 const unsigned long WATCHDOG_TOGGLE_INTERVAL_MS = 5000UL;
 uint8_t watchdogOutputLevel = LOW;
+const unsigned long RUNTIME_DIAGNOSTIC_INTERVAL_MS = 60UL * 1000UL;
+const unsigned long HTTP_SLOW_REQUEST_MS = 3000UL;
+const uint16_t HTTP_REQUEST_TIMEOUT_MS = 4000U;
+unsigned long runtimeDiagnosticLastMs = 0;
+int lastPrimaryHttpCode = 0;
+int lastTanLapHttpCode = 0;
+unsigned long lastPrimaryHttpDurationMs = 0;
+unsigned long lastTanLapHttpDurationMs = 0;
+String bootResetReason;
+bool bootReportSent = false;
+int lastWiFiDisconnectReason = -1;
+WiFiEventHandler wifiConnectedHandler;
+WiFiEventHandler wifiDisconnectedHandler;
+WiFiEventHandler wifiGotIpHandler;
+WiFiEventHandler wifiDhcpTimeoutHandler;
 int time1, time2, time3;
 bool pcf8575Ready = false;
 uint8_t xkcRawLevel = HIGH;
@@ -149,14 +164,113 @@ static_assert(PRESSURE_CALIB_EEPROM_ADDRESS + sizeof(PressureCalibStorage) <= EE
 BlynkTimer timer;
 
 WidgetTerminal terminal(V0);
+
+void sendBlynkDiagnostics(const char *source) {
+  if (!Blynk.connected())
+    return;
+
+  int wifiStatus = WiFi.status();
+  int rssi = (wifiStatus == WL_CONNECTED) ? WiFi.RSSI() : 0;
+  int channel = (wifiStatus == WL_CONNECTED) ? WiFi.channel() : 0;
+  char line[220];
+
+  snprintf(line, sizeof(line),
+           "[%s] FW=%s, reset=%s, uptime=%lu s\n",
+           source, BLYNK_FIRMWARE_VERSION, bootResetReason.c_str(),
+           millis() / 1000UL);
+  Blynk.virtualWrite(V0, line);
+
+  snprintf(line, sizeof(line),
+           "[%s] wifi=%d, blynk=%d, channel=%d, RSSI=%d dBm, "
+           "last_disconnect=%d, heap=%u, frag=%u%%, PCF=%d, WD=%u\n",
+           source, wifiStatus, Blynk.connected(), channel, rssi,
+           lastWiFiDisconnectReason, ESP.getFreeHeap(),
+           ESP.getHeapFragmentation(), pcf8575Ready, watchdogOutputLevel);
+  Blynk.virtualWrite(V0, line);
+
+  snprintf(line, sizeof(line),
+           "[%s] HTTP Kenh12=%d/%lu ms, TanLap1=%d/%lu ms\n",
+           source, lastPrimaryHttpCode, lastPrimaryHttpDurationMs,
+           lastTanLapHttpCode, lastTanLapHttpDurationMs);
+  Blynk.virtualWrite(V0, line);
+}
+
 BLYNK_CONNECTED() {
   // Thuoc tinh widget can duoc gui lai sau moi lan thiet bi ket noi Blynk.
   xkcWidgetNeedsUpdate = true;
   networkFailureTracked = false;
   modemResetAttemptsWithoutRecovery = 0;
   key_pluse = true;
+  Serial.printf("[BLYNK] Da ket noi, uptime=%lu s\n", millis() / 1000UL);
+  if (!bootReportSent) {
+    sendBlynkDiagnostics("BOOT");
+    bootReportSent = true;
+  }
 }
 //-------------------------
+void printBootDiagnostics() {
+  bootResetReason = ESP.getResetReason();
+  Serial.println();
+  Serial.println("[BOOT] ESP8266 khoi dong");
+  Serial.printf("[BOOT] Firmware: %s\n", BLYNK_FIRMWARE_VERSION);
+  Serial.print("[BOOT] Reset reason: ");
+  Serial.println(bootResetReason);
+  Serial.print("[BOOT] Reset info: ");
+  Serial.println(ESP.getResetInfo());
+  Serial.printf("[BOOT] Heap=%u, max_block=%u, fragmentation=%u%%\n",
+                ESP.getFreeHeap(), ESP.getMaxFreeBlockSize(),
+                ESP.getHeapFragmentation());
+}
+
+void setupWiFiDiagnostics() {
+  wifiConnectedHandler = WiFi.onStationModeConnected(
+      [](const WiFiEventStationModeConnected &event) {
+        Serial.printf("[WIFI] Da ket noi AP, channel=%u, RSSI=%d dBm, uptime=%lu s\n",
+                      event.channel, WiFi.RSSI(), millis() / 1000UL);
+      });
+
+  wifiDisconnectedHandler = WiFi.onStationModeDisconnected(
+      [](const WiFiEventStationModeDisconnected &event) {
+        lastWiFiDisconnectReason = static_cast<unsigned int>(event.reason);
+        Serial.printf("[WIFI] Mat ket noi AP, reason=%u, heap=%u, max_block=%u, frag=%u%%, uptime=%lu s\n",
+                      static_cast<unsigned int>(event.reason),
+                      ESP.getFreeHeap(), ESP.getMaxFreeBlockSize(),
+                      ESP.getHeapFragmentation(), millis() / 1000UL);
+      });
+
+  wifiGotIpHandler = WiFi.onStationModeGotIP(
+      [](const WiFiEventStationModeGotIP &event) {
+        Serial.printf("[WIFI] Da nhan IP=%s, gateway=%s, channel=%u, RSSI=%d dBm\n",
+                      event.ip.toString().c_str(), event.gw.toString().c_str(),
+                      WiFi.channel(), WiFi.RSSI());
+      });
+
+  wifiDhcpTimeoutHandler = WiFi.onStationModeDHCPTimeout([]() {
+    Serial.printf("[WIFI] DHCP timeout, status=%d, uptime=%lu s\n",
+                  WiFi.status(), millis() / 1000UL);
+  });
+}
+
+void serviceRuntimeDiagnostics() {
+  unsigned long now = millis();
+  if ((unsigned long)(now - runtimeDiagnosticLastMs) <
+      RUNTIME_DIAGNOSTIC_INTERVAL_MS) {
+    return;
+  }
+  runtimeDiagnosticLastMs = now;
+
+  int rssi = (WiFi.status() == WL_CONNECTED) ? WiFi.RSSI() : 0;
+  int channel = (WiFi.status() == WL_CONNECTED) ? WiFi.channel() : 0;
+  Serial.printf("[DIAG] uptime=%lu s, wifi=%d, blynk=%d, RSSI=%d dBm, channel=%d, heap=%u, max_block=%u, frag=%u%%, modem_state=%u\n",
+                now / 1000UL, WiFi.status(), Blynk.connected(), rssi,
+                channel, ESP.getFreeHeap(), ESP.getMaxFreeBlockSize(),
+                ESP.getHeapFragmentation(),
+                static_cast<unsigned int>(modemRecoveryState));
+  Serial.printf("[DIAG] HTTP primary=%d/%lu ms, TanLap1=%d/%lu ms\n",
+                lastPrimaryHttpCode, lastPrimaryHttpDurationMs,
+                lastTanLapHttpCode, lastTanLapHttpDurationMs);
+}
+
 bool writeModemPowerLevel(uint8_t level) {
   if (!pcf8575Ready)
     return false;
@@ -338,6 +452,28 @@ void serviceExternalWatchdog() {
   } else {
     Serial.println("Khong gui duoc heartbeat den watchdog");
   }
+}
+
+bool rearmExternalWatchdog() {
+  if (!pcf8575Ready)
+    return false;
+
+  // Mach LM555 nay chi san sang lai sau khi nhan mot canh LOW moi.
+  // Tao HIGH -> LOW ngay sau khi PCF8575 khoi dong de tai kich hoat som.
+  if (!pcf8575_1.digitalWrite(pin_WATCHDOG, HIGH)) {
+    Serial.println("[WATCHDOG] Loi tao muc HIGH khi tai kich hoat");
+    return false;
+  }
+  delay(100);
+  if (!pcf8575_1.digitalWrite(pin_WATCHDOG, LOW)) {
+    Serial.println("[WATCHDOG] Loi tao canh LOW khi tai kich hoat");
+    return false;
+  }
+
+  watchdogOutputLevel = LOW;
+  watchdogLastToggleMs = millis();
+  Serial.println("[WATCHDOG] Da tao canh HIGH->LOW de tai kich hoat LM555");
+  return true;
 }
 //-------------------------
 void updateXkcLottieWidget() {
@@ -658,6 +794,27 @@ void savedata() {
   EEPROM.end();
 }
 //-------------------------
+int performHttpGet(const String &url, const char *targetName,
+                   unsigned long &durationMs) {
+  serviceExternalWatchdog();
+  unsigned long startedMs = millis();
+  bool beginOk = http.begin(client, url.c_str());
+  if (beginOk)
+    http.setTimeout(HTTP_REQUEST_TIMEOUT_MS);
+  int httpCode = beginOk ? http.GET() : -1000;
+  http.end();
+  durationMs = (unsigned long)(millis() - startedMs);
+  serviceExternalWatchdog();
+
+  if (!beginOk || httpCode < 200 || httpCode >= 300 ||
+      durationMs >= HTTP_SLOW_REQUEST_MS) {
+    Serial.printf("[HTTP] %s code=%d, duration=%lu ms, heap=%u, max_block=%u, frag=%u%%\n",
+                  targetName, httpCode, durationMs, ESP.getFreeHeap(),
+                  ESP.getMaxFreeBlockSize(), ESP.getHeapFragmentation());
+  }
+  return httpCode;
+}
+
 void updata() {
   if (WiFi.status() != WL_CONNECTED)
     return;
@@ -665,15 +822,13 @@ void updata() {
   String server_path = server_name + "batch/update?token=" + BLYNK_AUTH_TOKEN +
                        "&V2=" + String(nhietdo, 2) +
                        "&V3=" + String(Result1, 2);
-  http.begin(client, server_path.c_str());
-  http.GET();
-  http.end();
+  lastPrimaryHttpCode =
+      performHttpGet(server_path, "Kenh12 V2/V3", lastPrimaryHttpDurationMs);
 
   String server_path_TanLap1 = server_name + "batch/update?token=" + TanLap1 +
                                "&V16=" + String(Result1, 2);
-  http.begin(client, server_path_TanLap1.c_str());
-  http.GET();
-  http.end();
+  lastTanLapHttpCode =
+      performHttpGet(server_path_TanLap1, "TanLap1 V16", lastTanLapHttpDurationMs);
 }
 void tem() {
   sensors.requestTemperatures();
@@ -692,7 +847,9 @@ void tem() {
 BLYNK_WRITE(V0) {
   String dataS = param.asStr();
   dataS.trim();
-  if (dataS == "modem_reset") {
+  if (dataS == "diag") {
+    sendBlynkDiagnostics("DIAG");
+  } else if (dataS == "modem_reset") {
     terminal.clear();
     bool started = startModemPowerCycle(true);
     Blynk.virtualWrite(V0, started
@@ -709,6 +866,7 @@ BLYNK_WRITE(V0) {
                        "pre_N_X.X  : Thay diem calib thu N\n"
                        "calib_pre  : Xem cac diem calib\n"
                        "pre_clear  : Khoi phuc calib mac dinh\n"
+                       "diag       : Xem trang thai ESP/WiFi/HTTP\n"
                        "modem_reset: Reset nguon modem 4G\n"
                        "update     : Cap nhat firmware\n");
   } else if (dataS == "calib_pre") {
@@ -790,7 +948,11 @@ void setup() {
   ESP.wdtDisable();
   ESP.wdtEnable(300000);
   Serial.begin(9600);
+  printBootDiagnostics();
+  setupWiFiDiagnostics();
+  WiFi.persistent(false);
   WiFi.mode(WIFI_STA);
+  WiFi.setAutoReconnect(true);
   WiFi.begin(ssid, password);
   Blynk.config(BLYNK_AUTH_TOKEN);
   delay(5000);
@@ -814,6 +976,7 @@ void setup() {
     Serial.println("Khong tim thay PCF8575");
   } else {
     Serial.println("PCF8575 da san sang");
+    rearmExternalWatchdog();
   }
 
   EEPROM.begin(EEPROM_SIZE_BYTES);
@@ -842,4 +1005,5 @@ void loop() {
   serviceModemPowerCycle();
   Blynk.run();
   timer.run();
+  serviceRuntimeDiagnostics();
 }
