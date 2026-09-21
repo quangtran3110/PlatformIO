@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Static Verification Script for VOLUME Firmware Synchronization (Round 2).
-Ensures all 12 projects use the common core, have BLYNK_FIRMWARE_VERSION 260919.2,
+Ensures all 12 projects use the common core, have BLYNK_FIRMWARE_VERSION 260921.1,
 match the hardware/pin matrix, verify clean OTA flow in shared core,
 verify single PIN_TERMINAL definition, strict EEPROM read safety,
 and contain no secret leaks or leftover __CODEX_SET_ placeholders.
@@ -16,14 +16,14 @@ from pathlib import Path
 WORKSPACE_DIR = Path(__file__).resolve().parent.parent
 SHARED_CORE_REL = "../../shared/volume_reader_core.h"
 SHARED_CORE_PATH = WORKSPACE_DIR / "shared" / "volume_reader_core.h"
-EXPECTED_FIRMWARE_VERSION = "260919.2"
+EXPECTED_FIRMWARE_VERSION = "260921.1"
 
 EXPECTED_MATRIX = {
     "TRAM1": {
         "rtc": "USE_RTC_DS3231",
         "eeprom_addr": "0x57",
         "eeprom_size": "4096",
-        "pulse_active": "LOW",
+        "pulse_active": "HIGH",
         "pulse_pin": "D6",
         "pin_live": '"V24"',
         "pin_daily": '"V25"',
@@ -122,7 +122,7 @@ EXPECTED_MATRIX = {
         "rtc": "USE_RTC_DS1307",
         "eeprom_addr": "0x50",
         "eeprom_size": "4096",
-        "pulse_active": "LOW",
+        "pulse_active": "HIGH",
         "pulse_pin": "D6",
         "pin_live": '"V29"',
         "pin_daily": '"V31"',
@@ -360,7 +360,7 @@ def run_checks() -> bool:
             else:
                 passed_checks += 1
 
-        # Must have firmware version 260919.2
+        # Must have firmware version 260921.1
         total_checks += 1
         if f'#define BLYNK_FIRMWARE_VERSION "{EXPECTED_FIRMWARE_VERSION}"' not in content:
             errors.append(f"{project_name}: Expected BLYNK_FIRMWARE_VERSION '{EXPECTED_FIRMWARE_VERSION}' not found")

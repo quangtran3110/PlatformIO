@@ -2,7 +2,7 @@
 #define BLYNK_TEMPLATE_NAME "VOLUME"
 #define BLYNK_AUTH_TOKEN "l9_wgiR92junPEnOHeSqsljr9c0wQkJ6"
 
-#define BLYNK_FIRMWARE_VERSION "260919.2"
+#define BLYNK_FIRMWARE_VERSION "260921.1"
 #define BLYNK_PRINT Serial
 #define APP_DEBUG
 
@@ -30,7 +30,7 @@ constexpr uint8_t EEPROM_I2C_ADDRESS = 0x57;
 constexpr uint32_t EEPROM_SIZE = 4096;
 constexpr uint32_t STATE_MAGIC = 0x54314451UL; // "T1DQ"
 constexpr uint8_t FLOW_PULSE_PIN = D6;
-constexpr uint8_t PULSE_ACTIVE_LEVEL = LOW;
+constexpr uint8_t PULSE_ACTIVE_LEVEL = HIGH;
 
 const char *PIN_LIVE = "V24";
 const char *PIN_DAILY = "V25";

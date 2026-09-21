@@ -2,7 +2,7 @@
 
 > **Ngày thực hiện**: 19/09/2026  
 > **Workspace**: `C:\Users\quang\OneDrive\Work\PIO\VOLUME`  
-> **Phiên bản đồng bộ**: `260919.2` (áp dụng cho toàn bộ 12 dự án)  
+> **Phiên bản đồng bộ**: `260921.1` (áp dụng cho toàn bộ 12 dự án)  
 > **Trạng thái**: **ĐẠT kiểm tra mã nguồn và biên dịch độc lập**. Toàn bộ 12 dự án đã được bổ sung direct dependency headers prelude, chuẩn hóa `lib_extra_dirs = ../../lib`, vượt qua 380/380 kiểm tra tĩnh và 12/12 bản dựng PlatformIO ngày 19/09/2026.
 
 ---
@@ -21,20 +21,20 @@
 ### Chuẩn Hóa Cấu Hình `platformio.ini` Cả 12 Dự Án
 - Toàn bộ 12 file `platformio.ini` đã được chuẩn hóa đường dẫn tương đối nhất quán: `lib_extra_dirs = ../../lib` (thay cho đường dẫn tuyệt đối hoặc bổ sung dòng bị thiếu).
 
-### File Cấu Hình Từng Trạm (`src/main.cpp`) Đã Nâng Cấp Version `260919.2` & Direct Includes
+### File Cấu Hình Từng Trạm (`src/main.cpp`) Đã Nâng Cấp Version `260921.1` & Direct Includes
 Cả 12 file `src/main.cpp` đều được bổ sung direct dependency headers prelude (`<Arduino.h>`, `<BlynkSimpleEsp8266.h>`, `<ESP8266HTTPClient.h>`, `<ESP8266WiFi.h>`, `<ESP8266httpUpdate.h>`, `<I2C_eeprom.h>`, `<RTClib.h>`, `<SPI.h>`, `<TimeLib.h>`, `<WiFiClientSecure.h>`, `<UrlEncode.h>`, `<Wire.h>`) ngay trước `#include "../../shared/volume_reader_core.h"` để PlatformIO LDF nhận diện đầy đủ thư viện:
-1. `VOLUME/TRAM1/src/main.cpp`: Cấu hình đầy đủ cho `TRAM1` (đã được Codex điền thông tin bí mật và Wi-Fi), RTC DS3231, EEPROM 0x57 (4096), active-LOW D6, live V24, daily V25, terminal V0, version `260919.2`.
-2. `VOLUME/TRAM_CC_G1/src/main.cpp`: Version `260919.2`, bảo toàn token, pin V51/V52, EEPROM 0x57, RTC DS3231, active-HIGH D6.
-3. `VOLUME/TRAM_CC_G2/src/main.cpp`: Version `260919.2`, bảo toàn token, pin V54/V55, EEPROM 0x57, RTC DS3231, active-HIGH D6.
-4. `VOLUME/TRAM_CC_G3/src/main.cpp`: Version `260919.2`, bảo toàn token, pin V57/V58, EEPROM 0x57, RTC DS3231, active-HIGH D6.
-5. `VOLUME/TRAM2_G1/src/main.cpp`: Version `260919.2`, bảo toàn token, pin V62/V61, EEPROM 0x50 dung lượng **32768**, RTC DS3231, active-HIGH D6 (giữ nguyên custom build flags và monitor filters).
-6. `VOLUME/TRAM2_G2/src/main.cpp`: Version `260919.2`, bảo toàn token, pin V58/V59, EEPROM 0x57, RTC DS3231, active-HIGH D6.
-7. `VOLUME/TRAM2_G3/src/main.cpp`: Version `260919.2`, bảo toàn token, pin V60/V63, EEPROM 0x57, RTC DS3231, active-HIGH D6.
-8. `VOLUME/TRAM2BPT/src/main.cpp`: Version `260919.2`, nâng cấp từ nhánh cũ lên lõi chung, DS1307, EEPROM 0x50, active-LOW D6, live V24, daily V25.
-9. `VOLUME/TRAM3/src/main.cpp`: Version `260919.2`, tích hợp tham chiếu chuẩn vào lõi chung, DS1307, EEPROM 0x50, active-LOW D6, live V23, daily V24.
-10. `VOLUME/TRAM3BPT/src/main.cpp`: Version `260919.2`, nâng cấp từ nhánh cũ lên lõi chung, DS1307, EEPROM 0x50, active-LOW D6, live V29, daily V31.
-11. `VOLUME/TRAM4/src/main.cpp`: Version `260919.2`, bảo toàn token, pin V37/V35, EEPROM 0x57, RTC DS3231, active-HIGH D6.
-12. `VOLUME/TRAMBHD/src/main.cpp`: Version `260919.2`, nâng cấp từ nhánh cũ lên lõi chung, DS3231, EEPROM 0x57, active-LOW D6, live V32, daily V33.
+1. `VOLUME/TRAM1/src/main.cpp`: Cấu hình đầy đủ cho `TRAM1` (đã được Codex điền thông tin bí mật và Wi-Fi), RTC DS3231, EEPROM 0x57 (4096), active-HIGH D6, live V24, daily V25, terminal V0, version `260921.1`.
+2. `VOLUME/TRAM_CC_G1/src/main.cpp`: Version `260921.1`, bảo toàn token, pin V51/V52, EEPROM 0x57, RTC DS3231, active-HIGH D6.
+3. `VOLUME/TRAM_CC_G2/src/main.cpp`: Version `260921.1`, bảo toàn token, pin V54/V55, EEPROM 0x57, RTC DS3231, active-HIGH D6.
+4. `VOLUME/TRAM_CC_G3/src/main.cpp`: Version `260921.1`, bảo toàn token, pin V57/V58, EEPROM 0x57, RTC DS3231, active-HIGH D6.
+5. `VOLUME/TRAM2_G1/src/main.cpp`: Version `260921.1`, bảo toàn token, pin V62/V61, EEPROM 0x50 dung lượng **32768**, RTC DS3231, active-HIGH D6 (giữ nguyên custom build flags và monitor filters).
+6. `VOLUME/TRAM2_G2/src/main.cpp`: Version `260921.1`, bảo toàn token, pin V58/V59, EEPROM 0x57, RTC DS3231, active-HIGH D6.
+7. `VOLUME/TRAM2_G3/src/main.cpp`: Version `260921.1`, bảo toàn token, pin V60/V63, EEPROM 0x57, RTC DS3231, active-HIGH D6.
+8. `VOLUME/TRAM2BPT/src/main.cpp`: Version `260921.1`, nâng cấp từ nhánh cũ lên lõi chung, DS1307, EEPROM 0x50, active-LOW D6, live V24, daily V25.
+9. `VOLUME/TRAM3/src/main.cpp`: Version `260921.1`, tích hợp tham chiếu chuẩn vào lõi chung, DS1307, EEPROM 0x50, active-LOW D6, live V23, daily V24.
+10. `VOLUME/TRAM3BPT/src/main.cpp`: Version `260921.1`, nâng cấp từ nhánh cũ lên lõi chung, DS1307, EEPROM 0x50, active-HIGH D6, live V29, daily V31.
+11. `VOLUME/TRAM4/src/main.cpp`: Version `260921.1`, bảo toàn token, pin V37/V35, EEPROM 0x57, RTC DS3231, active-HIGH D6.
+12. `VOLUME/TRAMBHD/src/main.cpp`: Version `260921.1`, nâng cấp từ nhánh cũ lên lõi chung, DS3231, EEPROM 0x57, active-LOW D6, live V32, daily V33.
 
 ---
 
@@ -42,18 +42,18 @@ Cả 12 file `src/main.cpp` đều được bổ sung direct dependency headers 
 
 | STT | Trạm | Phiên Bản | RTC Chip | EEPROM Addr | Dung Lượng EEPROM | Mức Kích Xung D6 | Pin Live | Pin Daily | Pin Terminal | State Magic | OTA Thư Mục |
 |:---:|:---|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
-| 1 | `TRAM1` | **260919.2** | DS3231 | `0x57` | 4096 B | **LOW** | V24 | V25 | V0 | `0x54314451UL` ("T1DQ") | `TRAM1` |
-| 2 | `TRAM_CC_G1` | **260919.2** | DS3231 | `0x57` | 4096 B | HIGH | V51 | V52 | V0 | `0x43314451UL` ("C1DQ") | `TRAM_CC_G1` |
-| 3 | `TRAM_CC_G2` | **260919.2** | DS3231 | `0x57` | 4096 B | HIGH | V54 | V55 | V0 | `0x43324451UL` ("C2DQ") | `TRAM_CC_G2` |
-| 4 | `TRAM_CC_G3` | **260919.2** | DS3231 | `0x57` | 4096 B | HIGH | V57 | V58 | V0 | `0x43334451UL` ("C3DQ") | `TRAM_CC_G3` |
-| 5 | `TRAM2_G1` | **260919.2** | DS3231 | `0x50` | **32768 B** | HIGH | V62 | V61 | V0 | `0x47314451UL` ("G1DQ") | `TRAM2_G1` |
-| 6 | `TRAM2_G2` | **260919.2** | DS3231 | `0x57` | 4096 B | HIGH | V58 | V59 | V0 | `0x47324451UL` ("G2DQ") | `TRAM2_G2` |
-| 7 | `TRAM2_G3` | **260919.2** | DS3231 | `0x57` | 4096 B | HIGH | V60 | V63 | V0 | `0x47334451UL` ("G3DQ") | `TRAM2_G3` |
-| 8 | `TRAM2BPT` | **260919.2** | DS1307 | `0x50` | 4096 B | **LOW** | V24 | V25 | V0 | `0x32424451UL` ("2BDQ") | `TRAM2BPT` |
-| 9 | `TRAM3` | **260919.2** | DS1307 | `0x50` | 4096 B | **LOW** | V23 | V24 | V0 | `0x54334451UL` ("T3DQ") | `TRAM3` |
-| 10 | `TRAM3BPT` | **260919.2** | DS1307 | `0x50` | 4096 B | **LOW** | V29 | V31 | V0 | `0x33424451UL` ("3BDQ") | `TRAM3BPT` |
-| 11 | `TRAM4` | **260919.2** | DS3231 | `0x57` | 4096 B | HIGH | V37 | V35 | V0 | `0x54344451UL` ("T4DQ") | `TRAM4` |
-| 12 | `TRAMBHD` | **260919.2** | DS3231 | `0x57` | 4096 B | **LOW** | V32 | V33 | V0 | `0x42484451UL` ("BHDQ") | `TRAMBHD` |
+| 1 | `TRAM1` | **260921.1** | DS3231 | `0x57` | 4096 B | HIGH | V24 | V25 | V0 | `0x54314451UL` ("T1DQ") | `TRAM1` |
+| 2 | `TRAM_CC_G1` | **260921.1** | DS3231 | `0x57` | 4096 B | HIGH | V51 | V52 | V0 | `0x43314451UL` ("C1DQ") | `TRAM_CC_G1` |
+| 3 | `TRAM_CC_G2` | **260921.1** | DS3231 | `0x57` | 4096 B | HIGH | V54 | V55 | V0 | `0x43324451UL` ("C2DQ") | `TRAM_CC_G2` |
+| 4 | `TRAM_CC_G3` | **260921.1** | DS3231 | `0x57` | 4096 B | HIGH | V57 | V58 | V0 | `0x43334451UL` ("C3DQ") | `TRAM_CC_G3` |
+| 5 | `TRAM2_G1` | **260921.1** | DS3231 | `0x50` | **32768 B** | HIGH | V62 | V61 | V0 | `0x47314451UL` ("G1DQ") | `TRAM2_G1` |
+| 6 | `TRAM2_G2` | **260921.1** | DS3231 | `0x57` | 4096 B | HIGH | V58 | V59 | V0 | `0x47324451UL` ("G2DQ") | `TRAM2_G2` |
+| 7 | `TRAM2_G3` | **260921.1** | DS3231 | `0x57` | 4096 B | HIGH | V60 | V63 | V0 | `0x47334451UL` ("G3DQ") | `TRAM2_G3` |
+| 8 | `TRAM2BPT` | **260921.1** | DS1307 | `0x50` | 4096 B | **LOW** | V24 | V25 | V0 | `0x32424451UL` ("2BDQ") | `TRAM2BPT` |
+| 9 | `TRAM3` | **260921.1** | DS1307 | `0x50` | 4096 B | **LOW** | V23 | V24 | V0 | `0x54334451UL` ("T3DQ") | `TRAM3` |
+| 10 | `TRAM3BPT` | **260921.1** | DS1307 | `0x50` | 4096 B | HIGH | V29 | V31 | V0 | `0x33424451UL` ("3BDQ") | `TRAM3BPT` |
+| 11 | `TRAM4` | **260921.1** | DS3231 | `0x57` | 4096 B | HIGH | V37 | V35 | V0 | `0x54344451UL` ("T4DQ") | `TRAM4` |
+| 12 | `TRAMBHD` | **260921.1** | DS3231 | `0x57` | 4096 B | **LOW** | V32 | V33 | V0 | `0x42484451UL` ("BHDQ") | `TRAMBHD` |
 
 > [!NOTE]
 > Mọi thông tin xác thực nhạy cảm (Blynk Template ID, Auth Token, Main Token, mật khẩu Wi-Fi) của toàn bộ 12 trạm (kể cả `TRAM1` đã được Codex điền) đều được che giấu trong báo cáo này và bảo toàn nguyên vẹn trong file mã nguồn.
@@ -139,7 +139,7 @@ python tools/verify_volume_sync.py
 - Kiểm tra `ESP.rtcUserMemoryWrite` trong lõi chung không còn `reinterpret_cast<const uint32_t *>`.
 - Kiểm tra toàn bộ 12 file `platformio.ini` đều có cấu hình `lib_extra_dirs = ../../lib`.
 - Kiểm tra toàn bộ 12 file `src/main.cpp` đều có `#include <Arduino.h>` và các dependency headers đứng trước mọi khai báo `constexpr` và trước shared core.
-- Kiểm tra toàn bộ 12 trạm đều đạt phiên bản `260919.2`.
+- Kiểm tra toàn bộ 12 trạm đều đạt phiên bản `260921.1`.
 - Kiểm tra không còn bất kỳ chuỗi `__CODEX_SET_` nào tồn tại trong cả 12 file mã nguồn (xác nhận `TRAM1` đã hoàn tất cấu hình).
 - Xác minh tính chính xác của ma trận phần cứng: RTC, EEPROM địa chỉ/dung lượng, active level, pin live/daily/terminal, state magic, OTA URL đúng từng thư mục.
 - Kiểm tra không có `terminal.println` / `WidgetTerminal` và không có logic `reboot_num` restart do mất mạng.
@@ -159,17 +159,8 @@ Kích thước các tệp `firmware.bin` từ 440.720 đến 440.864 byte; khôn
 ## 5. Lưu Ý An Toàn và Xác Nhận Phần Cứng
 
 > [!WARNING]
-> **Xác nhận mức xung Active Level tại bàn thử (Bench Test) trước khi nạp thiết bị**:
-> Bốn mạch mới gồm:
-> - `TRAM1`
-> - `TRAM2BPT`
-> - `TRAM3BPT`
-> - `TRAMBHD`
-> 
-> Hiện tại đang được thiết lập mức tích cực **`active-LOW`** trên chân D6 (`PULSE_ACTIVE_LEVEL = LOW`).
-> Kỹ thuật viên / Codex **cần kiểm tra dạng sóng tín hiệu đầu ra của optocoupler (PC817 hoặc tương đương) trên mạch thực tế tại bàn thử**:
-> - Nếu khi có xung lưu lượng, tín hiệu kéo về 0V (GND) -> Giữ nguyên `active-LOW`.
-> - Nếu khi có xung lưu lượng, tín hiệu kéo lên 3.3V (VCC) -> Đổi thành `PULSE_ACTIVE_LEVEL = HIGH`.
+> **Quy ước mức xung đã được chủ thiết bị xác nhận ngày 21/09/2026**:
+> Chỉ `TRAM3`, `TRAM2BPT` và `TRAMBHD` dùng `active-LOW` trên D6. Toàn bộ trạm còn lại, bao gồm `TRAM1` và `TRAM3BPT`, dùng `active-HIGH`.
 
 > [!IMPORTANT]
 > Toàn bộ các bước biên dịch nhị phân PlatformIO và kiểm tra tính năng OTA thực địa đang chờ Codex thực hiện độc lập theo các lệnh trên. Báo cáo này không xác nhận trạng thái hoạt động thực địa.
