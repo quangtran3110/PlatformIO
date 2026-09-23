@@ -1,6 +1,7 @@
 #define BLYNK_TEMPLATE_ID "TMPL6swUcB_EZ"
 #define BLYNK_TEMPLATE_NAME "VOLUME"
-#define BLYNK_AUTH_TOKEN "BvVQVlNLOnVUDldbeczLXmn0YvBNdHDK"
+#define BLYNK_AUTH_TOKEN "Q2KAjaqI3sWhET-Ax94VPYfIk2Fmsr36"
+
 #define BLYNK_FIRMWARE_VERSION "260923"
 #define BLYNK_PRINT Serial
 #define APP_DEBUG
@@ -23,7 +24,7 @@ const char *password = "Password";
 //const char *ssid = "tram bom so 4";
 //const char *password = "0943950555";
 
-const char *MAIN_TOKEN = "Xd_XI0fm9nIsXBvvMZ6pjEtRd0irLLR2";
+const char *MAIN_TOKEN = "BvVQVlNLOnVUDldbeczLXmn0YvBNdHDK";
 #define URL_fw_Bin "https://raw.githubusercontent.com/quangtran3110/PlatformIO/main/VOLUME/TRAM3BPT/.pio/build/nodemcuv2/firmware.bin"
 
 #define USE_RTC_DS1307
