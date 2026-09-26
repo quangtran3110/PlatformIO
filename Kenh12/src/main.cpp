@@ -7,11 +7,10 @@
 #define BLYNK_TEMPLATE_NAME "Áp lực tuyến"
 #define BLYNK_AUTH_TOKEN "sVtMTLTQgaRjQTl31V7Qewtdv2KVs9ST"
 
-#define BLYNK_FIRMWARE_VERSION "260910"
+#define BLYNK_FIRMWARE_VERSION "260926.2"
 #define BLYNK_PRINT Serial
 #define APP_DEBUG
 
-#include "myBlynkAir.h"
 #include <BlynkSimpleEsp8266.h>
 #include <DallasTemperature.h>
 #include <EEPROM.h>
@@ -51,6 +50,10 @@ const uint8_t RELAY1_COIL_ON_LEVEL = LOW;
 const uint8_t RELAY1_COIL_OFF_LEVEL = HIGH;
 const uint8_t MODEM_POWER_ON_LEVEL = RELAY1_COIL_OFF_LEVEL;
 const uint8_t MODEM_POWER_CUT_LEVEL = RELAY1_COIL_ON_LEVEL;
+const uint8_t FAN_ON_LEVEL = LOW;
+const uint8_t FAN_OFF_LEVEL = HIGH;
+const float FAN_ON_TEMPERATURE_C = 40.0f;
+const float FAN_OFF_TEMPERATURE_C = 37.0f;
 
 const unsigned long NETWORK_CHECK_INTERVAL_MS = 10000UL;
 const unsigned long NETWORK_FAILURE_RESET_DELAY_MS = 5UL * 60UL * 1000UL;
@@ -77,7 +80,7 @@ const char *password = "Password";
 // const char *password = "0943950555";
 
 float Result1 = 0.0f;
-float temp[1], nhietdo;
+float nhietdo = 0.0f;
 float sensorValue = 0.0f;
 byte reboot_num;
 bool p = true, key_pluse = true;
@@ -85,6 +88,35 @@ int save_num;
 unsigned long watchdogLastToggleMs = 0;
 const unsigned long WATCHDOG_TOGGLE_INTERVAL_MS = 5000UL;
 uint8_t watchdogOutputLevel = LOW;
+bool fanIsOn = false;
+bool temperatureSensorFaultReported = false;
+const uint32_t OTA_RTC_OFFSET_WORDS = 32;
+const uint32_t OTA_RTC_MAGIC = 0x4B31324FUL; // "K12O"
+const unsigned long OTA_WIFI_TIMEOUT_MS = 45000UL;
+const uint16_t OTA_NETWORK_TIMEOUT_MS = 8000U;
+const int32_t OTA_ERROR_WIFI_TIMEOUT = -1001;
+const int32_t OTA_ERROR_WATCHDOG_INIT = -1002;
+const int32_t OTA_ERROR_NO_UPDATE = -1003;
+int8_t otaProgressBucket = -1;
+String lastOtaStatus = "none";
+
+enum OtaRtcPhase : uint32_t {
+  OTA_RTC_NONE = 0,
+  OTA_RTC_REQUESTED = 1,
+  OTA_RTC_RUNNING = 2,
+  OTA_RTC_SUCCESS = 3,
+  OTA_RTC_FAILED = 4,
+};
+
+struct OtaRtcState {
+  uint32_t magic;
+  uint32_t phase;
+  int32_t error;
+  uint32_t check;
+};
+
+void serviceExternalWatchdog();
+bool rearmExternalWatchdog();
 const unsigned long RUNTIME_DIAGNOSTIC_INTERVAL_MS = 60UL * 1000UL;
 const unsigned long HTTP_SLOW_REQUEST_MS = 3000UL;
 const uint16_t HTTP_REQUEST_TIMEOUT_MS = 4000U;
@@ -192,6 +224,10 @@ void sendBlynkDiagnostics(const char *source) {
            "[%s] HTTP Kenh12=%d/%lu ms, TanLap1=%d/%lu ms\n",
            source, lastPrimaryHttpCode, lastPrimaryHttpDurationMs,
            lastTanLapHttpCode, lastTanLapHttpDurationMs);
+  Blynk.virtualWrite(V0, line);
+
+  snprintf(line, sizeof(line), "[%s] Last OTA=%s\n", source,
+           lastOtaStatus.c_str());
   Blynk.virtualWrite(V0, line);
 }
 
@@ -406,38 +442,195 @@ void connectionstatus() {
   }
 }
 //-------------------------
+uint32_t otaRtcCheck(const OtaRtcState &state) {
+  return state.magic ^ state.phase ^ static_cast<uint32_t>(state.error) ^
+         0xA55A3CC3UL;
+}
+
+bool writeOtaRtcState(OtaRtcPhase phase, int32_t error = 0) {
+  OtaRtcState state = {OTA_RTC_MAGIC, static_cast<uint32_t>(phase), error, 0};
+  state.check = otaRtcCheck(state);
+  return ESP.rtcUserMemoryWrite(OTA_RTC_OFFSET_WORDS,
+                                reinterpret_cast<uint32_t *>(&state),
+                                sizeof(state));
+}
+
+bool readOtaRtcState(OtaRtcState &state) {
+  if (!ESP.rtcUserMemoryRead(OTA_RTC_OFFSET_WORDS,
+                             reinterpret_cast<uint32_t *>(&state),
+                             sizeof(state))) {
+    return false;
+  }
+  return state.magic == OTA_RTC_MAGIC && state.check == otaRtcCheck(state);
+}
+
+void clearOtaRtcState() {
+  OtaRtcState state = {};
+  ESP.rtcUserMemoryWrite(OTA_RTC_OFFSET_WORDS,
+                         reinterpret_cast<uint32_t *>(&state), sizeof(state));
+}
+
+bool initializeCleanOtaHardware() {
+  // OTA chi khoi tao PCF8575 0x20 de giu cac ngo ra o trang thai an toan
+  // va nuoi watchdog. Khong doc EEPROM, cam bien hay ket noi Blynk.
+  Wire.begin();
+  pcf8575_1.pinMode(S0pin, OUTPUT, LOW);
+  pcf8575_1.pinMode(S1pin, OUTPUT, LOW);
+  pcf8575_1.pinMode(S2pin, OUTPUT, LOW);
+  pcf8575_1.pinMode(S3pin, OUTPUT, LOW);
+  pcf8575_1.pinMode(XKC_in, INPUT_PULLUP);
+  pcf8575_1.pinMode(pin_WATCHDOG, OUTPUT, LOW);
+  pcf8575_1.pinMode(relay1, OUTPUT, MODEM_POWER_ON_LEVEL);
+  pcf8575_1.pinMode(relay2, OUTPUT, HIGH);
+  pcf8575_1.pinMode(pin_fan, OUTPUT, FAN_OFF_LEVEL);
+
+  pcf8575Ready = pcf8575_1.begin();
+  if (!pcf8575Ready) {
+    Serial.println("OTA: khong tim thay PCF8575 watchdog tai 0x20");
+    return false;
+  }
+  return rearmExternalWatchdog();
+}
+
 void update_started() {
-  Serial.println("CALLBACK:  HTTP update process started");
+  otaProgressBucket = -1;
+  ESP.wdtFeed();
+  rearmExternalWatchdog();
+  Serial.printf("OTA: bat dau tai, heap=%u, max_block=%u, frag=%u%%\n",
+                ESP.getFreeHeap(), ESP.getMaxFreeBlockSize(),
+                ESP.getHeapFragmentation());
 }
+
 void update_finished() {
-  Serial.println("CALLBACK:  HTTP update process finished");
+  Serial.println("OTA: tai firmware hoan tat");
+  writeOtaRtcState(OTA_RTC_SUCCESS);
 }
+
 void update_progress(int cur, int total) {
-  Serial.printf("CALLBACK:  HTTP update process at %d of %d bytes...\n", cur, total);
+  ESP.wdtFeed();
+  serviceExternalWatchdog();
+  if (total <= 0)
+    return;
+
+  int8_t bucket = static_cast<int8_t>((static_cast<uint32_t>(cur) * 10UL) /
+                                      static_cast<uint32_t>(total));
+  if (bucket != otaProgressBucket) {
+    otaProgressBucket = bucket;
+    Serial.printf("OTA: %d%% (%d/%d bytes)\n", bucket * 10, cur, total);
+  }
 }
+
 void update_error(int err) {
-  Serial.printf("CALLBACK:  HTTP update fatal error code %d\n", err);
+  Serial.printf("OTA: loi nghiem trong %d\n", err);
+  writeOtaRtcState(OTA_RTC_FAILED, err);
 }
+
 void update_fw() {
   WiFiClientSecure client_;
   client_.setInsecure();
-  Serial.print("Wait...");
+  client_.setTimeout(OTA_NETWORK_TIMEOUT_MS);
+  ESPhttpUpdate.setClientTimeout(OTA_NETWORK_TIMEOUT_MS);
+  ESPhttpUpdate.closeConnectionsOnUpdate(true);
   ESPhttpUpdate.onStart(update_started);
   ESPhttpUpdate.onEnd(update_finished);
   ESPhttpUpdate.onProgress(update_progress);
   ESPhttpUpdate.onError(update_error);
+
+  serviceExternalWatchdog();
   t_httpUpdate_return ret = ESPhttpUpdate.update(client_, URL_fw_Bin);
   switch (ret) {
   case HTTP_UPDATE_FAILED:
-    Serial.printf("HTTP_UPDATE_FAILD Error (%d): %s\n", ESPhttpUpdate.getLastError(), ESPhttpUpdate.getLastErrorString().c_str());
+    Serial.printf("OTA: that bai (%d): %s\n", ESPhttpUpdate.getLastError(),
+                  ESPhttpUpdate.getLastErrorString().c_str());
+    writeOtaRtcState(OTA_RTC_FAILED, ESPhttpUpdate.getLastError());
     break;
   case HTTP_UPDATE_NO_UPDATES:
-    Serial.println("HTTP_UPDATE_NO_UPDATES");
+    Serial.println("OTA: khong co ban cap nhat");
+    writeOtaRtcState(OTA_RTC_FAILED, OTA_ERROR_NO_UPDATE);
     break;
   case HTTP_UPDATE_OK:
-    Serial.println("HTTP_UPDATE_OK");
+    Serial.println("OTA: thanh cong");
+    writeOtaRtcState(OTA_RTC_SUCCESS);
     break;
   }
+}
+
+void runCleanOtaMode() {
+  Serial.printf("OTA clean boot: firmware=%s, reset=%s\n",
+                BLYNK_FIRMWARE_VERSION, ESP.getResetReason().c_str());
+  if (!initializeCleanOtaHardware()) {
+    writeOtaRtcState(OTA_RTC_FAILED, OTA_ERROR_WATCHDOG_INIT);
+    delay(500);
+    ESP.restart();
+    return;
+  }
+
+  WiFi.persistent(false);
+  WiFi.mode(WIFI_STA);
+  WiFi.setSleepMode(WIFI_NONE_SLEEP);
+  WiFi.begin(ssid, password);
+
+  unsigned long startedAt = millis();
+  while (WiFi.status() != WL_CONNECTED &&
+         static_cast<unsigned long>(millis() - startedAt) <
+             OTA_WIFI_TIMEOUT_MS) {
+    ESP.wdtFeed();
+    serviceExternalWatchdog();
+    delay(50);
+  }
+
+  if (WiFi.status() != WL_CONNECTED) {
+    Serial.println("OTA clean boot: WiFi timeout");
+    writeOtaRtcState(OTA_RTC_FAILED, OTA_ERROR_WIFI_TIMEOUT);
+    delay(500);
+    ESP.restart();
+    return;
+  }
+
+  Serial.printf("OTA: WiFi san sang, RSSI=%d, IP=%s\n", WiFi.RSSI(),
+                WiFi.localIP().toString().c_str());
+  update_fw();
+
+  // Neu cap nhat thanh cong, ESPhttpUpdate se tu khoi dong lai. Den day chi
+  // khi OTA khong cai duoc firmware; khoi dong lai de ve che do binh thuong.
+  serviceExternalWatchdog();
+  delay(500);
+  ESP.restart();
+}
+
+bool handleCleanOtaBoot() {
+  OtaRtcState state = {};
+  if (!readOtaRtcState(state))
+    return false;
+
+  if (state.phase == OTA_RTC_REQUESTED) {
+    if (!writeOtaRtcState(OTA_RTC_RUNNING)) {
+      lastOtaStatus = "failed (rtc write)";
+      clearOtaRtcState();
+      return false;
+    }
+    runCleanOtaMode();
+    return true;
+  }
+
+  if (state.phase == OTA_RTC_SUCCESS) {
+    lastOtaStatus = "success";
+  } else if (state.phase == OTA_RTC_FAILED) {
+    lastOtaStatus = "failed (" + String(state.error) + ")";
+  } else if (state.phase == OTA_RTC_RUNNING) {
+    lastOtaStatus = "interrupted/reset";
+  }
+  Serial.println("Last OTA: " + lastOtaStatus);
+  clearOtaRtcState();
+  return false;
+}
+
+bool requestCleanOta() {
+  if (!writeOtaRtcState(OTA_RTC_REQUESTED))
+    return false;
+  delay(250);
+  ESP.restart();
+  return true;
 }
 //-------------------------
 void serviceExternalWatchdog() {
@@ -830,17 +1023,46 @@ void updata() {
   lastTanLapHttpCode =
       performHttpGet(server_path_TanLap1, "TanLap1 V16", lastTanLapHttpDurationMs);
 }
+void setFanState(bool turnOn) {
+  if (!pcf8575Ready || fanIsOn == turnOn)
+    return;
+
+  uint8_t outputLevel = turnOn ? FAN_ON_LEVEL : FAN_OFF_LEVEL;
+  if (pcf8575_1.digitalWrite(pin_fan, outputLevel)) {
+    fanIsOn = turnOn;
+    Serial.printf("[FAN] %s, nhiet do=%.2f C\n", turnOn ? "ON" : "OFF",
+                  nhietdo);
+  } else {
+    Serial.println("[FAN] Khong ghi duoc ngo ra pin_fan");
+  }
+}
+
 void tem() {
   sensors.requestTemperatures();
-  // Serial.println(sensors.getDeviceCount());
-  for (byte i = 0; i < sensors.getDeviceCount(); i++) {
-    temp[i] = sensors.getTempCByIndex(i);
-    nhietdo = temp[i];
-    // Blynk.virtualWrite(V36, temp[i]);
-    //Serial.printf("Nhiet do %u: %.2f °C\n", i, temp[i]);
+  float measuredTemperature = sensors.getTempCByIndex(0);
+  bool validTemperature = sensors.getDeviceCount() > 0 &&
+                          measuredTemperature != DEVICE_DISCONNECTED_C &&
+                          isfinite(measuredTemperature) &&
+                          measuredTemperature >= -55.0f &&
+                          measuredTemperature <= 125.0f;
+
+  if (!validTemperature) {
+    // Loi cam bien thi bat quat theo huong an toan, nhung khong gui thong bao Blynk.
+    if (!temperatureSensorFaultReported) {
+      Serial.printf("[TEMP] Cam bien loi, gia tri=%.2f C; bat quat an toan\n",
+                    measuredTemperature);
+      temperatureSensorFaultReported = true;
+    }
+    setFanState(true);
+    return;
   }
-  if (temp[0] > 42) {
-    Blynk.logEvent("error-5", String("Nhiệt độ tủ cao: ") + temp[0] + String("°C"));
+
+  temperatureSensorFaultReported = false;
+  nhietdo = measuredTemperature;
+  if (!fanIsOn && nhietdo >= FAN_ON_TEMPERATURE_C) {
+    setFanState(true);
+  } else if (fanIsOn && nhietdo <= FAN_OFF_TEMPERATURE_C) {
+    setFanState(false);
   }
 }
 
@@ -857,8 +1079,12 @@ BLYNK_WRITE(V0) {
                                : "Khong the reset modem: dang reset hoac PCF8575 loi.\n");
   } else if (dataS == "update") {
     terminal.clear();
-    Blynk.virtualWrite(V0, "ESP UPDATE...");
-    update_fw();
+    Blynk.virtualWrite(V0,
+                       "Da nhan lenh OTA sach; ESP se khoi dong lai.\n");
+    if (!requestCleanOta()) {
+      Blynk.virtualWrite(V0,
+                         "OTA loi: khong ghi duoc yeu cau vao RTC memory.\n");
+    }
   } else if (dataS == "help") {
     terminal.clear();
     Blynk.virtualWrite(V0,
@@ -949,6 +1175,8 @@ void setup() {
   ESP.wdtEnable(300000);
   Serial.begin(9600);
   printBootDiagnostics();
+  if (handleCleanOtaBoot())
+    return;
   setupWiFiDiagnostics();
   WiFi.persistent(false);
   WiFi.mode(WIFI_STA);
@@ -969,7 +1197,7 @@ void setup() {
   pcf8575_1.pinMode(pin_WATCHDOG, OUTPUT, LOW);
   pcf8575_1.pinMode(relay1, OUTPUT, MODEM_POWER_ON_LEVEL);
   pcf8575_1.pinMode(relay2, OUTPUT, HIGH);  // OFF relay
-  pcf8575_1.pinMode(pin_fan, OUTPUT, HIGH); // OFF relay
+  pcf8575_1.pinMode(pin_fan, OUTPUT, FAN_OFF_LEVEL); // OFF relay
 
   pcf8575Ready = pcf8575_1.begin();
   if (!pcf8575Ready) {
