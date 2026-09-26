@@ -74,7 +74,7 @@
 #define VOLUME_TOKEN_G3 "DEdOyQWTbvQ5_ma_MEP1_Z8gefY_rnfE"
 
 #define BLYNK_PRINT Serial
-#define BLYNK_FIRMWARE_VERSION "250621"
+#define BLYNK_FIRMWARE_VERSION "260926.1"
 const char *ssid = "NHA MAY NUOC CAI CAT";
 const char *password = "12345678";
 // const char *ssid = "Wifi";
@@ -82,6 +82,7 @@ const char *password = "12345678";
 
 #pragma region
 #define APP_DEBUG
+#include "CleanOta.h"
 #include "myBlynkAir.h"
 #include <BlynkSimpleEsp8266.h>
 #include <SPI.h>
@@ -137,8 +138,6 @@ WiFiClient client;
 static Eeprom24C32_64 eeprom(EEPROM_ADDRESS);
 const word address = 0;
 //-------------
-#include <ESP8266httpUpdate.h>
-#include <WiFiClientSecure.h>
 #define URL_fw_Bin "https://raw.githubusercontent.com/quangtran3110/PlatformIO/main/TRAM_CC/MAIN_CC/.pio/build/nodemcuv2/firmware.bin"
 //-------------
 #include <ESP8266HTTPClient.h>
@@ -233,39 +232,6 @@ void connectionstatus() {
     if (reboot_num != 0) {
       reboot_num = 0;
     }
-  }
-}
-void update_started() {
-  Serial.println("CALLBACK:  HTTP update process started");
-}
-void update_finished() {
-  Serial.println("CALLBACK:  HTTP update process finished");
-}
-void update_progress(int cur, int total) {
-  Serial.printf("CALLBACK:  HTTP update process at %d of %d bytes...\n", cur, total);
-}
-void update_error(int err) {
-  Serial.printf("CALLBACK:  HTTP update fatal error code %d\n", err);
-}
-void update_fw() {
-  WiFiClientSecure client_;
-  client_.setInsecure();
-  Serial.print("Wait...");
-  ESPhttpUpdate.onStart(update_started);
-  ESPhttpUpdate.onEnd(update_finished);
-  ESPhttpUpdate.onProgress(update_progress);
-  ESPhttpUpdate.onError(update_error);
-  t_httpUpdate_return ret = ESPhttpUpdate.update(client_, URL_fw_Bin);
-  switch (ret) {
-  case HTTP_UPDATE_FAILED:
-    Serial.printf("HTTP_UPDATE_FAILD Error (%d): %s\n", ESPhttpUpdate.getLastError(), ESPhttpUpdate.getLastErrorString().c_str());
-    break;
-  case HTTP_UPDATE_NO_UPDATES:
-    Serial.println("HTTP_UPDATE_NO_UPDATES");
-    break;
-  case HTTP_UPDATE_OK:
-    Serial.println("HTTP_UPDATE_OK");
-    break;
   }
 }
 //---------------------------------------------------------------------------
@@ -1131,8 +1097,10 @@ BLYNK_WRITE(V5) // data string
     ESP.restart();
   } else if (dataS == "update") {
     keyterminal.clear();
-    Blynk.virtualWrite(V5, "UPDATE FIRMWARE...");
-    update_fw();
+    Blynk.virtualWrite(V5, "Đã nhận lệnh OTA sạch; ESP sẽ khởi động lại.");
+    if (!CleanOta::requestAndRestart()) {
+      Blynk.virtualWrite(V5, "OTA lỗi: không ghi được yêu cầu vào RTC memory.");
+    }
   } else if ((dataS == "ok") || (dataS == "Ok") || (dataS == "OK") || (dataS == "oK")) {
     if (clo_cache > 0) {
       data.clo = clo_cache;
@@ -1450,6 +1418,11 @@ BLYNK_WRITE(V57) // LLG3_1m3
 }
 //----------------------------------------------------
 void setup() {
+  Serial.begin(9600);
+  if (CleanOta::handleBoot(ssid, password, URL_fw_Bin)) {
+    return;
+  }
+
   ESP.wdtDisable();
   ESP.wdtEnable(300000);
   pinMode(S0, OUTPUT);
@@ -1457,7 +1430,6 @@ void setup() {
   pinMode(S2, OUTPUT);
   pinMode(S3, OUTPUT);
 
-  Serial.begin(9600);
   WiFi.mode(WIFI_STA);
   WiFi.begin(ssid, password);
   Blynk.config(BLYNK_AUTH_TOKEN);

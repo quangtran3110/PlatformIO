@@ -19,10 +19,10 @@
 #include <UrlEncode.h>
 #include <Wire.h>
 
-const char *ssid = "Cap Nuoc";
-const char *password = "0919126757";
-// const char *ssid = "tram bom so 4";
-// const char *password = "0943950555";
+// const char *ssid = "Cap Nuoc";
+// const char *password = "0919126757";
+const char *ssid = "net";
+const char *password = "Password";
 
 const char *MAIN_TOKEN = "8rYwP5-2nYyA6G1txMqXMamUNITRd-k9";
 #define URL_fw_Bin "https://raw.githubusercontent.com/quangtran3110/PlatformIO/main/VOLUME/TRAMBHD/.pio/build/nodemcuv2/firmware.bin"

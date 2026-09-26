@@ -9,3 +9,9 @@ firmware.elf
 idedata.json
 project.checksum
 main.cpp.o
+.pio/*
+!.pio/build/
+.pio/build/*
+!.pio/build/nodemcuv2/
+.pio/build/nodemcuv2/*
+!.pio/build/nodemcuv2/firmware.bin

@@ -36,20 +36,19 @@
 #define BLYNK_TEMPLATE_NAME "TRẠM SỐ 1"
 #define BLYNK_AUTH_TOKEN "SZfJItqPgAVkiB8VdBuzyl5f94BU3E4x"
 
-#define BLYNK_FIRMWARE_VERSION "260813"
+#define BLYNK_FIRMWARE_VERSION "260926.1"
 //------------------
+#include "CleanOta.h"
 #include "EmonLib.h"
 #include "PCF8575.h"
 #include "RTClib.h"
 #include <BlynkSimpleEsp8266.h>
 #include <ESP8266HTTPClient.h>
 #include <ESP8266WiFi.h>
-#include <ESP8266httpUpdate.h>
 #include <Eeprom24C32_64.h>
 #include <I2C_eeprom_cyclic_store.h>
 #include <SPI.h>
 #include <SimpleKalmanFilter.h>
-#include <WiFiClientSecure.h>
 #include <WidgetRTC.h>
 #include <Wire.h>
 //-----------------------------
@@ -197,39 +196,6 @@ void connectionstatus() {
     if (reboot_num != 0) {
       reboot_num = 0;
     }
-  }
-}
-void update_started() {
-  Serial.println("CALLBACK:  HTTP update process started");
-}
-void update_finished() {
-  Serial.println("CALLBACK:  HTTP update process finished");
-}
-void update_progress(int cur, int total) {
-  Serial.printf("CALLBACK:  HTTP update process at %d of %d bytes...\n", cur, total);
-}
-void update_error(int err) {
-  Serial.printf("CALLBACK:  HTTP update fatal error code %d\n", err);
-}
-void update_fw() {
-  WiFiClientSecure client_;
-  client_.setInsecure();
-  Serial.print("Wait...");
-  ESPhttpUpdate.onStart(update_started);
-  ESPhttpUpdate.onEnd(update_finished);
-  ESPhttpUpdate.onProgress(update_progress);
-  ESPhttpUpdate.onError(update_error);
-  t_httpUpdate_return ret = ESPhttpUpdate.update(client_, URL_fw_Bin);
-  switch (ret) {
-  case HTTP_UPDATE_FAILED:
-    Serial.printf("HTTP_UPDATE_FAILD Error (%d): %s\n", ESPhttpUpdate.getLastError(), ESPhttpUpdate.getLastErrorString().c_str());
-    break;
-  case HTTP_UPDATE_NO_UPDATES:
-    Serial.println("HTTP_UPDATE_NO_UPDATES");
-    break;
-  case HTTP_UPDATE_OK:
-    Serial.println("HTTP_UPDATE_OK");
-    break;
   }
 }
 //-------------------------------------------------------------------
@@ -804,8 +770,10 @@ BLYNK_WRITE(V11) // String
     Blynk.virtualWrite(V11, "Đã RESET! \nNhập mã để điều khiển!\n");
   } else if (dataS == "update") {
     terminal.clear();
-    Blynk.virtualWrite(V11, "UPDATE FIRMWARE...");
-    update_fw();
+    Blynk.virtualWrite(V11, "Đã nhận lệnh OTA sạch; ESP sẽ khởi động lại.");
+    if (!CleanOta::requestAndRestart()) {
+      Blynk.virtualWrite(V11, "OTA lỗi: không ghi được yêu cầu vào RTC memory.");
+    }
   } else if (dataS == "rst") {
     terminal.clear();
     Blynk.virtualWrite(V11, "ESP khởi động lại sau 3s");
@@ -995,6 +963,10 @@ BLYNK_WRITE(V30) // Check Clo
 //-------------------------------------------------------------------
 void setup() {
   Serial.begin(115200);
+  if (CleanOta::handleBoot(ssid, password, URL_fw_Bin)) {
+    return;
+  }
+
   WiFi.mode(WIFI_STA);
   WiFi.begin(ssid, password);
   Blynk.config(BLYNK_AUTH_TOKEN);
