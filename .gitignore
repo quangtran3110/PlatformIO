@@ -1,0 +1,9 @@
+# PlatformIO build outputs are local and reproducible.
+**/.pio/
+
+# Cloudflare local state and generated release manifests.
+**/.wrangler/
+**/release-output/
+
+# Local source backups.
+*.bak

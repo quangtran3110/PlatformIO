@@ -1,0 +1,8 @@
+{
+  "name": "tram-cc-private-ota",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test worker/test.mjs"
+  }
+}
