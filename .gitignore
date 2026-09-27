@@ -7,3 +7,8 @@
 
 # Local source backups.
 *.bak
+
+# Secrets for new projects stay only on the development computer.
+**/include/secrets.h
+**/.env
+**/.dev.vars
