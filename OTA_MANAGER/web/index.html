@@ -1,0 +1,238 @@
+<!doctype html>
+<html lang="vi">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#07131f" />
+    <meta
+      name="description"
+      content="Bảng điều khiển build, phát hành và cập nhật OTA cho các trạm ESP8266."
+    />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="stylesheet" href="/styles.css" />
+    <title>OTA Control Center</title>
+  </head>
+  <body>
+    <div class="app-shell">
+      <header class="topbar">
+        <div class="brand">
+          <span class="brand-mark" aria-hidden="true">OTA</span>
+          <div>
+            <strong>Control Center</strong>
+            <span>Quản lý firmware ESP</span>
+          </div>
+        </div>
+        <div class="system-state" aria-label="Trạng thái hệ thống">
+          <span class="state-pill"><i class="dot dot-online"></i>Ứng dụng cục bộ</span>
+          <button class="state-pill state-muted state-button" type="button" id="cloudflare-pill"><i class="dot"></i><span>Cloudflare chưa kiểm tra</span></button>
+        </div>
+      </header>
+
+      <aside class="sidebar">
+        <div class="sidebar-heading">
+          <div>
+            <span class="eyebrow">Thiết bị</span>
+            <h2>Danh sách trạm</h2>
+          </div>
+          <button class="icon-button" id="add-station" type="button" aria-label="Thêm trạm" title="Thêm trạm">+</button>
+        </div>
+        <label class="search-box">
+          <span aria-hidden="true">⌕</span>
+          <input id="station-search" type="search" placeholder="Tìm tên trạm" autocomplete="off" />
+        </label>
+        <nav class="station-list" id="station-list" aria-label="Danh sách trạm">
+          <div class="station-skeleton"></div>
+        </nav>
+        <div class="sidebar-foot">
+          <span>Kho mã nguồn</span>
+          <strong>D:\AI_PROJECTS\PIO</strong>
+        </div>
+      </aside>
+
+      <main class="workspace">
+        <section class="station-header">
+          <div>
+            <div class="station-kicker"><span class="live-dot" id="device-dot"></span><span id="station-state">Đang đọc dữ liệu</span></div>
+            <h1 id="station-name">OTA Manager</h1>
+            <p id="station-path">Đang tải thông tin dự án…</p>
+          </div>
+          <div class="header-actions">
+            <button class="button button-ghost" type="button" id="open-project">Mở thư mục dự án</button>
+            <button class="button button-ghost" type="button" id="refresh">Làm mới</button>
+          </div>
+        </section>
+
+        <section class="version-lane" aria-label="Trạng thái phiên bản">
+          <article class="version-card">
+            <span>Mã nguồn</span>
+            <strong id="source-version">—</strong>
+            <small>Đọc từ main.cpp</small>
+          </article>
+          <div class="lane-arrow" aria-hidden="true">→</div>
+          <article class="version-card">
+            <span>Firmware trên máy</span>
+            <strong id="binary-version">—</strong>
+            <small id="binary-meta">Chưa kiểm tra</small>
+          </article>
+          <div class="lane-arrow" aria-hidden="true">→</div>
+          <article class="version-card">
+            <span>Đã phát hành</span>
+            <strong id="release-version">—</strong>
+            <small>Cloudflare Private</small>
+          </article>
+          <div class="lane-arrow" aria-hidden="true">→</div>
+          <article class="version-card version-card-device">
+            <span>Thiết bị</span>
+            <strong id="device-version">—</strong>
+            <small id="device-meta">Lần kiểm tra gần nhất</small>
+          </article>
+        </section>
+
+        <section class="action-panel">
+          <div class="section-heading">
+            <div>
+              <span class="eyebrow">Quy trình an toàn</span>
+              <h2>Chọn bước tiếp theo</h2>
+            </div>
+            <span class="safety-note">Không gửi lệnh thiết bị nếu chưa xác nhận</span>
+          </div>
+
+          <div class="action-grid">
+            <button class="action-card action-primary" type="button" data-action="build">
+              <span class="step-number">01</span>
+              <span class="action-copy">
+                <strong>Build firmware</strong>
+                <small>Biên dịch và kiểm tra dung lượng</small>
+              </span>
+              <span class="action-arrow" aria-hidden="true">→</span>
+            </button>
+            <button class="action-card" type="button" data-action="publish" disabled>
+              <span class="step-number">02</span>
+              <span class="action-copy">
+                <strong>Phát hành</strong>
+                <small>Tải lên và đối chiếu Cloudflare</small>
+              </span>
+              <span class="action-arrow" aria-hidden="true">→</span>
+            </button>
+            <button class="action-card action-danger" type="button" data-action="ota" disabled>
+              <span class="step-number">03</span>
+              <span class="action-copy">
+                <strong>Cập nhật OTA</strong>
+                <small>Khởi động lại đúng một thiết bị</small>
+              </span>
+              <span class="action-arrow" aria-hidden="true">→</span>
+            </button>
+          </div>
+        </section>
+
+        <section class="lower-grid">
+          <article class="panel readiness-panel">
+            <div class="panel-title">
+              <div>
+                <span class="eyebrow">Kiểm tra nhanh</span>
+                <h2>Sẵn sàng phát hành</h2>
+              </div>
+              <span class="score" id="readiness-score">0/4</span>
+            </div>
+            <ul class="check-list" id="check-list">
+              <li><i></i><span>Đường dẫn dự án hợp lệ</span></li>
+              <li><i></i><span>Đọc được phiên bản firmware</span></li>
+              <li><i></i><span>Có binary trên máy</span></li>
+              <li><i></i><span>Cloudflare đã kết nối</span></li>
+            </ul>
+          </article>
+
+          <article class="panel activity-panel">
+            <div class="panel-title">
+              <div>
+                <span class="eyebrow">Hoạt động</span>
+                <h2>Nhật ký gần nhất</h2>
+              </div>
+              <button class="text-button" type="button" id="refresh-history">Làm mới</button>
+            </div>
+            <div class="activity-empty" id="activity-content">
+              <span class="activity-icon" aria-hidden="true">✓</span>
+              <div>
+                <strong>Chưa có thao tác trong phiên này</strong>
+                <p>Build và phát hành sẽ xuất hiện tại đây.</p>
+              </div>
+            </div>
+          </article>
+        </section>
+
+        <section class="job-console" id="job-console" hidden>
+          <div class="job-console-head">
+            <div>
+              <span class="eyebrow">Tác vụ đang chạy</span>
+              <h2 id="job-title">Đang xử lý</h2>
+            </div>
+            <span class="job-state" id="job-state">Đang chờ</span>
+          </div>
+          <pre id="job-log" aria-live="polite"></pre>
+        </section>
+      </main>
+    </div>
+
+    <dialog class="manager-dialog" id="confirm-dialog">
+      <form method="dialog" id="confirm-form">
+        <span class="eyebrow" id="confirm-eyebrow">Xác nhận</span>
+        <h2 id="confirm-title">Xác nhận thao tác</h2>
+        <p id="confirm-message"></p>
+        <label class="confirm-check" id="restart-confirm-row" hidden>
+          <input type="checkbox" id="restart-confirm" />
+          <span>Tôi hiểu thiết bị sẽ khởi động lại trong thời gian ngắn.</span>
+        </label>
+        <label class="field" id="name-confirm-row" hidden>
+          <span>Nhập đúng tên trạm để tiếp tục</span>
+          <input type="text" id="name-confirm" autocomplete="off" />
+        </label>
+        <div class="dialog-actions">
+          <button class="button button-ghost" value="cancel">Hủy</button>
+          <button class="button button-confirm" id="confirm-submit" value="confirm">Tiếp tục</button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog class="manager-dialog manager-dialog-wide" id="station-dialog">
+      <form method="dialog" id="station-form">
+        <span class="eyebrow">Cấu hình</span>
+        <h2>Thêm dự án ESP</h2>
+        <p>Chỉ thêm dự án đã có <code>platformio.ini</code> trong kho PIO.</p>
+        <div class="form-grid">
+          <label class="field">
+            <span>Tên trạm</span>
+            <input name="name" required placeholder="TRẠM TÂN AN" />
+          </label>
+          <label class="field">
+            <span>Mã trạm</span>
+            <input name="id" required pattern="[a-z0-9-]+" placeholder="tram-tan-an" />
+          </label>
+          <label class="field field-wide">
+            <span>Đường dẫn dự án</span>
+            <input name="projectPath" required placeholder="D:\AI_PROJECTS\PIO\TRAM_TAN_AN" />
+          </label>
+          <label class="field">
+            <span>Environment</span>
+            <input name="environment" value="nodemcuv2" />
+          </label>
+          <label class="field">
+            <span>Chân lệnh OTA</span>
+            <input name="otaPin" value="V5" />
+          </label>
+          <label class="field field-wide">
+            <span>Script phát hành, nếu đã có</span>
+            <input name="releaseScript" placeholder="ota\release-ten-tram.ps1" />
+          </label>
+        </div>
+        <p class="form-error" id="station-form-error" role="alert"></p>
+        <div class="dialog-actions">
+          <button class="button button-ghost" value="cancel">Hủy</button>
+          <button class="button button-confirm" id="station-submit" value="default">Thêm dự án</button>
+        </div>
+      </form>
+    </dialog>
+
+    <div class="toast" id="toast" role="status" aria-live="polite"></div>
+    <script src="/app.js" defer></script>
+  </body>
+</html>
