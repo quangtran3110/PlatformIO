@@ -64,7 +64,7 @@
 #define VOLUME_TOKEN_G2 "Hc5DgCBzl4Oi5hW_JOaNZ6oBKoGy5kFI"
 #define VOLUME_TOKEN_G3 "JTnEpJjGVVJ8DM1aJx7zZT4cyNYJrhr_"
 
-#define BLYNK_FIRMWARE_VERSION "260928.1"
+#define BLYNK_FIRMWARE_VERSION "260928.2"
 #define BLYNK_PRINT Serial
 #define APP_DEBUG
 
@@ -796,6 +796,20 @@ void savedata() {
   storageDirty = memcmp(&data, &dataCheck, sizeof(data)) != 0;
   if (storageDirty) storageUrgent = true;
 }
+bool validOtaRequestId(const String &requestId) {
+  if (requestId.length() != 12) return false;
+  for (uint8_t k = 0; k < requestId.length(); ++k) {
+    const char c = requestId[k];
+    if (!((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f'))) return false;
+  }
+  return true;
+}
+void scheduleRestart(RestartRequest request, uint32_t waitMs) {
+  savedata(); // Take one final runtime/config snapshot; serviceStorage writes it once.
+  restartRequest = request;
+  restartNotBefore = millis() + waitMs;
+  auto_resync_required = true;
+}
 //----------------------------------
 bool onG1() {
   if (!trip3 && data.SetAmpe3max > 3 && validCurrentLimits(data.SetAmpe3min, data.SetAmpe3max)) {
@@ -1106,24 +1120,33 @@ BLYNK_WRITE(V4) // PROTECT
 }
 BLYNK_WRITE(V5) // data string
 {
-  if (!stationNetwork.health.allowControl(millis())) return;
   String dataS = param.asStr();
   dataS.trim(); // Xóa khoảng trắng và ký tự xuống dòng thừa
   if (dataS.startsWith("ota_info:")) {
     String requestId = dataS.substring(9);
     requestId.trim();
-    bool validRequestId = requestId.length() == 12;
-    for (uint8_t k = 0; validRequestId && k < requestId.length(); ++k) {
-      const char c = requestId[k];
-      validRequestId = (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f');
-    }
-    if (validRequestId) {
+    if (validOtaRequestId(requestId)) {
       String response = "ota_reply:" + requestId + "|version=" + BLYNK_FIRMWARE_VERSION;
       Blynk.virtualWrite(V5, response);
     }
+    return;
+  } else if (dataS.startsWith("ota_prepare:")) {
+    String requestId = dataS.substring(12);
+    requestId.trim();
+    if (!validOtaRequestId(requestId)) return;
+    if (!configLoaded || !relayReady || restartRequest != RESTART_NONE || pulsesPending()) {
+      String response = "ota_reject:" + requestId + "|reason=busy";
+      Blynk.virtualWrite(V5, response);
+      return;
+    }
+    String response = "ota_accept:" + requestId + "|version=" + BLYNK_FIRMWARE_VERSION;
+    Blynk.virtualWrite(V5, response);
+    scheduleRestart(RESTART_OTA, 1000);
+    return;
   } else if (dataS == "help") {
     keyterminal.clear(); helpPosition = 0; helpNext = millis(); return;
   }
+  if (!stationNetwork.health.allowControl(millis())) return;
   if (restartRequest != RESTART_NONE && dataS != "reset") return;
   if ((dataS == "t2")) {
     keyterminal.clear();
@@ -1180,21 +1203,15 @@ BLYNK_WRITE(V5) // data string
     writeRelay(pin_NK2, HIGH);      // NK2
   } else if (dataS == "update") {
     keyterminal.clear();
-    savedata();
     Blynk.virtualWrite(V5, "Da nhan lenh OTA; ESP se khoi dong vao che do cap nhat sach\n");
-    restartRequest = RESTART_OTA;
-    restartNotBefore = millis() + 250;
-    auto_resync_required = true;
+    scheduleRestart(RESTART_OTA, 250);
   } else if (dataS == "save_num") {
     keyterminal.clear();
     Blynk.virtualWrite(V5, "Số lần ghi EEPROM: ", data.save_num);
   } else if (dataS == "rst") {
     keyterminal.clear();
     Blynk.virtualWrite(V5, "ESP Khởi động lại sau 3s");
-    savedata();
-    restartRequest = RESTART_NORMAL;
-    restartNotBefore = millis() + 3000;
-    auto_resync_required = true;
+    scheduleRestart(RESTART_NORMAL, 3000);
   } else if (dataS == "calib") {
     keyterminal.clear();
     Blynk.virtualWrite(V5, "--- THÔNG TIN HIỆU CHUẨN ---\n");
@@ -2860,7 +2877,6 @@ void serviceStorage() {
 void serviceRestartRequest() {
   if(restartRequest==RESTART_NONE || int32_t(millis()-restartNotBefore)<0 ||
      pulsesPending()) return;
-  savedata(); // Include the last measured running interval before restarting.
   if (storageDirty) return;
   // Write a full idle pulse word and require ACK. NK bits are preserved.
   uint16_t idle=relayWord|0xFFFC;

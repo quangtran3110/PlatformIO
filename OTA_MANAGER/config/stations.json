@@ -23,6 +23,7 @@
       "releaseScript": "ota\\release-tram-so-2.ps1",
       "terminalPin": "V5",
       "lastKnownDeviceVersion": null,
+      "otaHandshakeVersion": "260928.2",
       "cloudflareWorker": "tram-cc-private-ota",
       "networkQualityPin": "V52",
       "blynkServer": "https://sgp1.blynk.cloud",

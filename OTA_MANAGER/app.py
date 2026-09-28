@@ -442,6 +442,76 @@ def parse_terminal_version_reply(value: str, request_id: str) -> str | None:
     return match.group(1) if match else None
 
 
+def parse_ota_start_reply(value: str, request_id: str) -> dict[str, str] | None:
+    clean = normalize_blynk_value(value)
+    accepted = re.fullmatch(
+        rf"ota_accept:{re.escape(request_id)}\|version=([A-Za-z0-9._-]{{1,32}})",
+        clean,
+    )
+    if accepted:
+        return {"status": "accepted", "version": accepted.group(1)}
+    rejected = re.fullmatch(
+        rf"ota_reject:{re.escape(request_id)}\|reason=([A-Za-z0-9._-]{{1,32}})",
+        clean,
+    )
+    if rejected:
+        return {"status": "rejected", "reason": rejected.group(1)}
+    return None
+
+
+def version_at_least(version: str | None, minimum: str | None) -> bool:
+    if not version or not minimum:
+        return False
+    try:
+        current = tuple(int(part) for part in version.split("."))
+        required = tuple(int(part) for part in minimum.split("."))
+    except ValueError:
+        return False
+    width = max(len(current), len(required))
+    return current + (0,) * (width - len(current)) >= required + (0,) * (width - len(required))
+
+
+def request_ota_start(
+    station: dict[str, Any],
+    job_id: str,
+    timeout_seconds: float = 4.0,
+    poll_interval: float = 0.35,
+) -> dict[str, Any]:
+    pin = terminal_pin_for(station)
+    minimum = station.get("otaHandshakeVersion")
+    if not version_at_least(station.get("lastKnownDeviceVersion"), minimum):
+        blynk_request(station, "update", {pin: "update"})
+        append_job_log(job_id, f"Đã gửi một lệnh update qua Terminal {pin} (chế độ tương thích firmware cũ).")
+        return {"mode": "legacy", "terminalPin": pin, "requestId": None}
+
+    request_id = uuid.uuid4().hex[:12]
+    blynk_request(station, "update", {pin: f"ota_prepare:{request_id}"})
+    deadline = time.monotonic() + timeout_seconds
+    last_error: RuntimeError | None = None
+    while time.monotonic() < deadline:
+        try:
+            value = blynk_request(station, "get", {pin: ""})
+        except RuntimeError as exc:
+            last_error = exc
+            time.sleep(poll_interval)
+            continue
+        reply = parse_ota_start_reply(value, request_id)
+        if reply and reply["status"] == "accepted":
+            append_job_log(job_id, f"ESP đã xác nhận lệnh OTA qua Terminal {pin}.")
+            return {
+                "mode": "acknowledged",
+                "terminalPin": pin,
+                "requestId": request_id,
+                "deviceVersion": reply["version"],
+            }
+        if reply and reply["status"] == "rejected":
+            raise RuntimeError(f"ESP từ chối OTA: {reply['reason']}.")
+        time.sleep(poll_interval)
+    if last_error:
+        raise RuntimeError(f"ESP chưa xác nhận nhận lệnh OTA: {last_error}") from last_error
+    raise RuntimeError("ESP chưa xác nhận nhận lệnh OTA; chưa khởi động cập nhật.")
+
+
 def query_device_version(
     station: dict[str, Any],
     timeout_seconds: float = 3.0,
@@ -485,7 +555,11 @@ def blynk_status(station: dict[str, Any]) -> dict[str, Any]:
     version_verified = False
     version_error = None
     version_checked_at = None
-    if connected:
+    minimum_handshake_version = station.get("otaHandshakeVersion")
+    can_query_version = not minimum_handshake_version or version_at_least(
+        station.get("lastKnownDeviceVersion"), minimum_handshake_version
+    )
+    if connected and can_query_version:
         try:
             version_result = query_device_version(station)
             device_version = version_result["version"]
@@ -519,9 +593,8 @@ def execute_ota_and_verify(
         raise RuntimeError("Không xác định được phiên bản cần xác minh sau OTA.")
 
     append_job_log(job_id, f"Firmware {expected_version} đã khớp Cloudflare.")
-    blynk_request(station, "update", {pin: "update"})
+    start_result = request_ota_start(station, job_id)
     sent_at = utc_now()
-    append_job_log(job_id, f"Đã gửi lệnh update qua Terminal {pin}.")
     append_job_log(job_id, "Đang chờ thiết bị khởi động lại và kết nối Blynk…")
 
     deadline = time.monotonic() + timeout_seconds
@@ -551,6 +624,9 @@ def execute_ota_and_verify(
         if saw_offline and not announced_reconnect:
             append_job_log(job_id, "Thiết bị đã kết nối lại; đang đọc phiên bản qua Terminal…")
             announced_reconnect = True
+        if not saw_offline:
+            time.sleep(2.0)
+            continue
         try:
             version_result = query_device_version(station, timeout_seconds=5.0, poll_interval=0.5)
             last_version = version_result["version"]
@@ -565,6 +641,8 @@ def execute_ota_and_verify(
                     "deviceVersion": last_version,
                     "versionVerified": True,
                     "sawOffline": saw_offline,
+                    "commandMode": start_result["mode"],
+                    "requestId": start_result["requestId"],
                     "sentAt": sent_at,
                     "verifiedAt": version_result["verifiedAt"],
                     "release": release,

@@ -17,7 +17,7 @@ class OtaManagerTests(unittest.TestCase):
 
         self.assertIn(legacy_token, source)
         self.assertNotEqual(parsed["blynkToken"], legacy_token)
-        self.assertEqual(parsed["version"], "260928.1")
+        self.assertEqual(parsed["version"], "260928.2")
 
     def test_parse_source_hides_secrets_from_station_payload(self):
         station = app.get_station("tram-cc")
@@ -71,19 +71,96 @@ class OtaManagerTests(unittest.TestCase):
         self.assertEqual(result["version"], "260928.1")
         self.assertEqual(result["terminalPin"], "V12")
 
+    def test_ota_start_reply_requires_matching_request_id(self):
+        request_id = "a1b2c3d4e5f6"
+        self.assertEqual(
+            app.parse_ota_start_reply(
+                "ota_accept:a1b2c3d4e5f6|version=260928.2",
+                request_id,
+            ),
+            {"status": "accepted", "version": "260928.2"},
+        )
+        self.assertIsNone(
+            app.parse_ota_start_reply(
+                "ota_accept:ffffffffffff|version=260928.2",
+                request_id,
+            )
+        )
+
+    def test_request_ota_start_waits_for_matching_device_ack(self):
+        station = {
+            "terminalPin": "V12",
+            "lastKnownDeviceVersion": "260928.2",
+            "otaHandshakeVersion": "260928.2",
+        }
+        replies = iter([
+            "ota_prepare:a1b2c3d4e5f6",
+            "ota_accept:a1b2c3d4e5f6|version=260928.2",
+        ])
+        updates = []
+
+        def fake_request(_station, endpoint, params):
+            if endpoint == "update":
+                updates.append(params)
+                return ""
+            return next(replies)
+
+        with patch.object(app.uuid, "uuid4", return_value=SimpleNamespace(hex="a1b2c3d4e5f60000")):
+            with patch.object(app, "append_job_log"):
+                with patch.object(app, "blynk_request", side_effect=fake_request):
+                    with patch.object(app.time, "monotonic", side_effect=[0.0, 0.0, 0.0]):
+                        with patch.object(app.time, "sleep"):
+                            result = app.request_ota_start(
+                                station,
+                                "test-job",
+                                timeout_seconds=1.0,
+                                poll_interval=0.001,
+                            )
+
+        self.assertEqual(updates, [{"V12": "ota_prepare:a1b2c3d4e5f6"}])
+        self.assertEqual(result["mode"], "acknowledged")
+        self.assertEqual(result["deviceVersion"], "260928.2")
+
+    def test_request_ota_start_legacy_sends_update_once(self):
+        station = {
+            "terminalPin": "V12",
+            "lastKnownDeviceVersion": None,
+            "otaHandshakeVersion": "260928.2",
+        }
+        with patch.object(app, "append_job_log"):
+            with patch.object(app, "blynk_request", return_value="") as request:
+                result = app.request_ota_start(station, "test-job")
+
+        request.assert_called_once_with(station, "update", {"V12": "update"})
+        self.assertEqual(result["mode"], "legacy")
+
+    def test_status_does_not_send_unsupported_version_query(self):
+        station = {
+            "terminalPin": "V12",
+            "lastKnownDeviceVersion": None,
+            "otaHandshakeVersion": "260928.2",
+        }
+        with patch.object(app, "blynk_request", return_value="true") as request:
+            with patch.object(app, "query_device_version") as query_version:
+                result = app.blynk_status(station)
+
+        request.assert_called_once_with(station, "isHardwareConnected", {})
+        query_version.assert_not_called()
+        self.assertTrue(result["connected"])
+        self.assertIsNone(result["deviceVersion"])
+
     def test_ota_completion_requires_terminal_version_match(self):
         station = {"id": "tram-thu", "name": "TRẠM THỬ", "terminalPin": "V12"}
         release = {"version": "260928.1", "sha256": "abc"}
 
+        connection_states = iter(["false", "true"])
+
         def fake_request(_station, endpoint, params):
-            if endpoint == "update":
-                self.assertEqual(params, {"V12": "update"})
-                return ""
             if endpoint == "isHardwareConnected":
-                return "true"
+                return next(connection_states)
             self.fail(f"Unexpected endpoint: {endpoint}")
 
-        ticks = iter([0.0, 0.0, 6.0, 6.0])
+        ticks = iter([0.0, 0.0, 6.0, 6.0, 7.0, 7.0])
         version_result = {
             "version": "260928.1",
             "terminalPin": "V12",
@@ -91,18 +168,22 @@ class OtaManagerTests(unittest.TestCase):
         }
         with patch.object(app, "append_job_log"):
             with patch.object(app, "remember_device_version") as remember_version:
-                with patch.object(app, "blynk_request", side_effect=fake_request):
-                    with patch.object(app, "query_device_version", return_value=version_result):
-                        with patch.object(app.time, "monotonic", side_effect=lambda: next(ticks)):
-                            result = app.execute_ota_and_verify(
-                                station,
-                                release,
-                                "test-job",
-                                timeout_seconds=30,
-                            )
+                with patch.object(app, "request_ota_start", return_value={"mode": "legacy", "requestId": None}):
+                    with patch.object(app, "blynk_request", side_effect=fake_request):
+                        with patch.object(app, "query_device_version", return_value=version_result) as query_version:
+                            with patch.object(app.time, "monotonic", side_effect=lambda: next(ticks)):
+                                with patch.object(app.time, "sleep"):
+                                    result = app.execute_ota_and_verify(
+                                        station,
+                                        release,
+                                        "test-job",
+                                        timeout_seconds=30,
+                                    )
 
         self.assertTrue(result["versionVerified"])
         self.assertEqual(result["deviceVersion"], "260928.1")
+        self.assertTrue(result["sawOffline"])
+        query_version.assert_called_once_with(station, timeout_seconds=5.0, poll_interval=0.5)
         remember_version.assert_called_once_with("tram-thu", "260928.1")
 
     def test_safe_add_station_rejects_path_outside_project_root(self):
