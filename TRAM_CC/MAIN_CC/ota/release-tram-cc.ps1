@@ -9,6 +9,26 @@ $wranglerConfig = Join-Path $PSScriptRoot 'wrangler.jsonc'
 $mainCpp = Join-Path $ProjectPath 'src\main.cpp'
 $binary = Join-Path $ProjectPath '.pio\build\nodemcuv2\firmware.bin'
 
+function Get-HashHex {
+  param(
+    [Parameter(Mandatory = $true)][string]$Path,
+    [Parameter(Mandatory = $true)][ValidateSet('SHA256', 'MD5')][string]$Algorithm
+  )
+
+  $stream = [System.IO.File]::OpenRead($Path)
+  $hasher = if ($Algorithm -eq 'SHA256') {
+    [System.Security.Cryptography.SHA256]::Create()
+  } else {
+    [System.Security.Cryptography.MD5]::Create()
+  }
+  try {
+    return ([System.BitConverter]::ToString($hasher.ComputeHash($stream))).Replace('-', '').ToLowerInvariant()
+  } finally {
+    $hasher.Dispose()
+    $stream.Dispose()
+  }
+}
+
 if (!(Test-Path -LiteralPath $mainCpp)) { throw "Khong tim thay main.cpp: $mainCpp" }
 if (!(Test-Path -LiteralPath $platformio)) { throw "Khong tim thay PlatformIO: $platformio" }
 if (!(Test-Path -LiteralPath $Wrangler)) { throw "Khong tim thay Wrangler: $Wrangler" }
@@ -23,21 +43,26 @@ if ($LASTEXITCODE -ne 0) { throw 'Bien dich firmware that bai' }
 if (!(Test-Path -LiteralPath $binary)) { throw "Khong tim thay firmware.bin: $binary" }
 
 $item = Get-Item -LiteralPath $binary
-$sha256 = (Get-FileHash -LiteralPath $binary -Algorithm SHA256).Hash.ToLowerInvariant()
-$md5 = (Get-FileHash -LiteralPath $binary -Algorithm MD5).Hash.ToLowerInvariant()
+$sha256 = Get-HashHex -Path $binary -Algorithm SHA256
+$md5 = Get-HashHex -Path $binary -Algorithm MD5
 $objectKey = "tram-cc/releases/$version/firmware.bin"
 
 $outputDir = Join-Path $PSScriptRoot 'release-output'
 New-Item -ItemType Directory -Path $outputDir -Force | Out-Null
 $manifestPath = Join-Path $outputDir 'latest.json'
-[ordered]@{
+$manifestJson = [ordered]@{
   version = $version
   objectKey = $objectKey
   size = $item.Length
   sha256 = $sha256
   md5 = $md5
   publishedAtUtc = [DateTime]::UtcNow.ToString('o')
-} | ConvertTo-Json | Set-Content -LiteralPath $manifestPath -Encoding utf8NoBOM
+} | ConvertTo-Json
+[System.IO.File]::WriteAllText(
+  $manifestPath,
+  $manifestJson + [Environment]::NewLine,
+  (New-Object System.Text.UTF8Encoding($false))
+)
 
 & $Wrangler kv key put $objectKey --path $binary --binding FIRMWARE --remote --config $wranglerConfig
 if ($LASTEXITCODE -ne 0) { throw 'Tai firmware len KV that bai; latest.json chua bi thay doi' }
