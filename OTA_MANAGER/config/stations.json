@@ -10,9 +10,23 @@
       "terminalPin": "V5",
       "networkQualityPin": "V76",
       "blynkServer": "https://sgp1.blynk.cloud",
-      "lastKnownDeviceVersion": "260926.4",
+      "lastKnownDeviceVersion": "260928.1",
       "cloudflareWorker": "tram-cc-private-ota",
       "notes": "Trạm thí điểm OTA Private"
+    },
+    {
+      "id": "ts2",
+      "name": "Trạm Số 2",
+      "shortName": "Trạm Số 2",
+      "projectPath": "D:\\AI_PROJECTS\\PIO\\Tram_So_2",
+      "environment": "nodemcuv2",
+      "releaseScript": "ota\\release-tram-so-2.ps1",
+      "terminalPin": "V5",
+      "lastKnownDeviceVersion": null,
+      "cloudflareWorker": "tram-cc-private-ota",
+      "networkQualityPin": "V52",
+      "blynkServer": "https://sgp1.blynk.cloud",
+      "notes": "Trạm bơm chính - OTA Private"
     }
   ]
 }

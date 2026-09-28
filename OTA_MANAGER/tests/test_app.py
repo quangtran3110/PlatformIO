@@ -9,6 +9,16 @@ import app
 
 
 class OtaManagerTests(unittest.TestCase):
+    def test_parse_source_ignores_commented_legacy_token(self):
+        station = app.get_station("ts2")
+        parsed = app.parse_source(station)
+        source = app.source_path_for(station).read_text(encoding="utf-8")
+        legacy_token = "ESzia3fpA-29cs8gt85pGnrPq_rICcqf"
+
+        self.assertIn(legacy_token, source)
+        self.assertNotEqual(parsed["blynkToken"], legacy_token)
+        self.assertEqual(parsed["version"], "260928.1")
+
     def test_parse_source_hides_secrets_from_station_payload(self):
         station = app.get_station("tram-cc")
         parsed = app.parse_source(station)

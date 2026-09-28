@@ -95,14 +95,52 @@ def binary_path_for(station: dict[str, Any]) -> Path:
     return project_path_for(station) / ".pio" / "build" / environment / "firmware.bin"
 
 
+def strip_cpp_comments(source: str) -> str:
+    output: list[str] = []
+    index = 0
+    quote: str | None = None
+    while index < len(source):
+        char = source[index]
+        following = source[index + 1] if index + 1 < len(source) else ""
+        if quote:
+            output.append(char)
+            if char == "\\" and index + 1 < len(source):
+                index += 1
+                output.append(source[index])
+            elif char == quote:
+                quote = None
+        elif char in {'"', "'"}:
+            quote = char
+            output.append(char)
+        elif char == "/" and following == "/":
+            index += 2
+            while index < len(source) and source[index] not in "\r\n":
+                index += 1
+            continue
+        elif char == "/" and following == "*":
+            index += 2
+            while index + 1 < len(source) and source[index:index + 2] != "*/":
+                if source[index] in "\r\n":
+                    output.append(source[index])
+                index += 1
+            index += 1
+        else:
+            output.append(char)
+        index += 1
+    return "".join(output)
+
+
 def parse_source(station: dict[str, Any]) -> dict[str, Any]:
     source_path = source_path_for(station)
     if not source_path.exists():
         return {"version": None, "otaUrl": None, "blynkToken": None, "error": "Không tìm thấy src/main.cpp"}
     source = source_path.read_text(encoding="utf-8", errors="replace")
-    version_match = re.search(r'#define\s+BLYNK_FIRMWARE_VERSION\s+"([^"]+)"', source)
-    ota_match = re.search(r'#define\s+URL_fw_Bin\s+"([^"]+)"', source)
-    token_match = re.search(r'#define\s+BLYNK_AUTH_TOKEN\s+"([^"]+)"', source)
+    # Ignore old credentials and settings kept inside C/C++ comments. Several
+    # station projects retain a commented legacy token above the active one.
+    active_source = strip_cpp_comments(source)
+    version_match = re.search(r'(?m)^\s*#define\s+BLYNK_FIRMWARE_VERSION\s+"([^"]+)"', active_source)
+    ota_match = re.search(r'(?m)^\s*#define\s+URL_fw_Bin\s+"([^"]+)"', active_source)
+    token_match = re.search(r'(?m)^\s*#define\s+BLYNK_AUTH_TOKEN\s+"([^"]+)"', active_source)
     return {
         "version": version_match.group(1) if version_match else None,
         "otaUrl": ota_match.group(1) if ota_match else None,

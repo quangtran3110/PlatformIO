@@ -2,7 +2,7 @@
   "$schema": "https://developers.cloudflare.com/workers/wrangler/config-schema.json",
   "name": "tram-cc-private-ota",
   "main": "worker/src/index.js",
-  "compatibility_date": "2026-09-26",
+  "compatibility_date": "2026-09-28",
   "workers_dev": true,
   "kv_namespaces": [
     {
@@ -11,7 +11,7 @@
     }
   ],
   "secrets": {
-    "required": ["TRAM_CC_OTA_KEY"]
+    "required": ["TRAM_CC_OTA_KEY", "TRAM_SO_2_OTA_KEY"]
   },
   "observability": {
     "enabled": true,

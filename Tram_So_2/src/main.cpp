@@ -64,7 +64,7 @@
 #define VOLUME_TOKEN_G2 "Hc5DgCBzl4Oi5hW_JOaNZ6oBKoGy5kFI"
 #define VOLUME_TOKEN_G3 "JTnEpJjGVVJ8DM1aJx7zZT4cyNYJrhr_"
 
-#define BLYNK_FIRMWARE_VERSION "260917.2"
+#define BLYNK_FIRMWARE_VERSION "260928.1"
 #define BLYNK_PRINT Serial
 #define APP_DEBUG
 
@@ -131,7 +131,7 @@ const int Pin8 = 8;
 // Bạn cần "tune" 3 giá trị này để có kết quả tốt nhất. Hãy bắt đầu với các giá trị này.
 SimpleKalmanFilter levelKalmanFilter(2, 2, 0.01);
 String Tram2_Rualoc = "f_mIttU4MH80_pakaBYWjXq1cOWpqqYg";
-#define URL_fw_Bin "https://raw.githubusercontent.com/quangtran3110/PlatformIO/refs/heads/main/Tram_So_2/.pio/build/nodemcuv2/firmware.bin"
+#define URL_fw_Bin "https://tram-cc-private-ota.dieu-hanh-cap-nuoc.workers.dev/tram-so-2/E1V4eGdMjEL2ZFnSuurXKMjgSIMJ9760ipQQYAUPuNQ/firmware.bin"
 //-----------------------------
 const int S0 = 3;
 const int S1 = 2;
@@ -1109,7 +1109,19 @@ BLYNK_WRITE(V5) // data string
   if (!stationNetwork.health.allowControl(millis())) return;
   String dataS = param.asStr();
   dataS.trim(); // Xóa khoảng trắng và ký tự xuống dòng thừa
-  if (dataS == "help") {
+  if (dataS.startsWith("ota_info:")) {
+    String requestId = dataS.substring(9);
+    requestId.trim();
+    bool validRequestId = requestId.length() == 12;
+    for (uint8_t k = 0; validRequestId && k < requestId.length(); ++k) {
+      const char c = requestId[k];
+      validRequestId = (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f');
+    }
+    if (validRequestId) {
+      String response = "ota_reply:" + requestId + "|version=" + BLYNK_FIRMWARE_VERSION;
+      Blynk.virtualWrite(V5, response);
+    }
+  } else if (dataS == "help") {
     keyterminal.clear(); helpPosition = 0; helpNext = millis(); return;
   }
   if (restartRequest != RESTART_NONE && dataS != "reset") return;

@@ -1,4 +1,7 @@
-const MANIFEST_KEY = "tram-cc/latest.json";
+const STATIONS = Object.freeze({
+  "tram-cc": { secretName: "TRAM_CC_OTA_KEY" },
+  "tram-so-2": { secretName: "TRAM_SO_2_OTA_KEY" },
+});
 
 function notFound() {
   return new Response("Not found", {
@@ -26,13 +29,13 @@ async function sameSecret(provided, expected) {
   return difference === 0;
 }
 
-function validManifest(value) {
+function validManifest(value, stationId) {
   return Boolean(
     value &&
       typeof value.version === "string" &&
       /^\d{6}\.\d+$/.test(value.version) &&
       typeof value.objectKey === "string" &&
-      value.objectKey.startsWith("tram-cc/releases/") &&
+      value.objectKey.startsWith(`${stationId}/releases/`) &&
       typeof value.size === "number" &&
       value.size > 0 &&
       typeof value.md5 === "string" &&
@@ -45,22 +48,24 @@ function validManifest(value) {
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
-    const match = /^\/tram-cc\/([^/]+)\/firmware\.bin$/.exec(url.pathname);
+    const match = /^\/([a-z0-9-]+)\/([^/]+)\/firmware\.bin$/.exec(url.pathname);
     if (!match || (request.method !== "GET" && request.method !== "HEAD")) {
       return notFound();
     }
 
-    if (!(await sameSecret(decodeURIComponent(match[1]), env.TRAM_CC_OTA_KEY))) {
+    const stationId = match[1];
+    const station = STATIONS[stationId];
+    if (!station || !(await sameSecret(decodeURIComponent(match[2]), env[station.secretName]))) {
       return notFound();
     }
 
     let manifest;
     try {
-      manifest = await env.FIRMWARE.get(MANIFEST_KEY, "json");
+      manifest = await env.FIRMWARE.get(`${stationId}/latest.json`, "json");
     } catch {
       return new Response("Invalid firmware manifest", { status: 503 });
     }
-    if (!validManifest(manifest)) {
+    if (!validManifest(manifest, stationId)) {
       return new Response("Invalid firmware manifest", { status: 503 });
     }
 
