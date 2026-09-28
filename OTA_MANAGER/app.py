@@ -65,6 +65,16 @@ def save_station_config(payload: dict[str, Any]) -> None:
     write_json_atomic(CONFIG_PATH, payload)
 
 
+def remember_device_version(station_id: str, version: str) -> None:
+    config = load_station_config()
+    for station in config.get("stations", []):
+        if station.get("id") == station_id:
+            if station.get("lastKnownDeviceVersion") != version:
+                station["lastKnownDeviceVersion"] = version
+                save_station_config(config)
+            return
+
+
 def get_station(station_id: str) -> dict[str, Any]:
     for station in load_station_config().get("stations", []):
         if station.get("id") == station_id:
@@ -507,6 +517,7 @@ def execute_ota_and_verify(
             version_result = query_device_version(station, timeout_seconds=5.0, poll_interval=0.5)
             last_version = version_result["version"]
             if last_version == expected_version:
+                remember_device_version(station["id"], last_version)
                 append_job_log(job_id, f"Đã xác minh thiết bị đang chạy phiên bản {last_version}.")
                 return {
                     "accepted": True,
