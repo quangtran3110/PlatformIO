@@ -7,7 +7,7 @@
       "projectPath": "D:\\AI_PROJECTS\\PIO\\TRAM_CC\\MAIN_CC",
       "environment": "nodemcuv2",
       "releaseScript": "ota\\release-tram-cc.ps1",
-      "otaPin": "V5",
+      "terminalPin": "V5",
       "networkQualityPin": "V76",
       "blynkServer": "https://sgp1.blynk.cloud",
       "lastKnownDeviceVersion": "260926.4",

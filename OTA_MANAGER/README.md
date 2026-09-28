@@ -27,14 +27,15 @@ http://127.0.0.1:8765
 5. Ứng dụng build lại, upload Cloudflare và tải ngược để so hash.
 6. Chỉ khi file khớp và thiết bị Online, nút **Cập nhật OTA** mới được mở.
 7. OTA yêu cầu đánh dấu xác nhận và nhập đúng tên trạm.
+8. Sau khi gửi OTA, ứng dụng chờ thiết bị kết nối lại, hỏi phiên bản qua chân Terminal và chỉ báo hoàn tất khi phiên bản khớp.
 
 ## Ý nghĩa trạng thái
 
 - **Mã nguồn:** version đọc từ `BLYNK_FIRMWARE_VERSION`.
 - **Firmware trên máy:** file `.pio\build\<environment>\firmware.bin`.
 - **Đã phát hành:** manifest gần nhất do script phát hành tạo.
-- **Thiết bị:** phiên bản đã xác nhận gần nhất trong cấu hình trạm.
-- **Cloudflare đã kết nối:** Wrangler có phiên đăng nhập hợp lệ.
+- **Thiết bị:** phiên bản firmware vừa được thiết bị trả lời qua Terminal.
+- **Cloudflare đã đăng nhập:** máy đang có phiên OAuth do Wrangler lưu. Khi phát hành, Cloudflare sẽ xác thực lại phiên này.
 
 ## Thêm dự án
 
@@ -44,7 +45,7 @@ Bấm dấu **+** cạnh “Danh sách trạm”, sau đó nhập:
 - Mã trạm dạng `tram-tan-an`.
 - Đường dẫn dự án trong `D:\AI_PROJECTS\PIO`.
 - PlatformIO environment, thông thường là `nodemcuv2`.
-- Chân lệnh OTA, thông thường là `V5`.
+- Chân Terminal đang nhận lệnh của dự án, ví dụ `V5`, `V10` hoặc `V12`.
 - Đường dẫn tương đối đến script phát hành nếu trạm đã có OTA Private.
 
 Dự án mới có thể dùng chức năng Build ngay. Nút Phát hành chỉ được mở khi dự án có URL OTA và script phát hành hợp lệ.
@@ -57,6 +58,7 @@ Dự án mới có thể dùng chức năng Build ngay. Nút Phát hành chỉ �
 - Thông tin đăng nhập Cloudflare do Wrangler quản lý trong thư mục cục bộ đã cấu hình và không đưa lên Git.
 - Các API thay đổi trạng thái chỉ chấp nhận yêu cầu từ giao diện cục bộ.
 - OTA yêu cầu xác nhận hai lớp và kiểm tra lại hash ngay trước khi gửi lệnh.
+- Mỗi lần hỏi phiên bản dùng một mã ngẫu nhiên; phản hồi cũ trên Terminal không được chấp nhận.
 
 ## Các tệp chính
 
@@ -80,7 +82,20 @@ OTA_MANAGER/
 - Nếu binary tải ngược khác file trên máy dù một byte, ứng dụng dừng trước OTA.
 - Không phát hành lại một version cũ bằng binary khác; phải tăng version.
 - Không gửi OTA khi thiết bị Offline.
+- Không báo OTA thành công nếu thiết bị chưa kết nối lại và trả về đúng phiên bản mục tiêu.
 
-## Giới hạn hiện tại
+## Giao thức Terminal dùng chung
 
-Version thiết bị đang dùng giá trị đã nghiệm thu gần nhất trong cấu hình. Các dự án mới nên dành một datastream chỉ đọc để firmware tự báo version; khi đó ứng dụng có thể xác minh version hoàn toàn tự động sau reconnect.
+Không cần tạo thêm datastream chỉ để báo phiên bản. OTA Manager gửi lệnh chỉ đọc vào chân Terminal đã có:
+
+```text
+ota_info:a1b2c3d4e5f6
+```
+
+Firmware trả lời trên cùng chân bằng `Blynk.virtualWrite()`:
+
+```text
+ota_reply:a1b2c3d4e5f6|version=260928.1
+```
+
+Mã 12 ký tự thay đổi trong mỗi lần kiểm tra. Lệnh này không ghi EEPROM, không điều khiển relay và không khởi động lại thiết bị. Trong giai đoạn chuyển tiếp, thiết bị đang chạy firmware cũ có thể chỉ hiện phiên bản nghiệm thu gần nhất cho đến lần OTA đầu tiên có giao thức mới.

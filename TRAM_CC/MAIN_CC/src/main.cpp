@@ -9,7 +9,7 @@
 #define VOLUME_TOKEN_G3 "DEdOyQWTbvQ5_ma_MEP1_Z8gefY_rnfE"
 
 #define BLYNK_PRINT Serial
-#define BLYNK_FIRMWARE_VERSION "260926.4"
+#define BLYNK_FIRMWARE_VERSION "260928.1"
 
 const char *ssid = "NHA MAY NUOC CAI CAT";
 const char *password = "12345678";
@@ -780,7 +780,19 @@ BLYNK_WRITE(V4) // On/off chuc nang bao ve
 BLYNK_WRITE(V5) // data string
 {
   String dataS = param.asStr();
-  if (dataS == "cc" || dataS == "CC") {
+  if (dataS.startsWith("ota_info:")) {
+    String requestId = dataS.substring(9);
+    requestId.trim();
+    bool validRequestId = requestId.length() == 12;
+    for (uint8_t i = 0; validRequestId && i < requestId.length(); i++) {
+      const char c = requestId.charAt(i);
+      validRequestId = (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f');
+    }
+    if (validRequestId) {
+      String response = "ota_reply:" + requestId + "|version=" + BLYNK_FIRMWARE_VERSION;
+      Blynk.virtualWrite(V5, response);
+    }
+  } else if (dataS == "cc" || dataS == "CC") {
     keyterminal.clear();
     Blynk.virtualWrite(V5, "Người vận hành: 'NM Cái Cát'\nMain kích hoạt trong 10s");
     key = true;

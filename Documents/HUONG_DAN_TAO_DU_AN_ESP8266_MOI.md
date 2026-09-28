@@ -511,13 +511,26 @@ void setup() {
 }
 ```
 
-Lệnh OTA sạch trên V5:
+Lệnh OTA sạch dùng chính chân Terminal đang có của dự án. Ví dụ dưới đây dùng V5; dự án khác có thể dùng V0, V10, V12 hoặc chân Terminal riêng của dự án đó:
 
 ```cpp
 BLYNK_WRITE(V5) {
   String command = param.asStr();
 
-  if (command == "update") {
+  if (command.startsWith("ota_info:")) {
+    String requestId = command.substring(9);
+    requestId.trim();
+    bool validRequestId = requestId.length() == 12;
+    for (uint8_t i = 0; validRequestId && i < requestId.length(); i++) {
+      const char c = requestId.charAt(i);
+      validRequestId = (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f');
+    }
+    if (validRequestId) {
+      String response = "ota_reply:" + requestId +
+                        "|version=" + BLYNK_FIRMWARE_VERSION;
+      Blynk.virtualWrite(V5, response);
+    }
+  } else if (command == "update") {
     Blynk.virtualWrite(V5, "Đã nhận yêu cầu OTA; ESP sẽ khởi động lại.");
     if (!CleanOta::requestAndRestart()) {
       Blynk.virtualWrite(V5, "OTA lỗi: không ghi được yêu cầu.");
@@ -527,6 +540,8 @@ BLYNK_WRITE(V5) {
 ```
 
 Không dùng `terminal.println()` hoặc `WidgetTerminal.println()`. Gửi thông báo bằng `Blynk.virtualWrite()`; lỗi kỹ thuật chi tiết ghi ra Serial.
+
+OTA Manager lưu chân Terminal riêng cho từng trạm. Mỗi lần kiểm tra, phần mềm gửi `ota_info:<mã-ngẫu-nhiên>` và chỉ nhận `ota_reply` có đúng mã đó. Vì vậy không cần tạo thêm datastream chỉ để báo phiên bản và không thể nhầm với nội dung Terminal cũ.
 
 ### Vì sao OTA sạch khởi động lại trước khi tải?
 
@@ -592,7 +607,7 @@ Ghi nhận:
 
 - Tên thiết bị Blynk.
 - Device URI.
-- Phiên bản đang chạy.
+- Phiên bản đang chạy được thiết bị trả lời qua Terminal.
 - Trạng thái Online.
 - Thời gian telemetry mới nhất.
 - Chất lượng mạng.
@@ -602,7 +617,7 @@ Chỉ gửi lệnh khi chắc chắn đúng thiết bị và firmware đích đ�
 
 ### Giai đoạn F — Gửi OTA
 
-Gửi đúng một lệnh `update` đến V5 của đúng thiết bị.
+Gửi đúng một lệnh `update` đến chân Terminal đã cấu hình của đúng thiết bị.
 
 Không gửi liên tiếp nhiều lần. Thiết bị cần thời gian:
 
@@ -619,7 +634,7 @@ Không gửi liên tiếp nhiều lần. Thiết bị cần thời gian:
 Chỉ kết luận thành công khi đủ các điều kiện:
 
 - Thiết bị reconnect.
-- Blynk báo đúng phiên bản mới.
+- Thiết bị trả lời đúng phiên bản mới qua Terminal bằng mã kiểm tra của lần nghiệm thu.
 - Build date thay đổi đúng.
 - Telemetry mới tiếp tục xuất hiện.
 - Không reset lặp.

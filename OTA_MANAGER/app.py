@@ -264,6 +264,56 @@ def create_job(
     return {key: job[key] for key in ("id", "type", "stationId", "status", "createdAt")}
 
 
+def append_job_log(job_id: str, message: str) -> None:
+    with JOBS_LOCK:
+        JOBS[job_id]["logs"].append(message)
+        JOBS[job_id]["logs"] = JOBS[job_id]["logs"][-MAX_JOB_LOG_LINES:]
+
+
+def run_task_job(job_id: str, task: Callable[[str], dict[str, Any]]) -> None:
+    with JOBS_LOCK:
+        job = JOBS[job_id]
+        job["status"] = "running"
+        job["startedAt"] = utc_now()
+    try:
+        result = task(job_id)
+        with JOBS_LOCK:
+            JOBS[job_id].update(status="success", completedAt=utc_now(), result=result)
+        append_history({"stationId": job["stationId"], "type": job["type"], "status": "success", "result": result})
+    except Exception as exc:  # pragma: no cover - network/device boundary
+        with JOBS_LOCK:
+            JOBS[job_id].update(status="failed", completedAt=utc_now(), error=str(exc))
+        append_history({"stationId": job["stationId"], "type": job["type"], "status": "failed", "error": str(exc)})
+
+
+def create_task_job(
+    job_type: str,
+    station: dict[str, Any],
+    task: Callable[[str], dict[str, Any]],
+) -> dict[str, Any]:
+    if active_job_for_station(station["id"]):
+        raise RuntimeError("Trạm đang có một tác vụ khác; hãy chờ tác vụ đó hoàn tất.")
+    job_id = uuid.uuid4().hex
+    job = {
+        "id": job_id,
+        "type": job_type,
+        "stationId": station["id"],
+        "stationName": station["name"],
+        "status": "queued",
+        "createdAt": utc_now(),
+        "startedAt": None,
+        "completedAt": None,
+        "logs": [],
+        "result": None,
+        "error": None,
+    }
+    with JOBS_LOCK:
+        JOBS[job_id] = job
+    thread = threading.Thread(target=run_task_job, args=(job_id, task), daemon=True)
+    thread.start()
+    return {key: job[key] for key in ("id", "type", "stationId", "status", "createdAt")}
+
+
 def settings_environment() -> dict[str, str]:
     settings = load_settings()
     config_home = settings.get("wranglerConfigHome")
@@ -318,6 +368,62 @@ def blynk_request(station: dict[str, Any], endpoint: str, params: dict[str, str]
         raise RuntimeError(f"Không kết nối được Blynk: {exc}") from exc
 
 
+def terminal_pin_for(station: dict[str, Any]) -> str:
+    return str(station.get("terminalPin") or station.get("otaPin") or "V5").upper()
+
+
+def normalize_blynk_value(value: str) -> str:
+    clean = value.strip()
+    try:
+        parsed = json.loads(clean)
+        if isinstance(parsed, str):
+            return parsed.strip()
+        if isinstance(parsed, list) and len(parsed) == 1 and isinstance(parsed[0], str):
+            return parsed[0].strip()
+    except json.JSONDecodeError:
+        pass
+    return clean
+
+
+def parse_terminal_version_reply(value: str, request_id: str) -> str | None:
+    clean = normalize_blynk_value(value)
+    match = re.fullmatch(
+        rf"ota_reply:{re.escape(request_id)}\|version=([A-Za-z0-9._-]{{1,32}})",
+        clean,
+    )
+    return match.group(1) if match else None
+
+
+def query_device_version(
+    station: dict[str, Any],
+    timeout_seconds: float = 3.0,
+    poll_interval: float = 0.35,
+) -> dict[str, Any]:
+    pin = terminal_pin_for(station)
+    request_id = uuid.uuid4().hex[:12]
+    command = f"ota_info:{request_id}"
+    blynk_request(station, "update", {pin: command})
+    deadline = time.monotonic() + timeout_seconds
+    last_error: RuntimeError | None = None
+    while time.monotonic() < deadline:
+        try:
+            value = blynk_request(station, "get", {pin: ""})
+            version = parse_terminal_version_reply(value, request_id)
+            if version:
+                return {
+                    "version": version,
+                    "terminalPin": pin,
+                    "requestId": request_id,
+                    "verifiedAt": utc_now(),
+                }
+        except RuntimeError as exc:
+            last_error = exc
+        time.sleep(poll_interval)
+    if last_error:
+        raise RuntimeError(f"Terminal chưa trả lời phiên bản: {last_error}") from last_error
+    raise RuntimeError("Terminal chưa hỗ trợ lệnh tự xác minh phiên bản.")
+
+
 def blynk_status(station: dict[str, Any]) -> dict[str, Any]:
     connected_text = blynk_request(station, "isHardwareConnected", {})
     connected = connected_text.lower() == "true"
@@ -327,12 +433,102 @@ def blynk_status(station: dict[str, Any]) -> dict[str, Any]:
             quality = blynk_request(station, "get", {station["networkQualityPin"]: ""})
         except RuntimeError:
             quality = None
+    device_version = None
+    version_verified = False
+    version_error = None
+    version_checked_at = None
+    if connected:
+        try:
+            version_result = query_device_version(station)
+            device_version = version_result["version"]
+            version_verified = True
+            version_checked_at = version_result["verifiedAt"]
+        except RuntimeError as exc:
+            version_error = str(exc)
+    if not device_version:
+        device_version = station.get("lastKnownDeviceVersion")
     return {
         "connected": connected,
         "networkQuality": quality,
-        "lastKnownDeviceVersion": station.get("lastKnownDeviceVersion"),
+        "deviceVersion": device_version,
+        "versionVerified": version_verified,
+        "versionError": version_error,
+        "versionCheckedAt": version_checked_at,
+        "terminalPin": terminal_pin_for(station),
         "checkedAt": utc_now(),
     }
+
+
+def execute_ota_and_verify(
+    station: dict[str, Any],
+    release: dict[str, Any],
+    job_id: str,
+    timeout_seconds: float = 180.0,
+) -> dict[str, Any]:
+    pin = terminal_pin_for(station)
+    expected_version = str(release.get("version") or parse_source(station).get("version") or "")
+    if not expected_version:
+        raise RuntimeError("Không xác định được phiên bản cần xác minh sau OTA.")
+
+    append_job_log(job_id, f"Firmware {expected_version} đã khớp Cloudflare.")
+    blynk_request(station, "update", {pin: "update"})
+    sent_at = utc_now()
+    append_job_log(job_id, f"Đã gửi lệnh update qua Terminal {pin}.")
+    append_job_log(job_id, "Đang chờ thiết bị khởi động lại và kết nối Blynk…")
+
+    deadline = time.monotonic() + timeout_seconds
+    first_probe_at = time.monotonic() + 5.0
+    saw_offline = False
+    announced_reconnect = False
+    last_version = None
+    last_error = None
+    while time.monotonic() < deadline:
+        if time.monotonic() < first_probe_at:
+            time.sleep(1.0)
+            continue
+        try:
+            connected_text = blynk_request(station, "isHardwareConnected", {})
+            connected = connected_text.lower() == "true"
+        except RuntimeError as exc:
+            connected = False
+            last_error = str(exc)
+
+        if not connected:
+            if not saw_offline:
+                append_job_log(job_id, "Thiết bị đã ngắt kết nối để cập nhật.")
+            saw_offline = True
+            time.sleep(2.0)
+            continue
+
+        if saw_offline and not announced_reconnect:
+            append_job_log(job_id, "Thiết bị đã kết nối lại; đang đọc phiên bản qua Terminal…")
+            announced_reconnect = True
+        try:
+            version_result = query_device_version(station, timeout_seconds=5.0, poll_interval=0.5)
+            last_version = version_result["version"]
+            if last_version == expected_version:
+                append_job_log(job_id, f"Đã xác minh thiết bị đang chạy phiên bản {last_version}.")
+                return {
+                    "accepted": True,
+                    "target": station["name"],
+                    "terminalPin": pin,
+                    "expectedVersion": expected_version,
+                    "deviceVersion": last_version,
+                    "versionVerified": True,
+                    "sawOffline": saw_offline,
+                    "sentAt": sent_at,
+                    "verifiedAt": version_result["verifiedAt"],
+                    "release": release,
+                }
+            last_error = f"Thiết bị phản hồi phiên bản {last_version}, chưa phải {expected_version}."
+        except RuntimeError as exc:
+            last_error = str(exc)
+        time.sleep(4.0)
+
+    detail = last_error or "không nhận được phản hồi phiên bản"
+    if last_version:
+        detail = f"phiên bản cuối cùng nhận được là {last_version}"
+    raise RuntimeError(f"OTA đã được gửi nhưng chưa xác minh đạt: {detail}.")
 
 
 def cloudflare_status() -> dict[str, Any]:
@@ -340,30 +536,15 @@ def cloudflare_status() -> dict[str, Any]:
     wrangler = settings.get("wranglerPath")
     if not wrangler or not Path(wrangler).exists():
         return {"connected": False, "error": "Không tìm thấy Wrangler", "checkedAt": utc_now()}
-    try:
-        result = subprocess.run(
-            wrap_command([wrangler, "whoami"]),
-            cwd=str(APP_ROOT),
-            env={**os.environ, **settings_environment()},
-            stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT,
-            text=True,
-            encoding="utf-8",
-            errors="replace",
-            timeout=30,
-            check=False,
-        )
-        output = result.stdout
-        account_match = re.search(r"Account Name\s+│\s+([^│\r\n]+)", output)
-        connected = result.returncode == 0 and "not authenticated" not in output.lower()
-        return {
-            "connected": connected,
-            "account": account_match.group(1).strip() if account_match else None,
-            "checkedAt": utc_now(),
-            "error": None if connected else "Cloudflare chưa đăng nhập",
-        }
-    except (OSError, subprocess.TimeoutExpired) as exc:
-        return {"connected": False, "error": str(exc), "checkedAt": utc_now()}
+    config_home = settings.get("wranglerConfigHome")
+    credential_path = Path(config_home) / ".wrangler" / "config" / "default.toml" if config_home else None
+    credentials_saved = bool(credential_path and credential_path.is_file() and credential_path.stat().st_size > 0)
+    return {
+        "connected": credentials_saved,
+        "authSource": "local-oauth" if credentials_saved else None,
+        "checkedAt": utc_now(),
+        "error": None if credentials_saved else "Cloudflare chưa đăng nhập",
+    }
 
 
 def safe_add_station(payload: dict[str, Any]) -> dict[str, Any]:
@@ -392,7 +573,7 @@ def safe_add_station(payload: dict[str, Any]) -> dict[str, Any]:
         "projectPath": str(project_path),
         "environment": str(payload.get("environment") or "nodemcuv2").strip(),
         "releaseScript": str(payload.get("releaseScript") or "").strip(),
-        "otaPin": str(payload.get("otaPin") or "V5").upper(),
+        "terminalPin": str(payload.get("terminalPin") or payload.get("otaPin") or "V5").upper(),
         "lastKnownDeviceVersion": None,
         "cloudflareWorker": str(payload.get("cloudflareWorker") or "").strip(),
         "networkQualityPin": str(payload.get("networkQualityPin") or "V76").upper(),
@@ -469,7 +650,7 @@ class OtaManagerHandler(BaseHTTPRequestHandler):
         path = urlparse(self.path).path
         try:
             if path == "/api/health":
-                self.send_json({"ok": True, "service": "OTA Manager", "version": "1.0.0"})
+                self.send_json({"ok": True, "service": "OTA Manager", "version": "1.1.0"})
                 return
             if path == "/api/stations":
                 self.send_json({"stations": load_stations()})
@@ -587,15 +768,16 @@ class OtaManagerHandler(BaseHTTPRequestHandler):
                 current = station_payload(station)
                 if not current["releaseMatchesBinary"]:
                     raise RuntimeError("Firmware phát hành chưa khớp binary trên máy.")
-                device = blynk_status(station)
-                if not device["connected"]:
+                connected_text = blynk_request(station, "isHardwareConnected", {})
+                if connected_text.lower() != "true":
                     raise RuntimeError("Thiết bị đang Offline; không gửi lệnh OTA.")
                 verified = verify_release(station)
-                pin = station.get("otaPin", "V5")
-                blynk_request(station, "update", {pin: "update"})
-                result = {"accepted": True, "pin": pin, "target": station["name"], "release": verified, "sentAt": utc_now()}
-                append_history({"stationId": station["id"], "type": "ota", "status": "accepted", "result": result})
-                self.send_json(result, HTTPStatus.ACCEPTED)
+                job = create_task_job(
+                    "ota",
+                    station,
+                    lambda job_id: execute_ota_and_verify(station, verified, job_id),
+                )
+                self.send_json(job, HTTPStatus.ACCEPTED)
                 return
         except (ValueError, json.JSONDecodeError) as exc:
             self.send_json({"error": str(exc)}, HTTPStatus.BAD_REQUEST)

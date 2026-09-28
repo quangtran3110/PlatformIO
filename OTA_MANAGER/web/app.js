@@ -120,8 +120,9 @@ function updateActionButtons(station) {
   const deviceReady = Boolean(state.device?.connected);
   const alreadyInstalled = Boolean(
     station?.sourceVersion &&
-      state.device?.lastKnownDeviceVersion &&
-      station.sourceVersion === state.device.lastKnownDeviceVersion,
+      state.device?.versionVerified &&
+      state.device?.deviceVersion &&
+      station.sourceVersion === state.device.deviceVersion,
   );
 
   buildButton.disabled = !station?.projectExists || !station?.platformioExists || busy;
@@ -159,7 +160,7 @@ function renderSelectedStation() {
     ? `${formatBytes(station.binary.size)} · ${station.binary.sha256.slice(0, 10).toUpperCase()}…`
     : "Chưa có firmware.bin";
   $("#release-version").textContent = station.release?.version || "Chưa phát hành";
-  $("#device-version").textContent = state.device?.lastKnownDeviceVersion || station.lastKnownDeviceVersion || "—";
+  $("#device-version").textContent = state.device?.deviceVersion || "—";
 
   const online = Boolean(state.device?.connected);
   const networkQualityLabels = {
@@ -175,9 +176,17 @@ function renderSelectedStation() {
       ? "Dự án sẵn sàng · thiết bị chưa kiểm tra"
       : "Không tìm thấy dự án";
   $("#device-dot").classList.toggle("is-offline", state.device !== null && !online);
-  $("#device-meta").textContent = state.device?.checkedAt
-    ? `Kiểm tra ${formatTime(state.device.checkedAt)}`
-    : "Đang đọc trạng thái Blynk";
+  if (state.device?.versionVerified) {
+    $("#device-meta").textContent = `Xác minh qua ${state.device.terminalPin} · ${formatTime(state.device.versionCheckedAt)}`;
+  } else if (state.device?.deviceVersion) {
+    $("#device-meta").textContent = `Dữ liệu chuyển tiếp · ${formatTime(state.device.checkedAt)}`;
+  } else if (state.device?.connected) {
+    $("#device-meta").textContent = "Terminal chưa phản hồi phiên bản";
+  } else {
+    $("#device-meta").textContent = state.device?.checkedAt
+      ? `Kiểm tra ${formatTime(state.device.checkedAt)}`
+      : "Đang đọc trạng thái Blynk";
+  }
 
   const checks = [
     station.projectExists && station.platformioExists,
@@ -207,7 +216,7 @@ async function loadCloudflare() {
     pill.classList.toggle("is-connected", state.cloudflare.connected);
     pill.classList.toggle("state-muted", !state.cloudflare.connected);
     pill.querySelector("span").textContent = state.cloudflare.connected
-      ? "Cloudflare đã kết nối"
+      ? "Cloudflare đã đăng nhập"
       : "Kết nối Cloudflare";
   } catch (error) {
     state.cloudflare = { connected: false, error: error.message };
@@ -267,8 +276,8 @@ async function loadHistory() {
 
 async function refreshAll() {
   try {
-    await Promise.all([loadStations(), loadCloudflare()]);
-    await Promise.all([loadDevice(), loadHistory()]);
+    await loadStations();
+    await Promise.all([loadCloudflare(), loadDevice(), loadHistory()]);
   } catch (error) {
     showToast(error.message || "Không thể làm mới dữ liệu.");
   }
@@ -308,7 +317,7 @@ function configureConfirmDialog(action, station) {
   $("#confirm-eyebrow").textContent = isOta ? "Thao tác thiết bị" : "Phát hành firmware";
   $("#confirm-title").textContent = isOta ? `OTA ${station.name}` : `Phát hành ${station.sourceVersion}`;
   $("#confirm-message").textContent = isOta
-    ? `Firmware đã được xác minh. OTA sẽ khởi động lại ${station.name} trong thời gian ngắn.`
+    ? `Firmware đã được xác minh. OTA sẽ khởi động lại ${station.name}, chờ thiết bị kết nối lại và tự đọc đúng phiên bản qua Terminal.`
     : `Ứng dụng sẽ build lại, tải firmware ${station.sourceVersion} lên Cloudflare và tải ngược để so hash.`;
   $("#restart-confirm-row").hidden = !isOta;
   $("#name-confirm-row").hidden = !isOta;
@@ -360,12 +369,12 @@ $("#confirm-form").addEventListener("submit", async (event) => {
       const job = await apiPost(`/api/stations/${station.id}/publish`);
       monitorJob(job.id);
     } else if (action === "ota") {
-      const result = await apiPost(`/api/stations/${station.id}/ota`, {
+      const job = await apiPost(`/api/stations/${station.id}/ota`, {
         confirmation: $("#name-confirm").value.trim(),
         confirmedRestart: $("#restart-confirm").checked,
       });
-      showToast(`Đã gửi OTA tới ${result.target}.`);
-      await Promise.all([loadDevice(), loadHistory()]);
+      showToast(`Đã bắt đầu OTA ${station.name}; ứng dụng sẽ tự xác minh phiên bản.`);
+      monitorJob(job.id);
     }
   } catch (error) {
     showToast(error.message);
@@ -417,7 +426,7 @@ $("#open-project").addEventListener("click", async () => {
 
 $("#cloudflare-pill").addEventListener("click", async () => {
   if (state.cloudflare?.connected) {
-    showToast("Cloudflare đã kết nối và sẵn sàng phát hành.");
+    showToast("Phiên đăng nhập Cloudflare đã được lưu và sẵn sàng phát hành.");
     return;
   }
   try {
