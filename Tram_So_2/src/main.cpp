@@ -64,7 +64,7 @@
 #define VOLUME_TOKEN_G2 "Hc5DgCBzl4Oi5hW_JOaNZ6oBKoGy5kFI"
 #define VOLUME_TOKEN_G3 "JTnEpJjGVVJ8DM1aJx7zZT4cyNYJrhr_"
 
-#define BLYNK_FIRMWARE_VERSION "260928.2"
+#define BLYNK_FIRMWARE_VERSION "260929.2"
 #define BLYNK_PRINT Serial
 #define APP_DEBUG
 
@@ -2466,9 +2466,9 @@ void setup() {
   delay(20);
   Serial.printf("\nBOOT firmware=%s reset=%s\n", BLYNK_FIRMWARE_VERSION,
                 ESP.getResetReason().c_str());
+  Wire.begin();
   if (handleOtaBootState())
     return;
-  Wire.begin();
   relayWord = 0xFFFF;
   relayReady = writePcfWord(0x21, relayWord); // One idle write, NK default HIGH.
   if (!relayReady)
