@@ -64,7 +64,7 @@
 #define VOLUME_TOKEN_G2 "Hc5DgCBzl4Oi5hW_JOaNZ6oBKoGy5kFI"
 #define VOLUME_TOKEN_G3 "JTnEpJjGVVJ8DM1aJx7zZT4cyNYJrhr_"
 
-#define BLYNK_FIRMWARE_VERSION "260929.2"
+#define BLYNK_FIRMWARE_VERSION "260929.3"
 #define BLYNK_PRINT Serial
 #define APP_DEBUG
 
@@ -182,7 +182,9 @@ const unsigned long OTA_WIFI_TIMEOUT_MS = 45000UL;
 const int32_t OTA_ERROR_WIFI_TIMEOUT = -1001;
 const int32_t OTA_ERROR_WATCHDOG_INIT = -1002;
 const int32_t OTA_ERROR_NO_UPDATE = -1003;
+const int32_t OTA_ERROR_MFLN_UNSUPPORTED = -1004;
 const int OTA_NETWORK_TIMEOUT_MS = 8000;
+const uint16_t OTA_TLS_RX_BUFFER = 4096;
 int8_t lastOtaProgressBucket = -1;
 String lastOtaStatus = "none";
 
@@ -538,6 +540,15 @@ void update_error(int err) {
 }
 void update_fw() {
   WiFiClientSecure client_;
+  rearmExternalWatchdog();
+  bool mflnSupported = WiFiClientSecure::probeMaxFragmentLength(
+      "raw.githubusercontent.com", 443, OTA_TLS_RX_BUFFER);
+  Serial.printf("OTA TLS MFLN 4096: %s\n", mflnSupported ? "supported" : "unsupported");
+  if (!mflnSupported) {
+    writeOtaRtcState(OTA_RTC_FAILED, OTA_ERROR_MFLN_UNSUPPORTED);
+    return;
+  }
+  client_.setBufferSizes(OTA_TLS_RX_BUFFER, 512);
   client_.setInsecure();
   client_.setTimeout(OTA_NETWORK_TIMEOUT_MS);
   ESPhttpUpdate.setClientTimeout(OTA_NETWORK_TIMEOUT_MS);
