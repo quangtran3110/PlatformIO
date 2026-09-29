@@ -45,6 +45,20 @@ function validManifest(value, stationId) {
   );
 }
 
+function parseRange(value, size) {
+  if (!value) return null;
+  const match = /^bytes=(\d+)-(\d*)$/.exec(value.trim());
+  if (!match) return false;
+
+  const start = Number(match[1]);
+  const requestedEnd = match[2] ? Number(match[2]) : size - 1;
+  if (!Number.isSafeInteger(start) || !Number.isSafeInteger(requestedEnd) ||
+      start < 0 || start >= size || requestedEnd < start) {
+    return false;
+  }
+  return { start, end: Math.min(requestedEnd, size - 1) };
+}
+
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
@@ -69,20 +83,41 @@ export default {
       return new Response("Invalid firmware manifest", { status: 503 });
     }
 
-    const firmware = await env.FIRMWARE.get(manifest.objectKey, "stream");
-    if (!firmware) {
-      return new Response("Firmware unavailable", { status: 503 });
-    }
-
     const headers = new Headers({
       "Content-Type": "application/octet-stream",
-      "Content-Length": String(manifest.size),
       "Cache-Control": "private, no-store, max-age=0",
+      "Accept-Ranges": "bytes",
       "X-MD5": manifest.md5,
       "X-Firmware-Version": manifest.version,
       "X-Firmware-SHA256": manifest.sha256,
       ETag: `"${manifest.sha256}"`,
     });
+
+    const range = parseRange(request.headers.get("Range"), manifest.size);
+    if (range === false) {
+      headers.set("Content-Range", `bytes */${manifest.size}`);
+      return new Response(null, { status: 416, headers });
+    }
+
+    if (range) {
+      const firmware = await env.FIRMWARE.get(manifest.objectKey, "arrayBuffer");
+      if (!firmware || firmware.byteLength !== manifest.size) {
+        return new Response("Firmware unavailable", { status: 503 });
+      }
+      const body = firmware.slice(range.start, range.end + 1);
+      headers.set("Content-Length", String(body.byteLength));
+      headers.set("Content-Range", `bytes ${range.start}-${range.end}/${manifest.size}`);
+      return new Response(request.method === "HEAD" ? null : body, {
+        status: 206,
+        headers,
+      });
+    }
+
+    const firmware = await env.FIRMWARE.get(manifest.objectKey, "stream");
+    if (!firmware) {
+      return new Response("Firmware unavailable", { status: 503 });
+    }
+    headers.set("Content-Length", String(manifest.size));
     return new Response(request.method === "HEAD" ? null : firmware, {
       status: 200,
       headers,

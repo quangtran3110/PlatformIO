@@ -64,7 +64,7 @@
 #define VOLUME_TOKEN_G2 "Hc5DgCBzl4Oi5hW_JOaNZ6oBKoGy5kFI"
 #define VOLUME_TOKEN_G3 "JTnEpJjGVVJ8DM1aJx7zZT4cyNYJrhr_"
 
-#define BLYNK_FIRMWARE_VERSION "260929.3"
+#define BLYNK_FIRMWARE_VERSION "260929.8"
 #define BLYNK_PRINT Serial
 #define APP_DEBUG
 
@@ -125,8 +125,8 @@ const int Pin8 = 8;
 
 //-----------------------------
 #include <ESP8266HTTPClient.h>
-#include <ESP8266httpUpdate.h>
 #include <WiFiClientSecure.h>
+#include <Updater.h>
 #include <SimpleKalmanFilter.h>
 // Bạn cần "tune" 3 giá trị này để có kết quả tốt nhất. Hãy bắt đầu với các giá trị này.
 SimpleKalmanFilter levelKalmanFilter(2, 2, 0.01);
@@ -181,10 +181,17 @@ const uint32_t OTA_RTC_MAGIC = 0x4F544132UL; // "OTA2"
 const unsigned long OTA_WIFI_TIMEOUT_MS = 45000UL;
 const int32_t OTA_ERROR_WIFI_TIMEOUT = -1001;
 const int32_t OTA_ERROR_WATCHDOG_INIT = -1002;
-const int32_t OTA_ERROR_NO_UPDATE = -1003;
-const int32_t OTA_ERROR_MFLN_UNSUPPORTED = -1004;
-const int OTA_NETWORK_TIMEOUT_MS = 8000;
+const int32_t OTA_ERROR_HTTP = -1004;
+const int32_t OTA_ERROR_LENGTH = -1005;
+const int32_t OTA_ERROR_BEGIN = -1006;
+const int32_t OTA_ERROR_STREAM_TIMEOUT = -1007;
+const int32_t OTA_ERROR_WRITE = -1008;
+const int32_t OTA_ERROR_END = -1009;
+const int OTA_NETWORK_TIMEOUT_MS = 30000;
 const uint16_t OTA_TLS_RX_BUFFER = 4096;
+const uint32_t OTA_RANGE_SIZE = 32768;
+const uint8_t OTA_RANGE_RETRIES = 3;
+uint8_t otaWriteBuffer[1024];
 int8_t lastOtaProgressBucket = -1;
 String lastOtaStatus = "none";
 
@@ -534,47 +541,147 @@ void update_progress(int cur, int total) {
     Serial.printf("OTA progress: %d%% (%d/%d bytes)\n", bucket * 10, cur, total);
   }
 }
-void update_error(int err) {
-  Serial.printf("CALLBACK:  HTTP update fatal error code %d\n", err);
-  writeOtaRtcState(OTA_RTC_FAILED, err);
-}
 void update_fw() {
-  WiFiClientSecure client_;
-  rearmExternalWatchdog();
-  bool mflnSupported = WiFiClientSecure::probeMaxFragmentLength(
-      "raw.githubusercontent.com", 443, OTA_TLS_RX_BUFFER);
-  Serial.printf("OTA TLS MFLN 4096: %s\n", mflnSupported ? "supported" : "unsupported");
-  if (!mflnSupported) {
-    writeOtaRtcState(OTA_RTC_FAILED, OTA_ERROR_MFLN_UNSUPPORTED);
-    return;
-  }
-  client_.setBufferSizes(OTA_TLS_RX_BUFFER, 512);
-  client_.setInsecure();
-  client_.setTimeout(OTA_NETWORK_TIMEOUT_MS);
-  ESPhttpUpdate.setClientTimeout(OTA_NETWORK_TIMEOUT_MS);
-  ESPhttpUpdate.closeConnectionsOnUpdate(true);
+  String otaUrl = String(URL_fw_Bin) + "?from=" + BLYNK_FIRMWARE_VERSION +
+                  "&boot=" + String(ESP.getCycleCount(), HEX);
   Serial.println("OTA: bat dau tai firmware");
   rearmExternalWatchdog();
-  ESPhttpUpdate.onStart(update_started);
-  ESPhttpUpdate.onEnd(update_finished);
-  ESPhttpUpdate.onProgress(update_progress);
-  ESPhttpUpdate.onError(update_error);
-  t_httpUpdate_return ret = ESPhttpUpdate.update(client_, URL_fw_Bin);
-  switch (ret) {
-  case HTTP_UPDATE_FAILED:
-    Serial.printf("HTTP_UPDATE_FAILED Error (%d): %s\n",
-                  ESPhttpUpdate.getLastError(),
-                  ESPhttpUpdate.getLastErrorString().c_str());
-    writeOtaRtcState(OTA_RTC_FAILED, ESPhttpUpdate.getLastError());
-    break;
-  case HTTP_UPDATE_NO_UPDATES:
-    Serial.println("HTTP_UPDATE_NO_UPDATES");
-    writeOtaRtcState(OTA_RTC_FAILED, OTA_ERROR_NO_UPDATE);
-    break;
-  case HTTP_UPDATE_OK:
-    Serial.println("HTTP_UPDATE_OK");
-    break;
+
+  int total = 0;
+  int written = 0;
+  uint8_t retries = 0;
+  bool updateBegun = false;
+  while (total == 0 || written < total) {
+    ESP.wdtFeed();
+    serviceExternalWatchdog();
+
+    uint32_t rangeEnd = static_cast<uint32_t>(written) + OTA_RANGE_SIZE - 1;
+    if (total > 0 && rangeEnd >= static_cast<uint32_t>(total)) rangeEnd = total - 1;
+
+    WiFiClientSecure client_;
+    client_.setBufferSizes(OTA_TLS_RX_BUFFER, 512);
+    client_.setInsecure();
+    client_.setTimeout(OTA_NETWORK_TIMEOUT_MS);
+
+    HTTPClient http;
+    http.setTimeout(OTA_NETWORK_TIMEOUT_MS);
+    http.setReuse(false);
+    const char *headers[] = {"x-MD5", "Content-Range"};
+    http.collectHeaders(headers, 2);
+    if (!http.begin(client_, otaUrl)) {
+      writeOtaRtcState(OTA_RTC_FAILED, OTA_ERROR_HTTP);
+      return;
+    }
+    http.addHeader("Range", "bytes=" + String(written) + "-" + String(rangeEnd));
+
+    int httpCode = http.GET();
+    if (httpCode != HTTP_CODE_PARTIAL_CONTENT) {
+      Serial.printf("OTA range HTTP error: %d at %d\n", httpCode, written);
+      http.end();
+      if (++retries < OTA_RANGE_RETRIES) continue;
+      if (updateBegun) Update.end(false);
+      writeOtaRtcState(OTA_RTC_FAILED, OTA_ERROR_HTTP);
+      return;
+    }
+
+    int responseStart = -1, responseEnd = -1, responseTotal = -1;
+    String contentRange = http.header("Content-Range");
+    if (sscanf(contentRange.c_str(), "bytes %d-%d/%d", &responseStart,
+               &responseEnd, &responseTotal) != 3 || responseStart != written ||
+        responseEnd < responseStart || responseTotal <= 0) {
+      Serial.printf("OTA Content-Range khong hop le: %s\n", contentRange.c_str());
+      http.end();
+      if (updateBegun) Update.end(false);
+      writeOtaRtcState(OTA_RTC_FAILED, OTA_ERROR_LENGTH);
+      return;
+    }
+
+    if (!updateBegun) {
+      total = responseTotal;
+      String md5 = http.header("x-MD5");
+      if (!Update.begin(static_cast<size_t>(total))) {
+        Serial.printf("OTA Update.begin error: %u\n", Update.getError());
+        http.end();
+        writeOtaRtcState(OTA_RTC_FAILED, OTA_ERROR_BEGIN);
+        return;
+      }
+      updateBegun = true;
+      if (md5.length() != 32 || !Update.setMD5(md5.c_str())) {
+        Serial.println("OTA: MD5 khong hop le");
+        http.end();
+        Update.end(false);
+        writeOtaRtcState(OTA_RTC_FAILED, OTA_ERROR_LENGTH);
+        return;
+      }
+      update_started();
+    } else if (responseTotal != total) {
+      Serial.println("OTA: kich thuoc firmware thay doi giua qua trinh tai");
+      http.end();
+      Update.end(false);
+      writeOtaRtcState(OTA_RTC_FAILED, OTA_ERROR_LENGTH);
+      return;
+    }
+
+    WiFiClient *stream = http.getStreamPtr();
+    int expected = responseEnd - responseStart + 1;
+    int receivedInRange = 0;
+    unsigned long lastDataAt = millis();
+    while (receivedInRange < expected) {
+      ESP.wdtFeed();
+      serviceExternalWatchdog();
+      int available = stream->available();
+      if (available > 0) {
+        size_t wanted = min(static_cast<size_t>(available), sizeof(otaWriteBuffer));
+        wanted = min(wanted, static_cast<size_t>(expected - receivedInRange));
+        int received = stream->read(otaWriteBuffer, wanted);
+        if (received > 0) {
+          size_t flashed = Update.write(otaWriteBuffer, static_cast<size_t>(received));
+          if (flashed != static_cast<size_t>(received)) {
+            Serial.printf("OTA flash write error: %u\n", Update.getError());
+            Update.end(false);
+            http.end();
+            writeOtaRtcState(OTA_RTC_FAILED, OTA_ERROR_WRITE);
+            return;
+          }
+          written += received;
+          receivedInRange += received;
+          lastDataAt = millis();
+          update_progress(written, total);
+          continue;
+        }
+      }
+      if (!http.connected() ||
+          static_cast<unsigned long>(millis() - lastDataAt) >= OTA_NETWORK_TIMEOUT_MS) {
+        break;
+      }
+      delay(1);
+    }
+    http.end();
+
+    if (receivedInRange == expected) {
+      retries = 0;
+      Serial.printf("OTA range OK: %d/%d\n", written, total);
+      continue;
+    }
+    Serial.printf("OTA range interrupted at %d/%d\n", written, total);
+    if (receivedInRange > 0) retries = 0;
+    if (++retries >= OTA_RANGE_RETRIES) {
+      Update.end(false);
+      writeOtaRtcState(OTA_RTC_FAILED, OTA_ERROR_STREAM_TIMEOUT);
+      return;
+    }
   }
+
+  bool complete = Update.end() && Update.isFinished();
+  if (!complete) {
+    Serial.printf("OTA Update.end error: %u\n", Update.getError());
+    writeOtaRtcState(OTA_RTC_FAILED, OTA_ERROR_END);
+    return;
+  }
+  update_finished();
+  Serial.println("HTTP_UPDATE_OK");
+  delay(200);
+  ESP.restart();
 } //-------------------------
 
 void updata() {
@@ -647,8 +754,8 @@ void runCleanOtaMode() {
                 ESP.getFreeHeap(), ESP.getMaxFreeBlockSize());
   update_fw();
 
-  // Success restarts inside ESPhttpUpdate. Reaching here means no image was
-  // installed, so return to normal operation without entering a reboot loop.
+  // Thanh cong se khoi dong lai ngay trong update_fw(). Neu quay lai day thi
+  // firmware moi chua duoc kich hoat; khoi dong lai de ve che do van hanh cu.
   serviceExternalWatchdog();
   delay(500);
   ESP.restart();
@@ -1137,7 +1244,8 @@ BLYNK_WRITE(V5) // data string
     String requestId = dataS.substring(9);
     requestId.trim();
     if (validOtaRequestId(requestId)) {
-      String response = "ota_reply:" + requestId + "|version=" + BLYNK_FIRMWARE_VERSION;
+      String response = "ota_reply:" + requestId + "|version=" + BLYNK_FIRMWARE_VERSION +
+                        "|last=" + lastOtaStatus + "|heap=" + ESP.getFreeHeap();
       Blynk.virtualWrite(V5, response);
     }
     return;

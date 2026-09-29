@@ -33,8 +33,8 @@ function environment() {
           return manifest;
         }
         if (key === manifest.objectKey) {
-          assert.equal(type, "stream");
-          return firmwareBytes;
+          assert.ok(type === "stream" || type === "arrayBuffer");
+          return type === "arrayBuffer" ? firmwareBytes.buffer.slice(0) : firmwareBytes;
         }
         return null;
       },
@@ -69,6 +69,31 @@ test("HEAD returns headers without a body", async () => {
   assert.equal(response.status, 200);
   assert.equal(response.headers.get("content-length"), String(firmwareBytes.byteLength));
   assert.equal((await response.arrayBuffer()).byteLength, 0);
+});
+
+test("serves an exact byte range for resumable OTA", async () => {
+  const response = await worker.fetch(
+    new Request("https://ota.example/tram-so-2/station-2-key/firmware.bin", {
+      headers: { Range: "bytes=1-2" },
+    }),
+    environment(),
+  );
+  assert.equal(response.status, 206);
+  assert.equal(response.headers.get("accept-ranges"), "bytes");
+  assert.equal(response.headers.get("content-range"), "bytes 1-2/4");
+  assert.equal(response.headers.get("content-length"), "2");
+  assert.deepEqual(new Uint8Array(await response.arrayBuffer()), new Uint8Array([2, 3]));
+});
+
+test("rejects an invalid or unsatisfiable range", async () => {
+  const response = await worker.fetch(
+    new Request("https://ota.example/tram-so-2/station-2-key/firmware.bin", {
+      headers: { Range: "bytes=9-12" },
+    }),
+    environment(),
+  );
+  assert.equal(response.status, 416);
+  assert.equal(response.headers.get("content-range"), "bytes */4");
 });
 
 test("keeps firmware and keys isolated per station", async () => {
