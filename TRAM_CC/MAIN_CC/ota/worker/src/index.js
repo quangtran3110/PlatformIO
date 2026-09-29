@@ -1,6 +1,7 @@
 const STATIONS = Object.freeze({
   "tram-cc": { secretName: "TRAM_CC_OTA_KEY" },
   "tram-so-2": { secretName: "TRAM_SO_2_OTA_KEY" },
+  "tram-so-3-vfd": { secretName: "TRAM_SO_3_VFD_OTA_KEY" },
 });
 
 function notFound() {

@@ -18,12 +18,20 @@ const manifests = {
     md5: "08d6c05a21512a79a1dfeb9d2a8f262f",
     sha256: "9f64a747e1b97f131fabb6b447296c9b6f0201e79fb3c5356e6c77e89b6a806a",
   },
+  "tram-so-3-vfd": {
+    version: "260929.2",
+    objectKey: "tram-so-3-vfd/releases/260929.2/firmware.bin",
+    size: firmwareBytes.byteLength,
+    md5: "08d6c05a21512a79a1dfeb9d2a8f262f",
+    sha256: "9f64a747e1b97f131fabb6b447296c9b6f0201e79fb3c5356e6c77e89b6a806a",
+  },
 };
 
 function environment() {
   return {
     TRAM_CC_OTA_KEY: "device-key",
     TRAM_SO_2_OTA_KEY: "station-2-key",
+    TRAM_SO_3_VFD_OTA_KEY: "station-3-vfd-key",
     FIRMWARE: {
       async get(key, type) {
         const stationId = key.split("/")[0];
@@ -109,4 +117,11 @@ test("keeps firmware and keys isolated per station", async () => {
     environment(),
   );
   assert.equal(wrongStationKey.status, 404);
+
+  const station3 = await worker.fetch(
+    new Request("https://ota.example/tram-so-3-vfd/station-3-vfd-key/firmware.bin"),
+    environment(),
+  );
+  assert.equal(station3.status, 200);
+  assert.equal(station3.headers.get("x-firmware-version"), "260929.2");
 });

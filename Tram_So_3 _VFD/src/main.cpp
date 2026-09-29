@@ -1,7 +1,7 @@
 #define BLYNK_TEMPLATE_ID "TMPL6Px18Gsjk"
 #define BLYNK_TEMPLATE_NAME "TRẠM 3 VFD"
 #define BLYNK_AUTH_TOKEN "eXmsWQOmDdHaBMALIxHJqhbJXtzg8Gw1"
-#define BLYNK_FIRMWARE_VERSION "260926.1"
+#define BLYNK_FIRMWARE_VERSION "260929.3"
 //------------------
 #define APP_DEBUG
 #define BLYNK_PRINT Serial
@@ -11,6 +11,7 @@
 #define BLYNK_PASTE(a, b) BLYNK_PASTE_IMPL(a, b)
 #define BLYNK_TO_V(pin) BLYNK_PASTE(V, pin)
 #define BLYNK_WRITE_VP(pin_enum) BLYNK_WRITE(BLYNK_TO_V(pin_enum))
+#include "ota_private.h"
 #include "CleanOta.h"
 #include "myBlynkAir.h"
 #include <BlynkSimpleEsp8266.h>
@@ -40,7 +41,7 @@ ModbusRTU mb;
 #include <ESP8266HTTPClient.h>
 #include <ESP8266WiFi.h>
 #include <UrlEncode.h>
-#define URL_fw_Bin "https://raw.githubusercontent.com/quangtran3110/PlatformIO/main/Tram_So_3%20_VFD/.pio/build/nodemcuv2/firmware.bin"
+#define URL_fw_Bin "https://tram-cc-private-ota.dieu-hanh-cap-nuoc.workers.dev/tram-so-3-vfd/" TRAM_SO_3_VFD_OTA_KEY "/firmware.bin"
 String server_main = "http://sgp1.blynk.cloud/external/api/";
 WiFiClient client;
 HTTPClient http;
@@ -87,7 +88,8 @@ Data edata, dataCheck;
 const struct Data dataDefault = {};
 //------------------
 #include "PCF8575.h"
-PCF8575 pcf8575_1(0x20);
+const uint8_t PCF8575_1_ADDRESS = 0x20;
+PCF8575 pcf8575_1(PCF8575_1_ADDRESS);
 
 const int pin_G1 = P7;
 const int pin_B1 = P6;
@@ -102,6 +104,9 @@ const int S0pin = P15;
 const int S1pin = P14;
 const int S2pin = P13;
 const int S3pin = P12;
+
+const unsigned long RUALOC_ON_MS = 6UL * 60UL * 1000UL;
+const unsigned long RUALOC_OFF_MS = 4UL * 60UL * 1000UL;
 //----Bế chứa--------------
 #include <SimpleKalmanFilter.h>
 long t;
@@ -110,10 +115,12 @@ float pi = 3.14;
 float bankinh2 = 240 * 240;
 const uint8_t dosau = 210;
 int timer_up;
+unsigned long rualocPhaseStartedAt = 0;
 byte status_g1 = 3;
 byte status_b1 = 3;
 byte status_nk1 = 3;
 byte status_fan = 3;
+bool rualocRelayOn = false;
 bool trip0 = false, trip1 = false, trip2 = false;
 bool key = false;
 bool maxtank = false, blynk_first_connect = false;
@@ -205,6 +212,8 @@ BLYNK_CONNECTED() {
   rtc_widget.begin();
   blynk_first_connect = true;
   Blynk.virtualWrite(V_PRE_SETPOINT, edata.pre_setpoint_x10 / 10.0f); // Cập nhật giá trị setpoint lên Blynk (đơn vị bar)
+  // Thiết bị là nguồn trạng thái. Không lấy lại giá trị V21 cũ từ Blynk.
+  Blynk.virtualWrite(V_RUALOC, edata.flags.rualoc);
 }
 // -- -Modbus VFD Communication-- -
 // Hằng số chung
@@ -394,6 +403,131 @@ void savedata() {
     }
   }
 }
+
+bool readPcf8575State(uint16_t &state) {
+  const uint8_t received = Wire.requestFrom(PCF8575_1_ADDRESS, (uint8_t)2);
+  if (received != 2 || Wire.available() < 2) {
+    while (Wire.available()) {
+      Wire.read();
+    }
+    return false;
+  }
+
+  state = (uint16_t)Wire.read();
+  state |= (uint16_t)Wire.read() << 8;
+  return true;
+}
+
+uint8_t pinStateFromSnapshot(uint16_t snapshot, uint8_t pin, uint8_t fallback, bool snapshotValid) {
+  if (!snapshotValid) {
+    return fallback;
+  }
+  return bitRead(snapshot, pin) ? HIGH : LOW;
+}
+
+void initializePcf8575PreservingState() {
+  uint16_t snapshot = 0;
+  const bool snapshotValid = readPcf8575State(snapshot);
+
+  // Nếu chỉ ESP reset, PCF8575 vẫn có điện: dùng đúng mức ngõ ra hiện tại
+  // để khởi tạo bộ đệm thư viện, tránh relay bị nhảy trong lúc boot.
+  const uint8_t s0State = pinStateFromSnapshot(snapshot, S0pin, LOW, snapshotValid);
+  const uint8_t s1State = pinStateFromSnapshot(snapshot, S1pin, LOW, snapshotValid);
+  const uint8_t s2State = pinStateFromSnapshot(snapshot, S2pin, LOW, snapshotValid);
+  const uint8_t s3State = pinStateFromSnapshot(snapshot, S3pin, LOW, snapshotValid);
+  const uint8_t g1State = pinStateFromSnapshot(snapshot, pin_G1, HIGH, snapshotValid);
+  const uint8_t b1State = pinStateFromSnapshot(snapshot, pin_B1, HIGH, snapshotValid);
+  const uint8_t nk1State = pinStateFromSnapshot(snapshot, pin_NK1, HIGH, snapshotValid);
+  const uint8_t fanPinState = pinStateFromSnapshot(snapshot, pin_fan, HIGH, snapshotValid);
+  const uint8_t p0State = pinStateFromSnapshot(snapshot, pin_P0, HIGH, snapshotValid);
+  const uint8_t p1State = pinStateFromSnapshot(snapshot, pin_P1, HIGH, snapshotValid);
+  const uint8_t p3State = pinStateFromSnapshot(snapshot, pin_P3, HIGH, snapshotValid);
+
+  // Khi rửa lọc đang tắt trong EEPROM thì P4 bắt buộc HIGH. Khi đang bật,
+  // giữ pha LOW/HIGH hiện có của PCF; nếu không đọc được PCF thì bắt đầu bằng pha mở.
+  const uint8_t p4State = edata.flags.rualoc
+                              ? pinStateFromSnapshot(snapshot, pin_P4, LOW, snapshotValid)
+                              : HIGH;
+
+  pcf8575_1.pinMode(S0pin, OUTPUT, s0State);
+  pcf8575_1.pinMode(S1pin, OUTPUT, s1State);
+  pcf8575_1.pinMode(S2pin, OUTPUT, s2State);
+  pcf8575_1.pinMode(S3pin, OUTPUT, s3State);
+  pcf8575_1.pinMode(pin_G1, OUTPUT, g1State);
+  pcf8575_1.pinMode(pin_B1, OUTPUT, b1State);
+  pcf8575_1.pinMode(pin_NK1, OUTPUT, nk1State);
+  pcf8575_1.pinMode(pin_fan, OUTPUT, fanPinState);
+  pcf8575_1.pinMode(pin_P0, OUTPUT, p0State);
+  pcf8575_1.pinMode(pin_P1, OUTPUT, p1State);
+  pcf8575_1.pinMode(pin_P3, OUTPUT, p3State);
+  pcf8575_1.pinMode(pin_P4, OUTPUT, p4State);
+
+  if (!pcf8575_1.begin()) {
+    Serial.println("PCF8575 0x20 initialization failed.");
+  }
+
+  status_g1 = g1State;
+  status_b1 = b1State;
+  status_nk1 = nk1State;
+  status_fan = (fanPinState == LOW) ? HIGH : LOW;
+  rualocRelayOn = (p4State == LOW);
+}
+
+void setRualocRelay(bool turnOn) {
+  if (rualocRelayOn == turnOn) {
+    return;
+  }
+
+  // Relay rửa lọc kích mức LOW.
+  pcf8575_1.digitalWrite(pin_P4, turnOn ? LOW : HIGH);
+  rualocRelayOn = turnOn;
+  rualocPhaseStartedAt = millis();
+}
+
+void processRualocCycle() {
+  if (!edata.flags.rualoc) {
+    return;
+  }
+
+  const unsigned long phaseDuration = rualocRelayOn ? RUALOC_ON_MS : RUALOC_OFF_MS;
+  if (millis() - rualocPhaseStartedAt >= phaseDuration) {
+    setRualocRelay(!rualocRelayOn);
+  }
+}
+
+void startRualoc() {
+  if (edata.flags.rualoc) {
+    return;
+  }
+
+  edata.flags.rualoc = 1;
+  edata.LLG1_RL = LLG1_1m3;
+  setRualocRelay(true);
+  savedata();
+}
+
+void stopRualoc() {
+  const bool wasRunning = edata.flags.rualoc;
+  setRualocRelay(false);
+  edata.flags.rualoc = 0;
+
+  if (wasRunning) {
+    Blynk.virtualWrite(V_LL_RUALOC, LLG1_1m3 - edata.LLG1_RL);
+    edata.LLG1_RL = 0;
+  }
+  savedata();
+}
+
+void resumeRualocAfterBoot() {
+  if (edata.flags.rualoc) {
+    // PCF vẫn giữ pha thực tế nếu chỉ ESP reset. Pha hiện tại được chạy lại
+    // đủ 6 phút (LOW) hoặc 4 phút (HIGH) kể từ lúc boot.
+    rualocPhaseStartedAt = millis();
+  } else {
+    rualocPhaseStartedAt = 0;
+  }
+}
+
 void on_cap1() {
   if ((status_g1 != HIGH) && (trip0 == false)) {
     status_g1 = HIGH;
@@ -1061,23 +1195,15 @@ BLYNK_WRITE_VP(V_RUALOC) // Rửa lọc
   if (key) {
     switch (param.asInt()) {
     case 0: { // Tắt
-      edata.flags.rualoc = 0;
-      if (edata.LLG1_RL != 0) {
-        Blynk.virtualWrite(V_LL_RUALOC, LLG1_1m3 - edata.LLG1_RL);
-        edata.LLG1_RL = 0;
-        savedata();
-      }
+      stopRualoc();
       break;
     }
     case 1: { // RL 1
-      edata.flags.rualoc = 1;
-      if (edata.LLG1_RL == 0) {
-        edata.LLG1_RL = LLG1_1m3;
-      }
+      startRualoc();
       break;
     }
     }
-    savedata();
+    Blynk.virtualWrite(V_RUALOC, edata.flags.rualoc);
   } else {
     Blynk.virtualWrite(V_RUALOC, edata.flags.rualoc);
   }
@@ -1259,28 +1385,8 @@ void setup() {
   // Hàm savedata() có cơ chế chống ghi thừa nên không ảnh hưởng hiệu suất.
   savedata();
 
-  pcf8575_1.begin();
-  pcf8575_1.pinMode(S0pin, OUTPUT);
-  pcf8575_1.pinMode(S1pin, OUTPUT);
-  pcf8575_1.pinMode(S2pin, OUTPUT);
-  pcf8575_1.pinMode(S3pin, OUTPUT);
-
-  pcf8575_1.pinMode(pin_G1, OUTPUT);
-  pcf8575_1.digitalWrite(pin_G1, HIGH);
-  pcf8575_1.pinMode(pin_B1, OUTPUT);
-  pcf8575_1.digitalWrite(pin_B1, HIGH);
-  pcf8575_1.pinMode(pin_NK1, OUTPUT);
-  pcf8575_1.digitalWrite(pin_NK1, HIGH);
-  pcf8575_1.pinMode(pin_fan, OUTPUT);
-  pcf8575_1.digitalWrite(pin_fan, HIGH);
-  pcf8575_1.pinMode(pin_P0, OUTPUT);
-  pcf8575_1.digitalWrite(pin_P0, HIGH);
-  pcf8575_1.pinMode(pin_P1, OUTPUT);
-  pcf8575_1.digitalWrite(pin_P1, HIGH);
-  pcf8575_1.pinMode(pin_P3, OUTPUT);
-  pcf8575_1.digitalWrite(pin_P3, HIGH);
-  pcf8575_1.pinMode(pin_P4, OUTPUT);
-  pcf8575_1.digitalWrite(pin_P4, HIGH);
+  initializePcf8575PreservingState();
+  resumeRualocAfterBoot();
 
   S.begin(9600, SWSERIAL_8N1);
   mb.begin(&S);
@@ -1313,6 +1419,7 @@ void setup() {
 void loop() {
   Blynk.run();
   timer.run();
+  processRualocCycle();
   mb.task(); // Xử lý các tác vụ Modbus ở chế độ nền
   controlPumpByWaterLevel();
 

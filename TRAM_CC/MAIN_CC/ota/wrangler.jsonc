@@ -11,7 +11,7 @@
     }
   ],
   "secrets": {
-    "required": ["TRAM_CC_OTA_KEY", "TRAM_SO_2_OTA_KEY"]
+    "required": ["TRAM_CC_OTA_KEY", "TRAM_SO_2_OTA_KEY", "TRAM_SO_3_VFD_OTA_KEY"]
   },
   "observability": {
     "enabled": true,
