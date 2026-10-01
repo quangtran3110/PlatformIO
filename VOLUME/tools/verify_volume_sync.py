@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """
-Static Verification Script for VOLUME Firmware Synchronization (Round 2).
-Ensures all 12 projects use the common core, have BLYNK_FIRMWARE_VERSION 260921.1,
-match the hardware/pin matrix, verify clean OTA flow in shared core,
+Static Verification Script for VOLUME Firmware Synchronization (Round 3).
+Ensures all 12 projects use the common core, have BLYNK_FIRMWARE_VERSION 261001.2,
+match the hardware/pin matrix, verify range-based private OTA flow,
 verify single PIN_TERMINAL definition, strict EEPROM read safety,
 and contain no secret leaks or leftover __CODEX_SET_ placeholders.
 """
@@ -16,7 +16,24 @@ from pathlib import Path
 WORKSPACE_DIR = Path(__file__).resolve().parent.parent
 SHARED_CORE_REL = "../../shared/volume_reader_core.h"
 SHARED_CORE_PATH = WORKSPACE_DIR / "shared" / "volume_reader_core.h"
-EXPECTED_FIRMWARE_VERSION = "260921.1"
+CLEAN_OTA_PATH = WORKSPACE_DIR / "shared" / "CleanRangeOta.h"
+EXPECTED_FIRMWARE_VERSION = "261001.2"
+OTA_WORKER_BASE = "https://tram-cc-private-ota.dieu-hanh-cap-nuoc.workers.dev"
+
+OTA_STATION_IDS = {
+    "TRAM1": "volume-tram1",
+    "TRAM_CC_G1": "volume-tram-cc-g1",
+    "TRAM_CC_G2": "volume-tram-cc-g2",
+    "TRAM_CC_G3": "volume-tram-cc-g3",
+    "TRAM2_G1": "volume-tram2-g1",
+    "TRAM2_G2": "volume-tram2-g2",
+    "TRAM2_G3": "volume-tram2-g3",
+    "TRAM2BPT": "volume-tram2bpt",
+    "TRAM3": "volume-tram3",
+    "TRAM3BPT": "volume-tram3bpt",
+    "TRAM4": "volume-tram4",
+    "TRAMBHD": "volume-trambhd",
+}
 
 EXPECTED_MATRIX = {
     "TRAM1": {
@@ -156,7 +173,7 @@ EXPECTED_MATRIX = {
 
 def run_checks() -> bool:
     print("=" * 75)
-    print("VOLUME Static Firmware Verification (Round 2)")
+    print("VOLUME Static Firmware Verification (Round 3)")
     print("=" * 75)
 
     total_checks = 0
@@ -204,23 +221,15 @@ def run_checks() -> bool:
         passed_checks += 1
         print("[PASS] Shared core: ESP.rtcUserMemoryWrite uses non-const uint32_t * pointer")
 
-    # Check clean OTA markers in core
+    # Check integration markers in the shared VOLUME core.
     ota_markers = [
-        "OTA_RTC_OFFSET_WORDS = 32",
-        "OTA_RTC_MAGIC = 0x4F544131UL",
-        "OTA_WIFI_TIMEOUT_MS = 45000UL",
-        "OTA_ERROR_WIFI_TIMEOUT = -1001",
-        "enum OtaRtcPhase",
-        "OtaRtcState",
-        "readOtaRtcState",
-        "writeOtaRtcState",
-        "clearOtaRtcState",
-        "cleanOtaProgress",
-        "runCleanOtaMode",
-        "handleOtaBootState",
-        "WiFi.persistent(false)",
-        "WIFI_NONE_SLEEP",
-        "ESP.wdtFeed()",
+        '#include "CleanRangeOta.h"',
+        "CleanRangeOta::handleBoot",
+        "CleanRangeOta::scheduleRequest",
+        "CleanRangeOta::service",
+        "ota_info:",
+        "ota_prepare:",
+        "persistState()",
     ]
     for marker in ota_markers:
         total_checks += 1
@@ -228,27 +237,38 @@ def run_checks() -> bool:
             errors.append(f"MISSING OTA MARKER in shared core: '{marker}'")
         else:
             passed_checks += 1
-    # Check that OTA_RTC_SUCCESS is recorded directly inside the ESPhttpUpdate.onEnd callback
     total_checks += 1
-    on_end_idx = core_content.find("ESPhttpUpdate.onEnd")
-    progress_idx = core_content.find("ESPhttpUpdate.onProgress", on_end_idx) if on_end_idx != -1 else -1
-    if on_end_idx == -1 or progress_idx == -1:
-        errors.append("MISSING: ESPhttpUpdate.onEnd callback structure not found in shared core")
+    if "ESPhttpUpdate.update" in core_content or "ESP8266httpUpdate.h" in core_content:
+        errors.append("FORBIDDEN: legacy monolithic ESPhttpUpdate remains in shared core")
     else:
-        on_end_block = core_content[on_end_idx:progress_idx]
-        if "writeOtaRtcState(OTA_RTC_SUCCESS" not in on_end_block:
-            errors.append("MISSING: writeOtaRtcState(OTA_RTC_SUCCESS) must be called inside ESPhttpUpdate.onEnd callback")
+        passed_checks += 1
+        print("[PASS] Shared core: legacy monolithic ESPhttpUpdate removed")
+
+    # Check the proven range downloader separately.
+    total_checks += 1
+    if not CLEAN_OTA_PATH.is_file():
+        errors.append(f"MISSING: range OTA module not found at {CLEAN_OTA_PATH}")
+    else:
+        range_ota = CLEAN_OTA_PATH.read_text(encoding="utf-8", errors="replace")
+        required_range_markers = [
+            "RTC_MAGIC = 0x4F544134UL",
+            "RANGE_SIZE = 4096UL",
+            "RANGE_RETRIES = 3",
+            "HTTP_CODE_PARTIAL_CONTENT",
+            "Content-Range",
+            "x-MD5",
+            "x-firmware-version",
+            "Update.setMD5",
+            "Update.isFinished",
+            "TOTAL_TIMEOUT_MS",
+            "MIN_HEAP_DURING_WRITE",
+        ]
+        missing = [marker for marker in required_range_markers if marker not in range_ota]
+        if missing:
+            errors.append("MISSING range OTA markers: " + ", ".join(missing))
         else:
             passed_checks += 1
-            print("[PASS] Shared core: OTA_RTC_SUCCESS is locked inside ESPhttpUpdate.onEnd callback before restart")
-
-    # Check bucket 10% progress logging in clean OTA
-    total_checks += 1
-    if "percent / 10" in core_content and "lastReportedProgressBucket" in core_content:
-        passed_checks += 1
-        print("[PASS] Shared core: clean OTA logs progress in 10% buckets with watchdog feed")
-    else:
-        errors.append("MISSING: Clean OTA 10% bucket progress logging logic")
+            print("[PASS] CleanRangeOta: 4 KB ranges, retries, version/MD5, heap and timeout gates verified")
 
     # Check i2c report fields
     i2c_markers = [
@@ -338,7 +358,6 @@ def run_checks() -> bool:
             "BlynkSimpleEsp8266.h",
             "ESP8266HTTPClient.h",
             "ESP8266WiFi.h",
-            "ESP8266httpUpdate.h",
             "I2C_eeprom.h",
             "RTClib.h",
             "TimeLib.h",
@@ -360,7 +379,7 @@ def run_checks() -> bool:
             else:
                 passed_checks += 1
 
-        # Must have firmware version 260921.1
+        # Must have the current firmware version.
         total_checks += 1
         if f'#define BLYNK_FIRMWARE_VERSION "{EXPECTED_FIRMWARE_VERSION}"' not in content:
             errors.append(f"{project_name}: Expected BLYNK_FIRMWARE_VERSION '{EXPECTED_FIRMWARE_VERSION}' not found")
@@ -460,10 +479,17 @@ def run_checks() -> bool:
         else:
             passed_checks += 1
 
-        # Check OTA URL contains project folder name
+        # Check private Worker station route and local secret include.
         total_checks += 1
-        if f"/VOLUME/{project_name}/" not in content:
-            errors.append(f"{project_name}: OTA URL does not point to its own folder '/VOLUME/{project_name}/'")
+        station_id = OTA_STATION_IDS[project_name]
+        expected_route = f'{OTA_WORKER_BASE}/{station_id}/'
+        if (
+            expected_route not in content
+            or 'VOLUME_OTA_KEY' not in content
+            or '#include "ota_private.h"' not in content
+            or "raw.githubusercontent.com" in content
+        ):
+            errors.append(f"{project_name}: private OTA route/key integration is incorrect for '{station_id}'")
         else:
             passed_checks += 1
 

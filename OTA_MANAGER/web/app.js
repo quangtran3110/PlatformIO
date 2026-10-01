@@ -4,6 +4,7 @@ const state = {
   cloudflare: null,
   device: null,
   activeJobId: null,
+  lastJobId: null,
   pendingAction: null,
 };
 
@@ -127,17 +128,20 @@ function updateActionButtons(station) {
 
   buildButton.disabled = !station?.projectExists || !station?.platformioExists || busy;
   publishButton.disabled =
-    !station?.binary || !station?.otaConfigured || !cloudflareReady || station?.releaseMatchesBinary || busy;
+    !station?.binary || !station?.binaryCurrent || !station?.otaConfigured || !cloudflareReady || station?.releaseMatchesBinary || busy;
   otaButton.disabled = !station?.releaseMatchesBinary || !deviceReady || alreadyInstalled || busy;
 
-  buildButton.classList.toggle("is-complete", Boolean(station?.binary));
+  buildButton.classList.toggle("is-complete", Boolean(station?.binaryCurrent));
   publishButton.classList.toggle("is-complete", Boolean(station?.releaseMatchesBinary));
   otaButton.classList.toggle("is-complete", Boolean(alreadyInstalled && station?.releaseMatchesBinary));
 
   if (station?.releaseMatchesBinary) {
     publishButton.querySelector("small").textContent = "Binary đã khớp Cloudflare";
   } else {
-    publishButton.querySelector("small").textContent = "Tải lên và đối chiếu Cloudflare";
+    const writeEstimate = Number.isFinite(station?.estimatedKvWrites)
+      ? ` · khoảng ${station.estimatedKvWrites} lượt ghi`
+      : "";
+    publishButton.querySelector("small").textContent = `Tải lên Cloudflare${writeEstimate}`;
   }
   if (alreadyInstalled) {
     otaButton.querySelector("small").textContent = "Thiết bị đã ở phiên bản này";
@@ -148,6 +152,54 @@ function updateActionButtons(station) {
   }
 }
 
+function updateNextAction(station) {
+  const icon = $("#next-action-icon");
+  const title = $("#next-action-title");
+  const message = $("#next-action-message");
+  const actionButton = $("#next-action-button");
+  const set = (step, heading, detail, tone = "") => {
+    icon.textContent = step;
+    title.textContent = heading;
+    message.textContent = detail;
+    $("#next-action").className = `next-action ${tone}`.trim();
+    actionButton.hidden = true;
+  };
+
+  if (!station?.projectExists || !station?.platformioExists) {
+    set("!", "Cần kiểm tra thư mục dự án", "Ứng dụng chưa tìm thấy dự án PlatformIO của trạm này.", "is-warning");
+    return;
+  }
+  if (station?.busy || state.activeJobId) {
+    set("…", "Ứng dụng đang làm việc", "Hãy chờ tác vụ hiện tại hoàn tất; bạn không cần thao tác thêm.");
+    return;
+  }
+  if (station.release?.version === station.sourceVersion && !station.releaseMatchesBinary) {
+    set("!", `Hãy đổi phiên bản ${station.sourceVersion}`, `Phiên bản này đã từng phát hành với file khác. Tăng số phiên bản rồi Build lại.`, "is-warning");
+    actionButton.hidden = false;
+    return;
+  }
+  if (!station?.binaryCurrent) {
+    set("1", "Bấm “Build firmware”", "Ứng dụng sẽ tạo và kiểm tra file firmware trên máy.");
+    return;
+  }
+  if (!station.releaseMatchesBinary) {
+    const writeEstimate = Number.isFinite(station?.estimatedKvWrites)
+      ? ` Dự kiến dùng khoảng ${station.estimatedKvWrites}/1.000 lượt ghi miễn phí trong ngày.`
+      : "";
+    set("2", "Bấm “Phát hành”", `File firmware sẽ được tải lên Cloudflare rồi tải ngược để kiểm tra chính xác.${writeEstimate}`);
+    return;
+  }
+  if (!state.device?.connected) {
+    set("!", "Thiết bị đang Offline", "Không thể OTA lúc này. Hãy kiểm tra nguồn và mạng của trạm rồi bấm Làm mới.", "is-warning");
+    return;
+  }
+  if (state.device?.versionVerified && state.device.deviceVersion === station.sourceVersion) {
+    set("✓", "Trạm đã cập nhật xong", `Thiết bị đang chạy đúng phiên bản ${station.sourceVersion}.`, "is-success");
+    return;
+  }
+  set("3", "Sẵn sàng cập nhật OTA", "Bấm “Cập nhật OTA”, đọc xác nhận và nhập đúng tên trạm.", "is-ready");
+}
+
 function renderSelectedStation() {
   const station = selectedStation();
   if (!station) return;
@@ -155,7 +207,11 @@ function renderSelectedStation() {
   $("#station-name").textContent = station.name;
   $("#station-path").textContent = station.projectPath;
   $("#source-version").textContent = station.sourceVersion || "—";
-  $("#binary-version").textContent = station.binary ? station.sourceVersion || "Có file" : "Chưa build";
+  $("#binary-version").textContent = station.binaryCurrent
+    ? station.sourceVersion || "Có file"
+    : station.binary
+      ? "Cần build lại"
+      : "Chưa build";
   $("#binary-meta").textContent = station.binary
     ? `${formatBytes(station.binary.size)} · ${station.binary.sha256.slice(0, 10).toUpperCase()}…`
     : "Chưa có firmware.bin";
@@ -164,7 +220,11 @@ function renderSelectedStation() {
 
   const online = Boolean(state.device?.connected);
   const networkQualityLabels = {
+    2: "Tốt",
+    1: "Dùng được",
+    0: "Kém / mất mạng",
     Tot: "Tốt",
+    "Du van hanh": "Dùng được",
     TrungBinh: "Trung bình",
     Kem: "Kém",
   };
@@ -188,15 +248,43 @@ function renderSelectedStation() {
       : "Đang đọc trạng thái Blynk";
   }
 
+  const otaStatusLabels = {
+    success: "Thành công",
+    none: "Chưa có",
+    "failed (-1013)": "Từ chối: thiếu RAM trước cập nhật",
+    "failed (-1014)": "Từ chối: thiếu RAM sau khi chuẩn bị",
+    "failed (-1015)": "Đã dừng: RAM xuống thấp khi ghi",
+  };
+  $("#last-ota-status").textContent =
+    otaStatusLabels[state.device?.lastOtaStatus] || state.device?.lastOtaStatus || "Chưa đọc được";
+  $("#free-heap").textContent = Number.isFinite(state.device?.freeHeap)
+    ? `${Math.round(state.device.freeHeap / 1024)} KB`
+    : "Chưa đọc được";
+  const otaMinHeap = state.device?.otaMinHeap;
+  const otaMinHeapElement = $("#ota-min-heap");
+  otaMinHeapElement.classList.remove("is-good", "is-warning", "is-danger");
+  if (Number.isFinite(otaMinHeap)) {
+    const otaHeapStatus = otaMinHeap >= 3500
+      ? ["Đạt", "is-good"]
+      : otaMinHeap >= 2500
+        ? ["Thấp nhưng đạt", "is-warning"]
+        : ["Không an toàn", "is-danger"];
+    otaMinHeapElement.textContent = `${(otaMinHeap / 1024).toFixed(1)} KB · ${otaHeapStatus[0]}`;
+    otaMinHeapElement.classList.add(otaHeapStatus[1]);
+  } else {
+    otaMinHeapElement.textContent = "Chưa có dữ liệu";
+  }
+
   const checks = [
     station.projectExists && station.platformioExists,
     Boolean(station.sourceVersion),
-    Boolean(station.binary),
+    Boolean(station.binaryCurrent),
     Boolean(state.cloudflare?.connected),
   ];
   checks.forEach((ok, index) => setCheck(index, ok));
   $("#readiness-score").textContent = `${checks.filter(Boolean).length}/4`;
   updateActionButtons(station);
+  updateNextAction(station);
 }
 
 async function loadStations() {
@@ -248,6 +336,7 @@ function historyLabel(type) {
     ota: "Gửi lệnh OTA",
     "station-added": "Thêm dự án",
     "cloudflare-connect": "Kết nối Cloudflare",
+    "version-bump": "Tạo phiên bản mới",
   }[type] || type;
 }
 
@@ -289,6 +378,7 @@ function jobStatusLabel(status) {
 
 async function monitorJob(jobId) {
   state.activeJobId = jobId;
+  state.lastJobId = jobId;
   const consolePanel = $("#job-console");
   consolePanel.hidden = false;
   let finished = false;
@@ -311,20 +401,53 @@ async function monitorJob(jobId) {
   }
 }
 
+async function getCurrentLog() {
+  if (!state.lastJobId) throw new Error("Chưa có tác vụ để lấy log.");
+  return apiGet(`/api/jobs/${state.lastJobId}/log`);
+}
+
+$("#copy-log").addEventListener("click", async () => {
+  try {
+    const log = await getCurrentLog();
+    await navigator.clipboard.writeText(log.text);
+    showToast("Đã sao chép log chẩn đoán.");
+  } catch (error) {
+    showToast(error.message || "Không thể sao chép log.");
+  }
+});
+
+$("#download-log").addEventListener("click", async () => {
+  try {
+    const log = await getCurrentLog();
+    const url = URL.createObjectURL(new Blob([log.text], { type: "text/plain;charset=utf-8" }));
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = log.filename;
+    link.click();
+    URL.revokeObjectURL(url);
+    showToast("Đã tải log chẩn đoán.");
+  } catch (error) {
+    showToast(error.message || "Không thể tải log.");
+  }
+});
+
 function configureConfirmDialog(action, station) {
   state.pendingAction = action;
   const isOta = action === "ota";
-  $("#confirm-eyebrow").textContent = isOta ? "Thao tác thiết bị" : "Phát hành firmware";
-  $("#confirm-title").textContent = isOta ? `OTA ${station.name}` : `Phát hành ${station.sourceVersion}`;
+  const isBump = action === "bump-version";
+  $("#confirm-eyebrow").textContent = isOta ? "Thao tác thiết bị" : isBump ? "Chuẩn bị firmware" : "Phát hành firmware";
+  $("#confirm-title").textContent = isOta ? `OTA ${station.name}` : isBump ? "Tạo phiên bản mới" : `Phát hành ${station.sourceVersion}`;
   $("#confirm-message").textContent = isOta
     ? `Firmware đã được xác minh. OTA sẽ khởi động lại ${station.name}, chờ thiết bị kết nối lại và tự đọc đúng phiên bản qua Terminal.`
-    : `Ứng dụng sẽ build lại, tải firmware ${station.sourceVersion} lên Cloudflare và tải ngược để so hash.`;
+    : isBump
+      ? `Ứng dụng sẽ tăng ${station.sourceVersion} thành phiên bản kế tiếp. Sau đó bạn chỉ cần bấm Build firmware.`
+      : `Ứng dụng sẽ tải file firmware ${station.sourceVersion} lên Cloudflare rồi tải ngược để kiểm tra. Thao tác này chưa khởi động lại thiết bị.`;
   $("#restart-confirm-row").hidden = !isOta;
   $("#name-confirm-row").hidden = !isOta;
   $("#restart-confirm").checked = false;
   $("#name-confirm").value = "";
   $("#name-confirm").placeholder = station.name;
-  $("#confirm-submit").textContent = isOta ? "Xác nhận OTA" : "Phát hành";
+  $("#confirm-submit").textContent = isOta ? "Xác nhận OTA" : isBump ? "Tạo phiên bản" : "Phát hành";
   $("#confirm-submit").disabled = isOta;
 }
 
@@ -339,7 +462,7 @@ function validateConfirmDialog() {
 async function runAction(action) {
   const station = selectedStation();
   if (!station) return;
-  if (["publish", "ota"].includes(action)) {
+  if (["bump-version", "publish", "ota"].includes(action)) {
     configureConfirmDialog(action, station);
     $("#confirm-dialog").showModal();
     return;
@@ -365,7 +488,13 @@ $("#confirm-form").addEventListener("submit", async (event) => {
   if ($("#confirm-submit").disabled) return;
   $("#confirm-dialog").close();
   try {
-    if (action === "publish") {
+    if (action === "bump-version") {
+      const result = await apiPost(`/api/stations/${station.id}/bump-version`, {
+        currentVersion: station.sourceVersion,
+      });
+      showToast(`Đã tạo phiên bản ${result.version}. Tiếp theo hãy Build firmware.`);
+      await refreshAll();
+    } else if (action === "publish") {
       const job = await apiPost(`/api/stations/${station.id}/publish`);
       monitorJob(job.id);
     } else if (action === "ota") {
@@ -412,6 +541,7 @@ $("#refresh").addEventListener("click", async () => {
 });
 $("#refresh-history").addEventListener("click", loadHistory);
 $("#add-station").addEventListener("click", () => $("#station-dialog").showModal());
+$("#next-action-button").addEventListener("click", () => runAction("bump-version"));
 
 $("#open-project").addEventListener("click", async () => {
   const station = selectedStation();

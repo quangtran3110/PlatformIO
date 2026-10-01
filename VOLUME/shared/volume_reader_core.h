@@ -6,7 +6,6 @@
 #include <BlynkSimpleEsp8266.h>
 #include <ESP8266HTTPClient.h>
 #include <ESP8266WiFi.h>
-#include <ESP8266httpUpdate.h>
 #include <I2C_eeprom.h>
 #include <RTClib.h>
 #include <SPI.h>
@@ -14,6 +13,7 @@
 #include <WiFiClientSecure.h>
 #include <UrlEncode.h>
 #include <Wire.h>
+#include "CleanRangeOta.h"
 
 #ifndef BLYNK_API_BASE
 constexpr const char *BLYNK_API_BASE = "https://sgp1.blynk.cloud/external/api/";
@@ -47,28 +47,6 @@ constexpr uint32_t MAX_VALID_PULSE_WIDTH_US = 5200000UL;
 constexpr uint32_t PULSE_INACTIVE_CONFIRM_US = 200000UL;
 constexpr uint32_t MAX_TOTAL_INACTIVE_GLITCH_US = 500000UL;
 constexpr uint16_t HTTP_TIMEOUT_MS = 5000;
-
-// Cấu hình OTA sạch qua RTC user memory
-// Offset 32 words = 128 byte; eboot dung 128 byte dau tien trong RTC memory
-constexpr uint32_t OTA_RTC_OFFSET_WORDS = 32;
-constexpr uint32_t OTA_RTC_MAGIC = 0x4F544131UL; // "OTA1"
-constexpr uint32_t OTA_WIFI_TIMEOUT_MS = 45000UL;
-constexpr int32_t OTA_ERROR_WIFI_TIMEOUT = -1001;
-
-enum OtaRtcPhase : uint32_t {
-  OTA_RTC_NONE = 0,
-  OTA_RTC_REQUESTED = 1,
-  OTA_RTC_RUNNING = 2,
-  OTA_RTC_SUCCESS = 3,
-  OTA_RTC_FAILED = 4,
-};
-
-struct OtaRtcState {
-  uint32_t magic;
-  uint32_t phase;
-  int32_t error;
-  uint32_t check;
-};
 
 struct __attribute__((packed)) PersistedState {
   uint32_t magic;
@@ -153,35 +131,6 @@ uint32_t lastRtcSyncDayKey = 0;
 
 String terminalText;
 String lastOtaStatus = "none";
-int lastReportedProgressBucket = -1;
-
-uint32_t calcOtaCheck(const OtaRtcState &s) {
-  return s.magic ^ s.phase ^ static_cast<uint32_t>(s.error) ^ 0x5A5AA5A5UL;
-}
-
-bool readOtaRtcState(OtaRtcState &otaState) {
-  if (!ESP.rtcUserMemoryRead(OTA_RTC_OFFSET_WORDS, reinterpret_cast<uint32_t *>(&otaState), sizeof(otaState))) {
-    return false;
-  }
-  if (otaState.magic != OTA_RTC_MAGIC) {
-    return false;
-  }
-  return otaState.check == calcOtaCheck(otaState);
-}
-
-bool writeOtaRtcState(uint32_t phase, int32_t error = 0) {
-  OtaRtcState otaState = {};
-  otaState.magic = OTA_RTC_MAGIC;
-  otaState.phase = phase;
-  otaState.error = error;
-  otaState.check = calcOtaCheck(otaState);
-  return ESP.rtcUserMemoryWrite(OTA_RTC_OFFSET_WORDS, reinterpret_cast<uint32_t *>(&otaState), sizeof(otaState));
-}
-
-void clearOtaRtcState() {
-  OtaRtcState otaState = {};
-  ESP.rtcUserMemoryWrite(OTA_RTC_OFFSET_WORDS, reinterpret_cast<uint32_t *>(&otaState), sizeof(otaState));
-}
 
 uint16_t crc16Ccitt(const uint8_t *buffer, size_t length) {
   uint16_t crc = 0xFFFF;
@@ -917,109 +866,6 @@ void connectionStatus() {
   }
 }
 
-void cleanOtaProgress(int current, int total) {
-  ESP.wdtFeed();
-  if (total <= 0) {
-    return;
-  }
-  int percent = (current * 100) / total;
-  int bucket = percent / 10;
-  if (bucket != lastReportedProgressBucket) {
-    lastReportedProgressBucket = bucket;
-    Serial.printf("OTA: tien do %d%% (%d / %d bytes)\n", bucket * 10, current, total);
-  }
-}
-
-void runCleanOtaMode() {
-  Serial.println(F("--- KHOI DONG VAO CHE DO OTA SACH ---"));
-  WiFi.persistent(false);
-  WiFi.mode(WIFI_STA);
-  WiFi.setSleepMode(WIFI_NONE_SLEEP);
-  WiFi.begin(ssid, password);
-
-  uint32_t startMs = millis();
-  while (WiFi.status() != WL_CONNECTED && (millis() - startMs) < OTA_WIFI_TIMEOUT_MS) {
-    ESP.wdtFeed();
-    delay(100);
-  }
-
-  if (WiFi.status() != WL_CONNECTED) {
-    Serial.println(F("OTA: ket noi WiFi timeout sau 45 giay"));
-    writeOtaRtcState(OTA_RTC_FAILED, OTA_ERROR_WIFI_TIMEOUT);
-    delay(500);
-    ESP.restart();
-    return;
-  }
-
-  Serial.printf("OTA: WiFi san sang IP=%s, bat dau nap firmware tu %s\n",
-                WiFi.localIP().toString().c_str(), URL_fw_Bin);
-
-  BearSSL::WiFiClientSecure updateClient;
-  updateClient.setInsecure();
-
-  lastReportedProgressBucket = -1;
-  ESPhttpUpdate.onStart([]() {
-    lastReportedProgressBucket = -1;
-    Serial.println(F("CALLBACK: HTTP update process started"));
-  });
-  ESPhttpUpdate.onEnd([]() {
-    Serial.println(F("CALLBACK: HTTP update process finished"));
-    if (!writeOtaRtcState(OTA_RTC_SUCCESS, 0)) {
-      Serial.println(F("OTA: onEnd khong ghi duoc OTA_RTC_SUCCESS vao RTC memory"));
-    }
-  });
-  ESPhttpUpdate.onProgress(cleanOtaProgress);
-  ESPhttpUpdate.onError([](int error) {
-    Serial.printf("CALLBACK: HTTP update fatal error code %d\n", error);
-  });
-
-  t_httpUpdate_return result = ESPhttpUpdate.update(updateClient, URL_fw_Bin);
-  switch (result) {
-  case HTTP_UPDATE_FAILED: {
-    int lastError = ESPhttpUpdate.getLastError();
-    Serial.printf("HTTP_UPDATE_FAILED Error (%d): %s\n", lastError,
-                  ESPhttpUpdate.getLastErrorString().c_str());
-    writeOtaRtcState(OTA_RTC_FAILED, lastError);
-    break;
-  }
-  case HTTP_UPDATE_NO_UPDATES:
-    Serial.println(F("HTTP_UPDATE_NO_UPDATES"));
-    writeOtaRtcState(OTA_RTC_FAILED, -2);
-    break;
-  case HTTP_UPDATE_OK:
-    Serial.println(F("HTTP_UPDATE_OK"));
-    writeOtaRtcState(OTA_RTC_SUCCESS, 0);
-    break;
-  }
-
-  delay(500);
-  ESP.restart();
-}
-
-bool handleOtaBootState() {
-  OtaRtcState otaState = {};
-  if (!readOtaRtcState(otaState)) {
-    return false;
-  }
-
-  if (otaState.phase == OTA_RTC_REQUESTED) {
-    writeOtaRtcState(OTA_RTC_RUNNING);
-    runCleanOtaMode();
-    return true;
-  }
-
-  if (otaState.phase == OTA_RTC_SUCCESS) {
-    lastOtaStatus = "success";
-  } else if (otaState.phase == OTA_RTC_FAILED) {
-    lastOtaStatus = "failed (" + String(otaState.error) + ")";
-  } else if (otaState.phase == OTA_RTC_RUNNING) {
-    lastOtaStatus = "interrupted/reset";
-  }
-  Serial.println("Last OTA: " + lastOtaStatus);
-  clearOtaRtcState();
-  return false;
-}
-
 void printTerminalDevice() {
   Serial.println(terminalText);
   String messageUrl = String(BLYNK_API_BASE) + "batch/update?token=" +
@@ -1039,6 +885,9 @@ void scanI2cOnce() {
   String report = "Firmware: " BLYNK_FIRMWARE_VERSION "\n";
   report += "Reset: " + ESP.getResetReason() + "\n";
   report += "Last OTA: " + lastOtaStatus + "\n";
+  if (CleanRangeOta::lastMinimumHeap() > 0) {
+    report += "OTA min heap: " + String(CleanRangeOta::lastMinimumHeap()) + "\n";
+  }
   report += "Heap: " + String(ESP.getFreeHeap()) +
             ", max block: " + String(ESP.getMaxFreeBlockSize()) + "\n";
   report += "I2C scan:\n";
@@ -1081,24 +930,50 @@ BLYNK_WRITE(InternalPinRTC) {
 
 BLYNK_WRITE(V0) {
   String command = param.asStr();
-  if (command == "rst") {
+  if (command.startsWith("ota_info:")) {
+    String requestId = command.substring(9);
+    if (requestId.length() != 12) return;
+    terminalText = "ota_reply:" + requestId +
+                   "|version=" BLYNK_FIRMWARE_VERSION +
+                   "|last=" + CleanRangeOta::lastStatus() +
+                   "|heap=" + String(ESP.getFreeHeap());
+    if (CleanRangeOta::lastMinimumHeap() > 0) {
+      terminalText += "|ota_min=" + String(CleanRangeOta::lastMinimumHeap());
+    }
+    printTerminalDevice();
+  } else if (command.startsWith("ota_prepare:")) {
+    String requestId = command.substring(12);
+    if (requestId.length() != 12) return;
+    if (!persistState()) {
+      terminalText = "ota_reject:" + requestId + "|reason=persist";
+    } else if (!CleanRangeOta::scheduleRequest(1200UL)) {
+      terminalText = "ota_reject:" + requestId + "|reason=rtc";
+    } else {
+      terminalText = "ota_accept:" + requestId +
+                     "|version=" BLYNK_FIRMWARE_VERSION;
+    }
+    printTerminalDevice();
+    apiClient.stop();
+  } else if (command == "rst") {
     persistState();
     terminalText = "ESP khoi dong lai sau 3s";
     printTerminalDevice();
     delay(3000);
     ESP.restart();
   } else if (command == "update") {
-    persistState();
-    terminalText = "Da nhan lenh OTA; ESP se khoi dong vao che do cap nhat sach";
-    printTerminalDevice();
-    apiClient.stop();
-    if (!writeOtaRtcState(OTA_RTC_REQUESTED)) {
+    if (!persistState()) {
+      terminalText = "OTA error: khong luu duoc du lieu hien tai";
+      printTerminalDevice();
+      return;
+    }
+    if (!CleanRangeOta::scheduleRequest(1200UL)) {
       terminalText = "OTA error: khong ghi duoc yeu cau vao RTC memory";
       printTerminalDevice();
       return;
     }
-    delay(250);
-    ESP.restart();
+    terminalText = "Da nhan lenh OTA; ESP se khoi dong vao che do cap nhat sach";
+    printTerminalDevice();
+    apiClient.stop();
   } else if (command == "rst_vl") {
     noInterrupts();
     pulseCount = 0;
@@ -1123,9 +998,11 @@ void setup() {
   Serial.begin(115200);
 
   // Kiem tra trang thai OTA sach tu RTC memory truoc khi khoi tao bat ky dich vu nao
-  if (handleOtaBootState()) {
+  if (CleanRangeOta::handleBoot(ssid, password, URL_fw_Bin,
+                                BLYNK_FIRMWARE_VERSION)) {
     return;
   }
+  lastOtaStatus = CleanRangeOta::lastStatus();
 
   setupWifiDiagnostics();
   WiFi.mode(WIFI_STA);
@@ -1186,6 +1063,7 @@ void setup() {
 }
 
 void loop() {
+  CleanRangeOta::service();
   Blynk.run();
   timer.run();
 }

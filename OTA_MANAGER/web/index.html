@@ -62,6 +62,16 @@
           </div>
         </section>
 
+        <section class="next-action" id="next-action" aria-live="polite">
+          <span class="next-action-icon" id="next-action-icon">1</span>
+          <div>
+            <span class="eyebrow">Bạn cần làm gì?</span>
+            <strong id="next-action-title">Đang kiểm tra trạm…</strong>
+            <p id="next-action-message">Vui lòng chờ vài giây.</p>
+          </div>
+          <button class="button button-next" type="button" id="next-action-button" hidden>Tạo phiên bản mới</button>
+        </section>
+
         <section class="version-lane" aria-label="Trạng thái phiên bản">
           <article class="version-card">
             <span>Mã nguồn</span>
@@ -140,6 +150,11 @@
               <li><i></i><span>Có binary trên máy</span></li>
               <li><i></i><span>Phiên đăng nhập Cloudflare đã lưu</span></li>
             </ul>
+            <div class="device-health">
+              <div><span>OTA gần nhất</span><strong id="last-ota-status">—</strong></div>
+              <div><span>Bộ nhớ trống</span><strong id="free-heap">—</strong></div>
+              <div><span>RAM thấp nhất khi OTA</span><strong id="ota-min-heap">—</strong></div>
+            </div>
           </article>
 
           <article class="panel activity-panel">
@@ -166,7 +181,11 @@
               <span class="eyebrow">Tác vụ đang chạy</span>
               <h2 id="job-title">Đang xử lý</h2>
             </div>
-            <span class="job-state" id="job-state">Đang chờ</span>
+            <div class="job-head-actions">
+              <button class="text-button" type="button" id="copy-log">Sao chép log</button>
+              <button class="text-button" type="button" id="download-log">Tải log</button>
+              <span class="job-state" id="job-state">Đang chờ</span>
+            </div>
           </div>
           <pre id="job-log" aria-live="polite"></pre>
         </section>

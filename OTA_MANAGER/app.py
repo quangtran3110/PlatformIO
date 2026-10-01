@@ -26,11 +26,13 @@ CONFIG_PATH = APP_ROOT / "config" / "stations.json"
 SETTINGS_PATH = APP_ROOT / "config" / "settings.json"
 DATA_ROOT = APP_ROOT / "data"
 HISTORY_PATH = DATA_ROOT / "history.json"
+LOGS_ROOT = DATA_ROOT / "logs"
 HOST = "127.0.0.1"
 PORT = 8765
 API_HEADER = "X-OTA-Manager"
 API_HEADER_VALUE = "local-ui"
 MAX_JOB_LOG_LINES = 1200
+KV_RELEASE_CHUNK_SIZE = 16 * 1024
 
 JOBS: dict[str, dict[str, Any]] = {}
 JOBS_LOCK = threading.Lock()
@@ -130,23 +132,100 @@ def strip_cpp_comments(source: str) -> str:
     return "".join(output)
 
 
+def cpp_string_definitions(*sources: str) -> dict[str, str]:
+    definitions: dict[str, str] = {}
+    for source in sources:
+        active = strip_cpp_comments(source)
+        for match in re.finditer(
+            r'(?m)^\s*#define\s+([A-Za-z_]\w*)\s+"((?:\\.|[^"\\])*)"\s*$',
+            active,
+        ):
+            try:
+                definitions[match.group(1)] = json.loads(f'"{match.group(2)}"')
+            except json.JSONDecodeError:
+                continue
+    return definitions
+
+
+def resolve_cpp_string_expression(expression: str, definitions: dict[str, str]) -> str | None:
+    parts: list[str] = []
+    cursor = 0
+    token_pattern = re.compile(r'\s*(?:"((?:\\.|[^"\\])*)"|([A-Za-z_]\w*))')
+    for match in token_pattern.finditer(expression):
+        if expression[cursor:match.start()].strip():
+            return None
+        cursor = match.end()
+        if match.group(1) is not None:
+            try:
+                parts.append(json.loads(f'"{match.group(1)}"'))
+            except json.JSONDecodeError:
+                return None
+        else:
+            value = definitions.get(match.group(2))
+            if value is None:
+                return None
+            parts.append(value)
+    if expression[cursor:].strip() or not parts:
+        return None
+    return "".join(parts)
+
+
 def parse_source(station: dict[str, Any]) -> dict[str, Any]:
     source_path = source_path_for(station)
     if not source_path.exists():
-        return {"version": None, "otaUrl": None, "blynkToken": None, "error": "Không tìm thấy src/main.cpp"}
+        return {"version": None, "otaUrl": None, "blynkToken": None, "updatedAt": None, "error": "Không tìm thấy src/main.cpp"}
     source = source_path.read_text(encoding="utf-8", errors="replace")
     # Ignore old credentials and settings kept inside C/C++ comments. Several
     # station projects retain a commented legacy token above the active one.
     active_source = strip_cpp_comments(source)
     version_match = re.search(r'(?m)^\s*#define\s+BLYNK_FIRMWARE_VERSION\s+"([^"]+)"', active_source)
-    ota_match = re.search(r'(?m)^\s*#define\s+URL_fw_Bin\s+"([^"]+)"', active_source)
+    ota_match = re.search(r'(?m)^\s*#define\s+URL_fw_Bin\s+(.+?)\s*$', active_source)
     token_match = re.search(r'(?m)^\s*#define\s+BLYNK_AUTH_TOKEN\s+"([^"]+)"', active_source)
+    definition_sources = [active_source]
+    for secret_path in (
+        project_path_for(station) / "include" / "secrets.h",
+        source_path.parent / "ota_private.h",
+    ):
+        if secret_path.is_file():
+            definition_sources.append(secret_path.read_text(encoding="utf-8", errors="replace"))
+    definitions = cpp_string_definitions(*definition_sources)
+    ota_url = resolve_cpp_string_expression(ota_match.group(1), definitions) if ota_match else None
     return {
         "version": version_match.group(1) if version_match else None,
-        "otaUrl": ota_match.group(1) if ota_match else None,
+        "otaUrl": ota_url,
         "blynkToken": token_match.group(1) if token_match else None,
+        "updatedAt": datetime.fromtimestamp(source_path.stat().st_mtime, tz=timezone.utc).isoformat(),
         "error": None if version_match else "Không tìm thấy BLYNK_FIRMWARE_VERSION",
     }
+
+
+def next_firmware_version(version: str) -> str:
+    parts = version.split(".")
+    if len(parts) < 2 or not all(part.isdigit() for part in parts):
+        raise ValueError("Version hiện tại không theo dạng số, ví dụ 260929.8.")
+    parts[-1] = str(int(parts[-1]) + 1)
+    return ".".join(parts)
+
+
+def bump_firmware_version(station: dict[str, Any], expected_current: str | None = None) -> dict[str, str]:
+    source_path = source_path_for(station)
+    parsed = parse_source(station)
+    current = parsed.get("version")
+    if not current:
+        raise ValueError("Không đọc được version hiện tại trong main.cpp.")
+    if expected_current and expected_current != current:
+        raise ValueError(f"Version đã thay đổi thành {current}; hãy làm mới giao diện.")
+    updated = next_firmware_version(current)
+    source = source_path.read_text(encoding="utf-8")
+    pattern = re.compile(rf'(?m)^(\s*#define\s+BLYNK_FIRMWARE_VERSION\s+"){re.escape(current)}("\s*)$')
+    revised, count = pattern.subn(rf"\g<1>{updated}\g<2>", source)
+    if count != 1:
+        raise ValueError("Không thể đổi version an toàn; cần kiểm tra dòng BLYNK_FIRMWARE_VERSION.")
+    temp_path = source_path.with_suffix(source_path.suffix + ".ota-manager.tmp")
+    temp_path.write_text(revised, encoding="utf-8")
+    temp_path.replace(source_path)
+    append_history({"stationId": station["id"], "type": "version-bump", "status": "success", "from": current, "to": updated})
+    return {"previousVersion": current, "version": updated}
 
 
 def file_hashes(path: Path) -> dict[str, Any]:
@@ -184,21 +263,30 @@ def station_payload(station: dict[str, Any]) -> dict[str, Any]:
     source = parse_source(station)
     binary_path = binary_path_for(station)
     binary = file_hashes(binary_path) if binary_path.exists() else None
+    binary_current = bool(binary and source.get("updatedAt") and binary["updatedAt"] >= source["updatedAt"])
     manifest = manifest_for(station)
     release_matches = bool(
-        binary
+        binary_current
         and manifest
         and manifest.get("version") == source.get("version")
         and str(manifest.get("sha256", "")).lower() == binary["sha256"].lower()
         and int(manifest.get("size", -1)) == binary["size"]
     )
+    estimated_kv_writes = (
+        (binary["size"] + KV_RELEASE_CHUNK_SIZE - 1) // KV_RELEASE_CHUNK_SIZE + 2
+        if binary
+        else None
+    )
     return {
         **station,
         "sourceVersion": source["version"],
         "sourceError": source["error"],
+        "sourceUpdatedAt": source["updatedAt"],
         "projectExists": project_path.exists(),
         "platformioExists": (project_path / "platformio.ini").exists(),
         "binary": binary,
+        "binaryCurrent": binary_current,
+        "estimatedKvWrites": estimated_kv_writes,
         "release": manifest,
         "releaseMatchesBinary": release_matches,
         "otaConfigured": bool(source["otaUrl"]),
@@ -216,6 +304,52 @@ def append_history(event: dict[str, Any]) -> None:
         history = read_json(HISTORY_PATH, [])
         history.insert(0, {"at": utc_now(), **event})
         write_json_atomic(HISTORY_PATH, history[:250])
+
+
+def redact_for_station(station: dict[str, Any], value: object) -> str:
+    """Remove credentials and private OTA URLs before data reaches a log file."""
+    text = str(value)
+    source = parse_source(station) if station.get("projectPath") else {}
+    for secret in (source.get("blynkToken"), source.get("otaUrl")):
+        if secret:
+            text = text.replace(str(secret), "[DA_CHE]")
+    text = re.sub(r"https://[^\s]+/[^\s/]+/[^\s/]+/firmware\.bin(?:\?[^\s]*)?", "[URL_OTA_DA_CHE]", text)
+    text = re.sub(r"(?i)(token=)[^&\s]+", r"\1[DA_CHE]", text)
+    return text
+
+
+def job_log_path(job: dict[str, Any]) -> Path:
+    safe_station = re.sub(r"[^a-z0-9-]+", "-", str(job["stationId"]).lower()).strip("-") or "system"
+    stamp = str(job["createdAt"]).replace(":", "-").replace("+", "_")
+    return LOGS_ROOT / f"{stamp}_{safe_station}_{job['type']}_{job['id'][:8]}.log"
+
+
+def persist_job_line(job: dict[str, Any], message: str) -> str:
+    LOGS_ROOT.mkdir(parents=True, exist_ok=True)
+    clean = redact_for_station(job.get("station", {}), message)
+    line = f"[{utc_now()}] {clean}"
+    path = Path(job["logPath"])
+    with path.open("a", encoding="utf-8") as handle:
+        handle.write(line + "\n")
+    return line
+
+
+def initialize_job_log(job: dict[str, Any]) -> None:
+    job["logPath"] = str(job_log_path(job))
+    headers = [
+        "OTA MANAGER - NHAT KY CHAN DOAN",
+        f"Ma tac vu: {job['id']}",
+        f"Tram: {job['stationName']} ({job['stationId']})",
+        f"Thao tac: {job['type']}",
+        f"Bat dau tao: {job['createdAt']}",
+        "Thong tin nhay cam da duoc tu dong che.",
+    ]
+    for header in headers:
+        persist_job_line(job, header)
+
+
+def public_job(job: dict[str, Any]) -> dict[str, Any]:
+    return {key: value for key, value in job.items() if key not in {"station", "logPath"}}
 
 
 def active_job_for_station(station_id: str) -> dict[str, Any] | None:
@@ -243,6 +377,7 @@ def run_job(
         job = JOBS[job_id]
         job["status"] = "running"
         job["startedAt"] = utc_now()
+    append_job_log(job_id, "Bắt đầu tác vụ.")
     try:
         env = os.environ.copy()
         if environment:
@@ -261,20 +396,21 @@ def run_job(
         assert process.stdout is not None
         for line in process.stdout:
             clean = line.rstrip("\r\n")
-            with JOBS_LOCK:
-                JOBS[job_id]["logs"].append(clean)
-                JOBS[job_id]["logs"] = JOBS[job_id]["logs"][-MAX_JOB_LOG_LINES:]
+            append_job_log(job_id, clean)
         return_code = process.wait()
         if return_code != 0:
             raise RuntimeError(f"Tiến trình kết thúc với mã lỗi {return_code}")
         result = after_success() if after_success else {}
         with JOBS_LOCK:
             JOBS[job_id].update(status="success", completedAt=utc_now(), result=result)
-        append_history({"stationId": job["stationId"], "type": job["type"], "status": "success", "result": result})
+        append_job_log(job_id, "Tác vụ hoàn tất thành công.")
+        append_history({"stationId": job["stationId"], "type": job["type"], "status": "success", "result": result, "jobId": job_id, "logFile": Path(job["logPath"]).name})
     except Exception as exc:  # pragma: no cover - subprocess boundary
+        safe_error = redact_for_station(job.get("station", {}), exc)
         with JOBS_LOCK:
-            JOBS[job_id].update(status="failed", completedAt=utc_now(), error=str(exc))
-        append_history({"stationId": job["stationId"], "type": job["type"], "status": "failed", "error": str(exc)})
+            JOBS[job_id].update(status="failed", completedAt=utc_now(), error=safe_error)
+        append_job_log(job_id, f"THẤT BẠI: {safe_error}")
+        append_history({"stationId": job["stationId"], "type": job["type"], "status": "failed", "error": safe_error, "jobId": job_id, "logFile": Path(job["logPath"]).name})
 
 
 def create_job(
@@ -300,7 +436,9 @@ def create_job(
         "logs": [],
         "result": None,
         "error": None,
+        "station": station,
     }
+    initialize_job_log(job)
     with JOBS_LOCK:
         JOBS[job_id] = job
     thread = threading.Thread(
@@ -314,8 +452,10 @@ def create_job(
 
 def append_job_log(job_id: str, message: str) -> None:
     with JOBS_LOCK:
-        JOBS[job_id]["logs"].append(message)
-        JOBS[job_id]["logs"] = JOBS[job_id]["logs"][-MAX_JOB_LOG_LINES:]
+        job = JOBS[job_id]
+        line = persist_job_line(job, message)
+        job["logs"].append(line)
+        job["logs"] = job["logs"][-MAX_JOB_LOG_LINES:]
 
 
 def run_task_job(job_id: str, task: Callable[[str], dict[str, Any]]) -> None:
@@ -323,15 +463,19 @@ def run_task_job(job_id: str, task: Callable[[str], dict[str, Any]]) -> None:
         job = JOBS[job_id]
         job["status"] = "running"
         job["startedAt"] = utc_now()
+    append_job_log(job_id, "Bắt đầu tác vụ.")
     try:
         result = task(job_id)
         with JOBS_LOCK:
             JOBS[job_id].update(status="success", completedAt=utc_now(), result=result)
-        append_history({"stationId": job["stationId"], "type": job["type"], "status": "success", "result": result})
+        append_job_log(job_id, "Tác vụ hoàn tất thành công.")
+        append_history({"stationId": job["stationId"], "type": job["type"], "status": "success", "result": result, "jobId": job_id, "logFile": Path(job["logPath"]).name})
     except Exception as exc:  # pragma: no cover - network/device boundary
+        safe_error = redact_for_station(job.get("station", {}), exc)
         with JOBS_LOCK:
-            JOBS[job_id].update(status="failed", completedAt=utc_now(), error=str(exc))
-        append_history({"stationId": job["stationId"], "type": job["type"], "status": "failed", "error": str(exc)})
+            JOBS[job_id].update(status="failed", completedAt=utc_now(), error=safe_error)
+        append_job_log(job_id, f"THẤT BẠI: {safe_error}")
+        append_history({"stationId": job["stationId"], "type": job["type"], "status": "failed", "error": safe_error, "jobId": job_id, "logFile": Path(job["logPath"]).name})
 
 
 def create_task_job(
@@ -354,7 +498,9 @@ def create_task_job(
         "logs": [],
         "result": None,
         "error": None,
+        "station": station,
     }
+    initialize_job_log(job)
     with JOBS_LOCK:
         JOBS[job_id] = job
     thread = threading.Thread(target=run_task_job, args=(job_id, task), daemon=True)
@@ -433,13 +579,34 @@ def normalize_blynk_value(value: str) -> str:
     return clean
 
 
-def parse_terminal_version_reply(value: str, request_id: str) -> str | None:
+def parse_terminal_version_reply(value: str, request_id: str) -> dict[str, Any] | None:
     clean = normalize_blynk_value(value)
-    match = re.fullmatch(
-        rf"ota_reply:{re.escape(request_id)}\|version=([A-Za-z0-9._-]{{1,32}})",
-        clean,
-    )
-    return match.group(1) if match else None
+    prefix = f"ota_reply:{request_id}|"
+    if not clean.startswith(prefix):
+        return None
+    fields: dict[str, str] = {}
+    for part in clean[len(prefix):].split("|"):
+        if "=" not in part:
+            return None
+        key, value_part = part.split("=", 1)
+        if key in fields or key not in {"version", "last", "heap", "ota_min"}:
+            return None
+        fields[key] = value_part.strip()
+    version = fields.get("version", "")
+    if not re.fullmatch(r"[A-Za-z0-9._-]{1,32}", version):
+        return None
+    heap = fields.get("heap")
+    if heap is not None and not re.fullmatch(r"\d{1,10}", heap):
+        return None
+    ota_min_heap = fields.get("ota_min")
+    if ota_min_heap is not None and not re.fullmatch(r"\d{1,10}", ota_min_heap):
+        return None
+    return {
+        "version": version,
+        "lastOtaStatus": fields.get("last"),
+        "freeHeap": int(heap) if heap is not None else None,
+        "otaMinHeap": int(ota_min_heap) if ota_min_heap is not None else None,
+    }
 
 
 def parse_ota_start_reply(value: str, request_id: str) -> dict[str, str] | None:
@@ -526,10 +693,10 @@ def query_device_version(
     while time.monotonic() < deadline:
         try:
             value = blynk_request(station, "get", {pin: ""})
-            version = parse_terminal_version_reply(value, request_id)
-            if version:
+            reply = parse_terminal_version_reply(value, request_id)
+            if reply:
                 return {
-                    "version": version,
+                    **reply,
                     "terminalPin": pin,
                     "requestId": request_id,
                     "verifiedAt": utc_now(),
@@ -555,6 +722,9 @@ def blynk_status(station: dict[str, Any]) -> dict[str, Any]:
     version_verified = False
     version_error = None
     version_checked_at = None
+    last_ota_status = None
+    free_heap = None
+    ota_min_heap = None
     minimum_handshake_version = station.get("otaHandshakeVersion")
     can_query_version = not minimum_handshake_version or version_at_least(
         station.get("lastKnownDeviceVersion"), minimum_handshake_version
@@ -563,6 +733,9 @@ def blynk_status(station: dict[str, Any]) -> dict[str, Any]:
         try:
             version_result = query_device_version(station)
             device_version = version_result["version"]
+            last_ota_status = version_result.get("lastOtaStatus")
+            free_heap = version_result.get("freeHeap")
+            ota_min_heap = version_result.get("otaMinHeap")
             version_verified = True
             version_checked_at = version_result["verifiedAt"]
         except RuntimeError as exc:
@@ -576,6 +749,9 @@ def blynk_status(station: dict[str, Any]) -> dict[str, Any]:
         "versionVerified": version_verified,
         "versionError": version_error,
         "versionCheckedAt": version_checked_at,
+        "lastOtaStatus": last_ota_status,
+        "freeHeap": free_heap,
+        "otaMinHeap": ota_min_heap,
         "terminalPin": terminal_pin_for(station),
         "checkedAt": utc_now(),
     }
@@ -585,7 +761,7 @@ def execute_ota_and_verify(
     station: dict[str, Any],
     release: dict[str, Any],
     job_id: str,
-    timeout_seconds: float = 180.0,
+    timeout_seconds: float = 480.0,
 ) -> dict[str, Any]:
     pin = terminal_pin_for(station)
     expected_version = str(release.get("version") or parse_source(station).get("version") or "")
@@ -593,6 +769,7 @@ def execute_ota_and_verify(
         raise RuntimeError("Không xác định được phiên bản cần xác minh sau OTA.")
 
     append_job_log(job_id, f"Firmware {expected_version} đã khớp Cloudflare.")
+    append_job_log(job_id, f"SHA256: {release.get('sha256', 'không có')} · kích thước: {release.get('size', 'không có')} byte.")
     start_result = request_ota_start(station, job_id)
     sent_at = utc_now()
     append_job_log(job_id, "Đang chờ thiết bị khởi động lại và kết nối Blynk…")
@@ -624,15 +801,35 @@ def execute_ota_and_verify(
         if saw_offline and not announced_reconnect:
             append_job_log(job_id, "Thiết bị đã kết nối lại; đang đọc phiên bản qua Terminal…")
             announced_reconnect = True
-        if not saw_offline:
-            time.sleep(2.0)
-            continue
         try:
             version_result = query_device_version(station, timeout_seconds=5.0, poll_interval=0.5)
             last_version = version_result["version"]
             if last_version == expected_version:
+                ota_status = version_result.get("lastOtaStatus")
+                normalized_status = str(ota_status or "").strip().lower()
+                if normalized_status not in {"", "none", "success"}:
+                    raise RuntimeError(f"Thiết bị đã lên phiên bản mới nhưng tự báo OTA: {ota_status}.")
+                if not saw_offline and normalized_status != "success":
+                    last_error = (
+                        "Blynk chưa ghi nhận nhịp offline và thiết bị chưa xác nhận OTA thành công"
+                    )
+                    time.sleep(4.0)
+                    continue
+                if not saw_offline:
+                    append_job_log(
+                        job_id,
+                        "Blynk không ghi nhận nhịp offline ngắn; xác minh trực tiếp bằng phiên bản và trạng thái OTA.",
+                    )
                 remember_device_version(station["id"], last_version)
-                append_job_log(job_id, f"Đã xác minh thiết bị đang chạy phiên bản {last_version}.")
+                heap = version_result.get("freeHeap")
+                ota_min_heap = version_result.get("otaMinHeap")
+                health = f" · bộ nhớ trống {heap} byte" if heap is not None else ""
+                ota_health = (
+                    f" · RAM thấp nhất khi OTA {ota_min_heap} byte"
+                    if ota_min_heap is not None
+                    else ""
+                )
+                append_job_log(job_id, f"Đã xác minh thiết bị đang chạy phiên bản {last_version} · OTA {ota_status or 'không có trạng thái'}{health}{ota_health}.")
                 return {
                     "accepted": True,
                     "target": station["name"],
@@ -640,6 +837,9 @@ def execute_ota_and_verify(
                     "expectedVersion": expected_version,
                     "deviceVersion": last_version,
                     "versionVerified": True,
+                    "lastOtaStatus": ota_status,
+                    "freeHeap": heap,
+                    "otaMinHeap": ota_min_heap,
                     "sawOffline": saw_offline,
                     "commandMode": start_result["mode"],
                     "requestId": start_result["requestId"],
@@ -647,13 +847,21 @@ def execute_ota_and_verify(
                     "verifiedAt": version_result["verifiedAt"],
                     "release": release,
                 }
-            last_error = f"Thiết bị phản hồi phiên bản {last_version}, chưa phải {expected_version}."
+            if saw_offline:
+                ota_status = version_result.get("lastOtaStatus")
+                status_detail = f" · trạng thái OTA: {ota_status}" if ota_status else ""
+                last_error = (
+                    f"Thiết bị đã quay lại firmware cũ {last_version}, chưa cài được "
+                    f"{expected_version}{status_detail}"
+                )
+                append_job_log(job_id, last_error + ".")
+                break
         except RuntimeError as exc:
             last_error = str(exc)
         time.sleep(4.0)
 
     detail = last_error or "không nhận được phản hồi phiên bản"
-    if last_version:
+    if last_version and not last_error:
         detail = f"phiên bản cuối cùng nhận được là {last_version}"
     raise RuntimeError(f"OTA đã được gửi nhưng chưa xác minh đạt: {detail}.")
 
@@ -799,7 +1007,18 @@ class OtaManagerHandler(BaseHTTPRequestHandler):
                     if not job:
                         self.send_json({"error": "Không tìm thấy tác vụ."}, HTTPStatus.NOT_FOUND)
                     else:
-                        self.send_json(job)
+                        self.send_json(public_job(job))
+                return
+            log_match = re.fullmatch(r"/api/jobs/([a-f0-9]+)/log", path)
+            if log_match:
+                with JOBS_LOCK:
+                    job = JOBS.get(log_match.group(1))
+                    if not job:
+                        self.send_json({"error": "Không tìm thấy tác vụ."}, HTTPStatus.NOT_FOUND)
+                        return
+                    log_path = Path(job["logPath"])
+                text_content = log_path.read_text(encoding="utf-8") if log_path.exists() else ""
+                self.send_json({"filename": log_path.name, "text": text_content})
                 return
             if path.startswith("/api/"):
                 self.send_json({"error": "Không tìm thấy API."}, HTTPStatus.NOT_FOUND)
@@ -832,7 +1051,7 @@ class OtaManagerHandler(BaseHTTPRequestHandler):
                 )
                 self.send_json(job, HTTPStatus.ACCEPTED)
                 return
-            match = re.fullmatch(r"/api/stations/([a-z0-9-]+)/(build|publish|verify|ota|open)", path)
+            match = re.fullmatch(r"/api/stations/([a-z0-9-]+)/(bump-version|build|publish|verify|ota|open)", path)
             if not match:
                 self.send_json({"error": "Không tìm thấy thao tác."}, HTTPStatus.NOT_FOUND)
                 return
@@ -840,6 +1059,13 @@ class OtaManagerHandler(BaseHTTPRequestHandler):
             action = match.group(2)
             settings = load_settings()
             project_path = project_path_for(station)
+
+            if action == "bump-version":
+                if active_job_for_station(station["id"]):
+                    raise RuntimeError("Trạm đang có tác vụ; hãy chờ hoàn tất trước khi tạo version mới.")
+                result = bump_firmware_version(station, str(payload.get("currentVersion") or "") or None)
+                self.send_json(result)
+                return
 
             if action == "build":
                 platformio = Path(settings["platformioPath"])
@@ -857,7 +1083,7 @@ class OtaManagerHandler(BaseHTTPRequestHandler):
 
             if action == "publish":
                 current = station_payload(station)
-                if not current["binary"]:
+                if not current["binary"] or not current["binaryCurrent"]:
                     raise RuntimeError("Hãy build firmware trước khi phát hành.")
                 if current["release"] and current["release"]["version"] == current["sourceVersion"] and not current["releaseMatchesBinary"]:
                     raise RuntimeError("Version hiện tại đã từng phát hành với binary khác. Hãy tăng version trước khi phát hành.")

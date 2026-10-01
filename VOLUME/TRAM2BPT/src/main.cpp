@@ -2,7 +2,7 @@
 #define BLYNK_TEMPLATE_NAME "VOLUME"
 #define BLYNK_AUTH_TOKEN "AdXbklpLJKTZQ5hK9Qpy7Sg5DdwgmQ8z"
 
-#define BLYNK_FIRMWARE_VERSION "260921.1"
+#define BLYNK_FIRMWARE_VERSION "261001.2"
 #define BLYNK_PRINT Serial
 #define APP_DEBUG
 
@@ -10,7 +10,6 @@
 #include <BlynkSimpleEsp8266.h>
 #include <ESP8266HTTPClient.h>
 #include <ESP8266WiFi.h>
-#include <ESP8266httpUpdate.h>
 #include <I2C_eeprom.h>
 #include <RTClib.h>
 #include <SPI.h>
@@ -25,7 +24,8 @@ const char *password = "0919126757";
 // const char *password = "0943950555";
 
 const char *MAIN_TOKEN = "YZXkYAgH44t-kjJPKapydw5vMlR7MGAC";
-#define URL_fw_Bin "https://raw.githubusercontent.com/quangtran3110/PlatformIO/main/VOLUME/TRAM2BPT/.pio/build/nodemcuv2/firmware.bin"
+#include "ota_private.h"
+#define URL_fw_Bin "https://tram-cc-private-ota.dieu-hanh-cap-nuoc.workers.dev/volume-tram2bpt/" VOLUME_OTA_KEY "/firmware.bin"
 
 #define USE_RTC_DS1307
 constexpr uint8_t EEPROM_I2C_ADDRESS = 0x50;

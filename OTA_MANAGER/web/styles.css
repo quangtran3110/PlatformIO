@@ -23,6 +23,10 @@
   box-sizing: border-box;
 }
 
+[hidden] {
+  display: none !important;
+}
+
 body {
   margin: 0;
   min-width: 0;
@@ -166,6 +170,67 @@ input:focus-visible {
 .live-dot.is-offline {
   background: var(--red);
   box-shadow: 0 0 0 0.25rem rgba(255, 107, 107, 0.09);
+}
+
+.next-action {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 0.9rem;
+  margin-top: 1rem;
+  padding: 0.95rem 1.1rem;
+  border: 1px solid rgba(57, 211, 180, 0.26);
+  border-radius: 0.9rem;
+  background: linear-gradient(110deg, rgba(57, 211, 180, 0.1), rgba(11, 27, 41, 0.62));
+}
+
+.button-next {
+  border-color: rgba(245, 169, 74, 0.38);
+  color: #241708;
+  background: var(--amber);
+  font-weight: 800;
+}
+
+.next-action.is-warning {
+  border-color: rgba(245, 169, 74, 0.34);
+  background: linear-gradient(110deg, rgba(245, 169, 74, 0.12), rgba(11, 27, 41, 0.62));
+}
+
+.next-action.is-success,
+.next-action.is-ready {
+  border-color: rgba(57, 211, 180, 0.42);
+}
+
+.next-action-icon {
+  display: grid;
+  width: 2.7rem;
+  height: 2.7rem;
+  place-items: center;
+  border-radius: 0.75rem;
+  color: #061916;
+  background: var(--teal);
+  font-size: 1rem;
+  font-weight: 900;
+}
+
+.next-action.is-warning .next-action-icon {
+  background: var(--amber);
+}
+
+.next-action strong,
+.next-action p {
+  display: block;
+}
+
+.next-action strong {
+  margin-top: 0.12rem;
+  font-size: 0.95rem;
+}
+
+.next-action p {
+  margin: 0.2rem 0 0;
+  color: var(--muted);
+  font-size: 0.76rem;
 }
 
 .dot-online,
@@ -627,6 +692,54 @@ h2 {
   border-radius: 50%;
 }
 
+.device-health {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.65rem;
+  margin-top: 0.8rem;
+}
+
+.device-health > div {
+  padding: 0.7rem 0.75rem;
+  border: 1px solid var(--line);
+  border-radius: 0.7rem;
+  background: rgba(255, 255, 255, 0.015);
+}
+
+.device-health span,
+.device-health strong {
+  display: block;
+}
+
+.device-health strong.is-good {
+  color: var(--teal);
+}
+
+.device-health strong.is-warning {
+  color: #f0bd67;
+}
+
+.device-health strong.is-danger {
+  color: #ff7b7b;
+}
+
+@media (max-width: 760px) {
+  .device-health {
+    grid-template-columns: 1fr;
+  }
+}
+
+.device-health span {
+  color: var(--muted);
+  font-size: 0.68rem;
+}
+
+.device-health strong {
+  margin-top: 0.25rem;
+  color: #d8ebe8;
+  font-size: 0.78rem;
+}
+
 .check-list li.is-ok {
   color: #d8ebe8;
 }
@@ -733,6 +846,12 @@ h2 {
   align-items: center;
   justify-content: space-between;
   gap: 1rem;
+}
+
+.job-head-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
 }
 
 .job-state {

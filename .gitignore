@@ -1,6 +1,7 @@
 # PlatformIO build outputs are local and reproducible.
 **/.pio/
 Tram_So_3 _VFD/src/ota_private.h
+**/src/ota_private.h
 Tram_So_3 _VFD/ota/release-output/
 
 # Cloudflare local state and generated release manifests.
@@ -14,3 +15,6 @@ Tram_So_3 _VFD/ota/release-output/
 **/include/secrets.h
 **/.env
 **/.dev.vars
+
+# OTA Manager runtime history and diagnostic logs stay on this computer.
+OTA_MANAGER/data/
